@@ -1,0 +1,23 @@
+
+Sample input file for PB/GB calculation
+#This input file is meant to show only that gmx_MMPBSA works. Although, we tried to use the input files as recommended in the 
+#Amber manual, some parameters have been changed to perform more expensive calculations in a reasonable amount of time. Feel free to change the parameters
+#according to what is better for your system.
+&general
+sys_name="PB_GB_IE",
+#startframe=1, interval=25, verbose=2, PBRadii=3,
+startframe=1, interval=1, verbose=2, PBRadii=3,
+interaction_entropy=1, ie_segment=25, temperature=298.15
+/
+&gb
+igb=5, saltcon=0.150,
+/
+&pb
+istrng=0.15, fillratio=4.0, radiopt=0, indi=1, exdi=80.0
+/
+
+
+
+
+
+
