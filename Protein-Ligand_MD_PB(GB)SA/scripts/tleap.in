@@ -1,0 +1,7 @@
+source env_path/dat/leap/cmd/leaprc.gaff
+LIGAND = loadmol2 ligand.mol2
+check LIGAND
+loadamberparams ligand.frcmod
+saveoff LIGAND ligand.lib
+saveamberparm LIGAND ligand.prmtop ligand.inpcrd
+quit
