@@ -84,13 +84,12 @@ parallel rename_func ::: *.mol
 Run each ligand-protein systems separately on each cluster node  
 
 **! Important**  
-Before to run do not forget change imports hardcoded (in the initial version) in the 01_complex_preparation_md.pbs  
+Before to run do not forget to set appropriate number of cpu (Default:128) in each pbs scripts:  
 ```
-#PBS -l select=1:ncpus=128:ompthreads=2    
-module load GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED   
-source activate AmberTools21  `
+#PBS -l select=1:ncpus=set_your_number:ompthreads=2 
 ```
 **To run:**  
+``module load parallel``
 Absolute path:
 ```
 parallel -j1  "test -d {1/.} || mkdir {1/.}; qsub -v lfile= {1},pfile= path/protein_H_full.pdb,script_path=path/scripts,wdir=/workdir/{1/.},mdtime=1 ../../scripts/01_complex_preparation_md.pbs" ::: path/ligands/*.mol
@@ -113,6 +112,7 @@ Usually it works well but if some unusual case of your target protonation is obs
 - _script_path_ - path to _scripts_ dir from this repository. Dir consists of all molecular dynamics parameters (*.mdp files), 
 additional scripts, PBSA(GBSA) parameters (mmpbsa.in).
 - _wdir_ - working directory. If skipped, current directory will be used. Should be different from _script_path_ argument.
+- _gromacs_version_ - GROMACS version to use (Default: _GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED_)
 
 **Output** 
 - **MD trajectories**  
@@ -140,6 +140,7 @@ Command creates separate folders named as each molname.mol if there were not cre
 - _topol_ - topol.top. Can be skipped. Default: $wdir/topol.top.
 - _index_ - index.ndx. Can be skipped. Default: $wdir/index.top
 - _LNAME_ - Ligand ID. Previous script (_01_complex_preparation_md.pbs_) has prepared files with fixed names, so by default it can be skipped. Default: UNL
+- _gromacs_version_ - GROMACS version to use. Can be skipped. Default: _GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED_.
 
 **Output** 
 

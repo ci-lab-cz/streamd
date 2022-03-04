@@ -4,11 +4,11 @@
 # Aleksandra Ivanova
 # Date : 20.02.2022
 #
-# Description: The following script run PB(GB)SA method for Protein-ligand binding free energy calculations.
+# Description: The following script run MMP(G)BSA method for Protein-ligand binding free energy calculations.  
 #
 # Run Information: You should prepare input files beforehand:
 #                  *.tpr, *.xtc and "index.ndx", "topol.top" files obtained after succesfull MD simulation. 
-#                  "mmpbsa.in" file to set PB(GB)SA parameters.
+#                  "mmpbsa.in" file to set MMP(G)BSA parameters.
 # 
 # Arguments: 
 #            Required: 
@@ -31,8 +31,14 @@
 #PBS -l select=1:ncpus=128:ompthreads=2
 #PBS -k oe
 
-module load GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED
+if [ -z $gromacs_version ];
+ then
+  gromacs_version="GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED"
+fi
+
+module load $gromacs_version
 source activate gmxMMPBSA
+#source activate AmberTools21-38
 
 # allows relative paths
 cd $PBS_O_WORKDIR

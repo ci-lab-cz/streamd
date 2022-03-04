@@ -29,11 +29,20 @@
 # Example call: qsub -v lfile=lig.mol,pfile=protein.pdb,script_path=path,mdtime=5 01_complex_preparation.pbs
 # wdir=$(pwd)
 #
+
 #PBS -l select=1:ncpus=128:ompthreads=2
 #PBS -k oe
 
-module load GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED
+>&2 echo 'Script running:***************************** System Variable setting *********************************'
+
+if [ -z $gromacs_version ];
+ then
+  gromacs_version="GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED"
+fi
+
+module load $gromacs_version
 source activate gmxMMPBSA
+
 
 # allows relative paths
 cd $PBS_O_WORKDIR
@@ -77,6 +86,7 @@ fi
 LNAME="$(cut -d '/' -f2 <<<$lfile | cut -d'.' -f1)"
 PNAME="$(cut -d '/' -f2 <<<$pfile | cut -d'.' -f1)"
 
+>&2 echo "GROMACS Version:" $gromacs_version
 >&2 echo "Ligand:" $LNAME
 >&2 echo "Protein:" $PNAME
 >&2 echo "WORKDIR:" $wdir
