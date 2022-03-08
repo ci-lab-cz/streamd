@@ -132,7 +132,7 @@ _All analysis results you can visualize with xmgrace:_
 **Description:**  
 Command creates separate folders named as each molname.mol if there were not created previously, and then runs all calculations simultaneous. 
 - _tpr_ - md_out.tpr
-- _xtc_ - md_out.xtc
+- _xtc_ - md_fit.xtc Complex trajectories. Make sure the trajectory is fitted and PBC have been removed.
 - _script_path_ - path to _scripts_ dir from this repository. Dir consists of PBSA(GBSA) parameters (mmpbsa.in).
 - _wdir_ - working directory. If skipped, current directory will be used. Should be different from _script_path_ argument.
 - _NP_ - number of processors. Should be less than total number of using frames. Can be skipped. Default: 128  
