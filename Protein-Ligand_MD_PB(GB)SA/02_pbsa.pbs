@@ -28,7 +28,7 @@
 # Example call: qsub -v tpr=md_out.tpr,xtc=md_out.xtc,script_path=path,wdir=$(pwd) 02_pbsa.pbs
 #  
 #
-#PBS -l select=1:ncpus=128:ompthreads=2
+#PBS -l select=1:ncpus=128:mpiprocs=128:ompthreads=2
 #PBS -k oe
 
 if [ -z $gromacs_version ];
@@ -38,7 +38,6 @@ fi
 
 module load $gromacs_version
 source activate gmxMMPBSA
-#source activate AmberTools21-38
 
 # allows relative paths
 cd $PBS_O_WORKDIR
@@ -51,12 +50,6 @@ fi
 
 if [ -z $script_path ]
   then script_path=$PBS_O_WORKDIR
-fi
-
-if [ $MDNAME ]
-  then 
-    tpr=$MDNAME.tpr
-    xtc=$MDNAME.xtc
 fi
 
 if [ -z $topol ]
@@ -76,7 +69,9 @@ if [ -z $NP ]
 fi
 
 cd $wdir
-echo $NP
+>&2 echo 'NP:' $NP
+>&2 echo 'WDIR:' $wdir
+>&2 echo 'gromacs_version:' $gromacs_version
 
 index_ligand=$(gmx make_ndx -f solv_ions.gro <<< "q" | sed -rn "s/([0-9]+) "$LNAME"[0-9: ]*atoms/\1/p"| head -1)
 >&2 echo 'Ligand Index:' $index_ligand
@@ -85,7 +80,10 @@ index_ligand=$(gmx make_ndx -f solv_ions.gro <<< "q" | sed -rn "s/([0-9]+) "$LNA
 >&2 echo 'Script running:***************************** 2. MMP(G)BSA Running  *********************************'
 mpirun -np $NP gmx_MMPBSA MPI -O -i $script_path/mmpbsa.in -cs $tpr -ci $index -cg 1 $index_ligand -ct $xtc -cp $topol -nogui 
 ## terms per time -eo energ_term.csv
+
+test -f gmx_MMPBSA.log && mv gmx_MMPBSA.log gmx_MMPBSA_1.log
 mpirun -np $NP gmx_MMPBSA MPI --clean
+test -f gmx_MMPBSA_1.log && cp gmx_MMPBSA_1.log gmx_MMPBSA.log
 
 
 >&2 echo 'Script running:***************************** 3. Finish  *********************************'
