@@ -5,12 +5,12 @@
 * **03_sum_result_pbsa.pbs**
 
 ## Dependency
-* **Python (3.9)**
+* **Python (3.8)**
 * **AmberTools**
 * **RDKit**
-* **gmx_MMPBSA**
+* **gmx_MMPBSA (1.4.3)**
 * **mpi4py**
-* **ParmEd**
+* **ParmEd
 
 ## installation
 *Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
@@ -18,15 +18,14 @@
 ```
 
 conda update conda
-conda create -n gmxMMPBSA python=3.9 -y -q
+conda create -n gmxMMPBSA python=3.8 -y -q
 conda activate gmxMMPBSA
-conda install -c conda-forge mpi4py
-conda install -c conda-forge ambertools
-conda install -c conda-forge compilers
+conda install mpi4py
+conda install -c conda-forge ambertools=21 compilers
 conda install -c conda-forge rdkit
 
 python -m pip install git+https://github.com/ParmEd/ParmEd.git@16fb236    
-python -m pip install gmx_MMPBSA
+python -m pip install gmx_MMPBSA==1.4.3
 
 ```
 
