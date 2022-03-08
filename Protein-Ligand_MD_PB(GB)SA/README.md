@@ -127,7 +127,7 @@ _All analysis results you can visualize with xmgrace:_
 `` for i in *.xvg; do gracebat $i;done `` 
 
 #### 5) gmx_MMPBSA energy evaluation of the protein - ligand system
-``parallel -j1  "test -d {1/.} || mkdir {1/.}; qsub -v tpr=md_out.tpr,xtc=md_out.xtc,script_path=path/scripts,wdir=wdir/{1/.},NP=128 02_pbsa.pbs" ::: ligands/*.mol ``
+``parallel -j1  "test -d {1/.} || mkdir {1/.}; qsub -v tpr=md_out.tpr,xtc=md_fit.xtc,script_path=path/scripts,wdir=wdir/{1/.},NP=128 02_pbsa.pbs" ::: ligands/*.mol ``
 
 **Description:**  
 Command creates separate folders named as each molname.mol if there were not created previously, and then runs all calculations simultaneous. 
