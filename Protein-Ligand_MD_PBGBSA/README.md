@@ -10,7 +10,7 @@
 * **RDKit**
 * **gmx_MMPBSA (1.4.3)**
 * **mpi4py**
-* **ParmEd
+* **ParmEd**
 
 ## installation
 *Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
