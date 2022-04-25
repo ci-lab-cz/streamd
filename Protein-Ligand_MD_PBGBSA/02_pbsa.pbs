@@ -81,9 +81,9 @@ index_ligand=$(gmx make_ndx -f solv_ions.gro <<< "q" | sed -rn "s/([0-9]+) "$LNA
 mpirun -np $NP gmx_MMPBSA MPI -O -i $script_path/mmpbsa.in -cs $tpr -ci $index -cg 1 $index_ligand -ct $xtc -cp $topol -nogui 
 ## terms per time -eo energ_term.csv
 
-test -f gmx_MMPBSA.log && mv gmx_MMPBSA.log gmx_MMPBSA_1.log
-mpirun -np $NP gmx_MMPBSA MPI --clean
-test -f gmx_MMPBSA_1.log && cp gmx_MMPBSA_1.log gmx_MMPBSA.log
+#test -f gmx_MMPBSA.log && mv gmx_MMPBSA.log gmx_MMPBSA_1.log
+#mpirun -np $NP gmx_MMPBSA MPI --clean
+#test -f gmx_MMPBSA_1.log && cp gmx_MMPBSA_1.log gmx_MMPBSA.log
 
 
 >&2 echo 'Script running:***************************** 3. Finish  *********************************'
