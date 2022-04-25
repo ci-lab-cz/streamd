@@ -23,9 +23,9 @@
 #            index - index.ndx. Default: $ wdir/index.top
 #            NP - number of processors. Should be less than total number of using frames. Default: 128  
 #            LNAME - Ligand ID. Default: UNL
-#                        
-#
-# Example call: qsub -v tpr=md_out.tpr,xtc=md_out.xtc,script_path=path,wdir=$(pwd) 02_pbsa.pbs
+#            wdir should contain:
+#            index.ndx  ligand.itp  md_fit.xtc  md_out.tpr  solv_ions.gro  topol.top
+# Example call: qsub -v tpr=md_out.tpr,xtc=md_fit.xtc,script_path=path,wdir=$(pwd) 02_pbsa.pbs
 #  
 #
 #PBS -l select=1:ncpus=128:mpiprocs=128:ompthreads=2
