@@ -83,13 +83,13 @@ then
   exit 1
 fi
 
-LNAME="$(cut -d '/' -f2 <<<$lfile | cut -d'.' -f1)"
-PNAME="$(cut -d '/' -f2 <<<$pfile | cut -d'.' -f1)"
+LNAME="$(awk -F'/' '{print $NF}' <<<$lfile | cut -d'.' -f1)"
+PNAME="$(awk -F'/' '{print $NF}' <<<$pfile | cut -d'.' -f1)"
 
 >&2 echo "GROMACS Version:" $gromacs_version
->&2 echo "Ligand:" $LNAME
->&2 echo "Protein:" $PNAME
->&2 echo "WORKDIR:" $wdir
+>&2 echo "Ligand:" $LNAME $lfile
+>&2 echo "Protein:" $PNAME $pfile
+>&2 echo "WORKDIR:" $wdir $(pwd)
 >&2 echo "Script Path" $script_path
 >&2 echo "MDtime:" $mdtime "ns"
 
