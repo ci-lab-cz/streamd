@@ -40,7 +40,6 @@ if [ -z $gromacs_version ];
   gromacs_version="GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED"
 fi
 
-module load $gromacs_version
 source activate gmxMMPBSA
 
 
@@ -95,18 +94,12 @@ PNAME="$(awk -F'/' '{print $NF}' <<<$pfile | cut -d'.' -f1)"
 
 cd $wdir
 
-
-# target preparation
->&2 echo 'Script running:***************************** 2. Target preparation *********************************'
-if [ $(cut -d '/' -f2 <<<$pfile | cut -d'.' -f2) != gro ]
-then
-   gmx pdb2gmx -f $pfile -o $PNAME.gro -water tip3p -ignh <<< 6 #pass FF - here AMBER99SB-ILDN
-else
-   >&2 echo 'Script running: Using prepared protein *.gro file'
-fi
+# Will Change mdp files
+cp $script_path"/"*.mdp .
 
 #ligand prep
->&2 echo 'Script running:***************************** 3. Ligand preparation *********************************'
+>&2 echo 'Script running:***************************** 2. Ligand preparation *********************************'
+## Using new version of gmx change python version so first need to run amber to prepare ligand and then load the new gmx
 if [ $(cut -d '/' -f2 <<<$lfile | cut -d'.' -f2) != gro ]
  then
   #prepare tleap - add ff from relevant conda env path
@@ -124,6 +117,20 @@ if [ $(cut -d '/' -f2 <<<$lfile | cut -d'.' -f2) != gro ]
   >&2 echo 'Script running: Using prepared ligand *.gro file'
 fi
 
+# target preparation
+>&2 echo 'Script running:***************************** 3. Target preparation *********************************'
+>&2 echo 'Start time:' $(date +%H:%M:%S' '%d-%m-%Y)
+
+module load $gromacs_version
+
+if [ $(cut -d '/' -f2 <<<$pfile | cut -d'.' -f2) != gro ]
+then
+   gmx pdb2gmx -f $pfile -o $PNAME.gro -water tip3p -ignh <<< 6 #pass FF - here AMBER99SB-ILDN
+else
+   >&2 echo 'Script running: Using prepared protein *.gro file'
+fi
+
+# 2.5 Ligand preparation
 #create itps
 cp ligand.top ligand.itp
 sed -i '/system/,+2 d' ligand.itp
@@ -167,9 +174,6 @@ if [ -e ligand.prm ]
     >&2 echo "Script running: No *prm file was provided, so nothing was included in topol.top"
 fi
 
-
-# Change mdp files
-cp $script_path"/"*.mdp .
 
 # Change ligand name in *mdp file (coupling groups).
 ## tc-grps  = Protein_UNL Water_and_ions; two coupling groups - more accurate
@@ -227,7 +231,7 @@ gmx energy -f nvt.edr -o temperature.xvg  <<< "16 0"
 
 # NPT
 >&2 echo 'Script running:***************************** 10. NPT *********************************'
-gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -n index.ndx -o npt.tpr  -maxwarn 1 
+gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -n index.ndx -o npt.tpr  -maxwarn 1
 gmx mdrun -deffnm npt -s npt.tpr
 
 gmx energy -f npt.edr -o pressure.xvg <<< "17 0"
@@ -267,6 +271,14 @@ gmx trjconv -s md_out.tpr -f md_out.xtc -o md_centermolsnoPBC.xtc -pbc mol -cent
 #use it for PBSA https://github.com/Valdes-Tresanco-MS/gmx_MMPBSA/issues/33
 gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -o md_fit.xtc -n index.ndx -fit rot+trans  <<< "Protein_UNL  0"
 
+if (( $mdtime >= 50 ))
+then
+  dtstep=100
+else
+  dtstep=50
+fi
+
+gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -dt $dtstep -o md_short_forcheck.xtc "0"
 
 gmx rms -s md_out.tpr -f md_out_noPBC.xtc -o rmsd.xvg -n index.ndx $tstep <<< "4  4"
 gmx rms -s em.tpr -f md_out_noPBC.xtc -o rmsd_xtal.xvg -n index.ndx $tstep <<< "4  4"
