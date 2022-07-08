@@ -47,6 +47,7 @@ python -m pip install gmx_MMPBSA==1.4.3
   Select -> Chemistry -> IDATM type -> HC
   Actions -> Atoms/Bonds -> delete
   ```
+  * Check states of histidines and put proper aliases HIE, HID or HIP instead of HIS (otherwise protonation can be distorted during MD preparation stage)
   * For Molecular dynamics and PBSA calculation - all hydrogens should be preserved. 
   
 *Target preparation can be automatically performed by Schrodinger*
