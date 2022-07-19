@@ -278,7 +278,7 @@ else
   dtstep=50
 fi
 
-gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -dt $dtstep -o md_short_forcheck.xtc "0"
+gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "0"
 
 gmx rms -s md_out.tpr -f md_out_noPBC.xtc -o rmsd.xvg -n index.ndx $tstep <<< "4  4"
 gmx rms -s em.tpr -f md_out_noPBC.xtc -o rmsd_xtal.xvg -n index.ndx $tstep <<< "4  4"
