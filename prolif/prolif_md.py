@@ -38,7 +38,7 @@ def main():
         protein_selection = f'protein or {args.append_protein_selection}'
     prot = u.atoms.select_atoms(protein_selection)
     fp = plf.Fingerprint(['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
-                          'PiStacking', 'MetalAcceptor'])
+                          'FaceToFace', 'EdgeToFace', 'MetalAcceptor'])
     fp.run(u.trajectory[::args.step], lig, prot, progress=args.verbose)
     df = fp.to_dataframe()
     df.columns = ['.'.join(item.strip().lower() for item in items[1:]) for items in df.columns]
