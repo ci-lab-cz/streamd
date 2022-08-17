@@ -30,12 +30,12 @@ fourierspacing          = 0.16      ; grid spacing for FFT
 tcoupl                  = V-rescale             ; modified Berendsen thermostat
 tc-grps                 = Protein_UNL Water_and_ions; two coupling groups - more accurate
 tau_t                   = 0.1     0.1           ; time constant, in ps
-ref_t                   = 300     300           ; reference temperature, one for each group, in K
+ref_t                   = 310     310           ; reference temperature, one for each group, in K
 ; Pressure coupling is off
 pcoupl                  = no        ; no pressure coupling in NVT
 ; Periodic boundary conditions
 pbc                     = xyz       ; 3-D PBC
 ; Velocity generation
 gen_vel                 = yes       ; assign velocities from Maxwell distribution
-gen_temp                = 300       ; temperature for Maxwell distribution
+gen_temp                = 310       ; temperature for Maxwell distribution
 gen_seed                = -1        ; generate a random seed

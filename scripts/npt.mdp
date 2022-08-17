@@ -30,7 +30,7 @@ fourierspacing          = 0.16      ; grid spacing for FFT
 tcoupl                  = V-rescale             ; modified Berendsen thermostat
 tc-grps                 = Protein_UNL Water_and_ions   ; two coupling groups - more accurate
 tau_t                   = 0.1     0.1           ; time constant, in ps
-ref_t                   = 300     300           ; reference temperature, one for each group, in K
+ref_t                   = 310     310           ; reference temperature, one for each group, in K
 ; Pressure coupling is on
 pcoupl                  = Parrinello-Rahman     ; Pressure coupling on in NPT
 pcoupltype              = isotropic             ; uniform scaling of box vectors
