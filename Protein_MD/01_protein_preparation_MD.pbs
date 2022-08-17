@@ -1,0 +1,197 @@
+#!/bin/bash
+#
+# Authors: 
+# Based on Olena Mokshyna's script.
+# Aleksandra Ivanova
+# Date : 20.02.2022
+#
+# Description: The following script prepares protein input files
+#               for energy minization and further simulation;
+#               defines the unite cell and fills it with water
+#               and adds ions. And runs the final simulation
+#
+# in case of GROMOS FF - We will make use of two files that PRODRG gives us.
+#Save the output of the field "The GROMOS87/GROMACS coordinate file (polar/aromatic hydrogens)"
+#
+# Run Information: You should prepare input files beforehand: Protonate, add all hydrogens for both, ligand and protein, and complete missing atoms and residues for the protein.
+#                  *pdb file for the protein;
+#                  and *mdp files for each minimization, equalibration and simulation
+# Arguments: pfile - *pdb or *gro file of protein,
+#            mdtime - time in ns
+#            script_path - dir contains *.mdp files (ions.mdp, minim.mdp, npt.mdp, nvt.mdp, md.mdp).
+#
+#                         
+#            Additional arguments:
+#            wdir - working dir. Can be skipped. This argument can be skipped, if so current directory will be used.            
+#
+# Example call: qsub -v pfile=protein.pdb,script_path=path,mdtime=5 01_complex_preparation.pbs
+# wdir=$(pwd)
+#
+
+#PBS -l select=1:ncpus=128:ompthreads=2
+#PBS -k oe
+
+>&2 echo 'Script running:***************************** System Variable setting *********************************'
+
+if [ -z $gromacs_version ];
+ then
+  gromacs_version="GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED"
+fi
+
+source activate gmxMMPBSA
+
+
+# allows relative paths
+cd $PBS_O_WORKDIR
+
+>&2 echo 'Script running:***************************** 1. Variable setting *********************************'
+
+
+if [ -z $pfile ];
+  then 
+  >&2 echo 'pfile argument is not set. Script will be interrupted'
+  exit 1
+fi
+
+if [ -z $mdtime ];
+  then
+  >&2 echo 'mdtime argument is not set. Script will be interrupted'
+  exit 1
+fi
+
+if [ -z $script_path ];
+  then
+  >&2 echo 'script_path argument is not set. Script will be interrupted'
+  exit 1
+fi
+
+if [ -z $wdir ]; 
+  then wdir=$PBS_O_WORKDIR
+fi
+
+if [ $script_path == $wdir ]
+then
+  >&2 echo 'Script error: Working directory equals script path. To avoid *.mdp files be modified current script will be interrupted.'
+  exit 1
+fi
+
+PNAME="$(awk -F'/' '{print $NF}' <<<$pfile | cut -d'.' -f1)"
+
+>&2 echo "GROMACS Version:" $gromacs_version
+>&2 echo "Protein:" $PNAME $pfile
+>&2 echo "WORKDIR:" $wdir $(pwd)
+>&2 echo "Script Path" $script_path
+>&2 echo "MDtime:" $mdtime "ns"
+
+cd $wdir
+
+# Will Change mdp files
+cp $script_path"/"*.mdp .
+
+# target preparation
+>&2 echo 'Script running:***************************** 3. Target preparation *********************************'
+>&2 echo 'Start time:' $(date +%H:%M:%S' '%d-%m-%Y)
+
+module load $gromacs_version
+
+if [ $(cut -d '/' -f2 <<<$pfile | cut -d'.' -f2) != gro ]
+then
+   gmx pdb2gmx -f $pfile -o protein.gro -water tip3p -ignh <<< 6 #pass FF - here AMBER99SB-ILDN
+else
+   >&2 echo 'Script running: Using prepared protein *.gro file'
+fi
+
+# Change name in *mdp file (coupling groups).
+## tc-grps  = Protein_UNL Water_and_ions; two coupling groups - more accurate
+sed -i 's/tc-grps..*/tc-grps                 = Protein Non-Protein   ; two coupling groups/' *.mdp
+# Change MD simulation time
+##nsteps                  = 5000000    ; 2 * 5000000 = 10000000 fs = 10000 ps (10 ns), 25000000*2 fs = 50 ns 100000000
+mdsteps=$(awk "BEGIN {picoseconds=$mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2; print steps}")
+sed -i 's/nsteps..*/nsteps                  = '$mdsteps'        ;/' md.mdp
+
+
+#Solvate
+>&2 echo 'Script running:***************************** 5. Solvation step *********************************'
+gmx editconf -f protein.gro -o newbox.gro -c -d 1.0 -bt cubic
+#gmx editconf -f complex.gro -o newbox.gro -bt dodecahedron -d 1.2 #Warning about bad box - wrong number of atoms (https://gromacs.org-gmx-users.maillist.sys.kth.narkive.com/q4NXMAoY/bad-box-error) Lena version
+gmx solvate -cp newbox.gro -cs spc216.gro -p topol.top -o solv.gro
+
+
+#Add ions
+>&2 echo 'Script running:***************************** 6. Ions *********************************'
+#use grompp to assemble *tpr file () using any *mdp file
+#here one can use *mdp for energy minization (as recommended in Justin's tutorials)
+gmx grompp -f ions.mdp -c solv.gro -p topol.top -o ions.tpr 
+#-maxwarn 10
+#FATAL error SDMSO type not found -> try renaming to SDmso
+
+gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname NA -nname CL -neutral <<< SOL
+
+#Energy minimization
+>&2 echo 'Script running:***************************** 8. Energy minimization *********************************'
+gmx grompp -f minim.mdp -c solv_ions.gro -p topol.top -o em.tpr -maxwarn 1
+gmx mdrun -v -deffnm em -s em.tpr
+
+##last but not least generate files for further analysis
+gmx energy -f em.edr -o potential.xvg <<< Potential
+
+# NVT
+>&2 echo 'Script running:***************************** 9. NVT *********************************'
+gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr -maxwarn 1
+gmx mdrun -deffnm nvt -s nvt.tpr
+
+gmx energy -f nvt.edr -o temperature.xvg  <<< Temperature
+
+
+# NPT
+>&2 echo 'Script running:***************************** 10. NPT *********************************'
+gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr  -maxwarn 1
+gmx mdrun -deffnm npt -s npt.tpr
+
+gmx energy -f npt.edr -o pressure.xvg <<< Pressure
+gmx energy -f npt.edr -o density.xvg <<< Density
+
+
+# MD
+>&2 echo 'Script running:***************************** 11. MD simulation *********************************'
+>&2 echo 'Run simulation:' $mdtime 'ns'
+gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md_out.tpr -maxwarn 1
+gmx mdrun -deffnm md_out -s md_out.tpr
+
+
+# RMSD
+>&2 echo 'Script running:***************************** 12. MD analysis *********************************'
+
+
+#can change later
+if (( $mdtime >= 10 ))
+then
+  tstep="-tu ns"
+else
+  tstep="-tu ps"
+fi
+
+gmx trjconv -s md_out.tpr -f md_out.xtc -o md_out_noPBC.xtc -pbc mol -center <<< "1  0"
+gmx trjconv -s md_out.tpr -f md_out.xtc -o md_centermolsnoPBC.xtc -pbc mol -center  <<< "Protein_UNL  0"
+#use it for PBSA https://github.com/Valdes-Tresanco-MS/gmx_MMPBSA/issues/33
+gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -o md_fit.xtc -fit rot+trans  <<< "Protein_UNL  0"
+
+if (( $mdtime >= 50 ))
+then
+  dtstep=100
+else
+  dtstep=50
+fi
+
+gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "0"
+
+gmx rms -s md_out.tpr -f md_out_noPBC.xtc -o rmsd.xvg  <<< "4  4"
+gmx rms -s em.tpr -f md_out_noPBC.xtc -o rmsd_xtal.xvg <<< "4  4"
+
+gmx gyrate -s md_out.tpr -f md_out_noPBC.xtc -o gyrate.xvg <<< "1"
+
+gmx rmsf -s md_out.tpr -f md_out_noPBC.xtc -o rmsf.xvg -oq rmsf.pdb -res <<< "1"
+
+
+>&2 echo 'Script running:***************************** FINISH *********************************'
+cp ~/$PBS_JOBNAME.{e,o}${PBS_JOBID%.*} .
