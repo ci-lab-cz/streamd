@@ -92,6 +92,7 @@ PNAME="$(awk -F'/' '{print $NF}' <<<$pfile | cut -d'.' -f1)"
 >&2 echo "Script Path" $script_path
 >&2 echo "MDtime:" $mdtime "ns"
 
+mkdir -p $wdir
 cd $wdir
 
 # Will Change mdp files

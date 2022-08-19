@@ -56,12 +56,12 @@ https://www.schrodinger.com/kb/29
 #### 2) Docking procedure
 Required to obtain relevant pose
 * **Perform docking procedure**  
-Using script from https://github.com/DrrDom/rdkit-scripts/blob/master/vina_dock.py   
+Using script from https://github.com/ci-lab-cz/docking-scripts   
 
 #### 3) Ligand preparation 
 * **Prepare docked poses for molecular dynamics procedure**  
 Using scripts from https://github.com/DrrDom/rdkit-scripts/ and chemaxon
-```
+```bash
 # extract doking poses from db
 python get_sdf_from_db.py -i grow_procedure.db -o exmp.sdf
 
@@ -92,19 +92,19 @@ Before to run do not forget to set appropriate number of cpu (Default:128) in ea
 ``module load parallel``
 Absolute path:
 ```
-parallel -j1  "test -d {1/.} || mkdir {1/.}; qsub -v lfile= {1},pfile= path/protein_H_full.pdb,script_path=path/scripts,wdir=/workdir/{1/.},mdtime=1 ../../scripts/01_complex_preparation_md.pbs" ::: path/ligands/*.mol
+parallel -j1  "qsub -v lfile= {1},pfile= path/protein_H_full.pdb,script_path=path/scripts,wdir=/workdir/{1/.},mdtime=1 ../../scripts/01_complex_preparation_md.pbs" ::: path/ligands/*.mol
 ```
 Relative path can be set as well, but remember that script will be running from working directory and all relative paths should consider it.
 Like:
 ```
-parallel -j1  "test -d {1/.} || mkdir {1/.}; qsub -v lfile=../{1},pfile=../protein_H_full.pdb,script_path=../../scripts,wdir=/workdir/{1/.},mdtime=1 ../../scripts/01_complex_preparation_md.pbs" ::: ligands/*.mol
+parallel -j1  "qsub -v lfile=../{1},pfile=../protein_H_full.pdb,script_path=../../scripts,wdir=/workdir/{1/.},mdtime=1 ../../scripts/01_complex_preparation_md.pbs" ::: ligands/*.mol
 ```
 
 **Description:**  
-Command creates separate folders named as each molname.mol if there were not created previously, and then runs all simulations simultaneous. 
-- _lfile_ - ligand file (use directory path upper because script would be run in the created molname directory).
+Command runs all simulations simultaneous. 
+- _lfile_ - ligand file (in the case of relative paths do not forget to add double dots to prepend the file name. Normally, using relative paths is not advised).
 - _pfile_ - protein file prepared for MD (Missing residues and loops problems were resolved).  
-If pdb protein file is used all hydrogens will be ignored and re-added by gmx (-ignh) 
+If pdb protein file is used, all hydrogens will be ignored and re-added by gmx (-ignh) 
 due to of extreme intolerance of the gmx pdb2gmx command to the variability in the numeration and typing of hydrogens.  
 Usually it works well but if some unusual case of your target protonation is observed you can set previously prepared gro file
  (gro file can be obtained by command`` gmx pdb2gmx -f $pfile -o $PNAME.gro -water tip3p -ignh ``)   
