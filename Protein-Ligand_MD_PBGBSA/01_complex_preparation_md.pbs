@@ -37,7 +37,7 @@
 
 if [ -z $gromacs_version ];
  then
-  gromacs_version="GROMACS/2018.1-intel-2017c-hybrid-single-PLUMED"
+  gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3"
 fi
 
 source activate gmxMMPBSA
