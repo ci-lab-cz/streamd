@@ -73,7 +73,8 @@ cd $wdir
 >&2 echo 'WDIR:' $wdir
 >&2 echo 'gromacs_version:' $gromacs_version
 
-index_ligand=$(gmx make_ndx -f solv_ions.gro <<< "q" | sed -rn "s/([0-9]+) "$LNAME"[0-9: ]*atoms/\1/p"| head -1)
+index_ligand=$(gmx make_ndx -f solv_ions.gro -n index.ndx <<< "q" | sed -rn "s/([0-9]+) "$LNAME"[0-9: ]*atoms/\1/p"| head -1)
+index_protein=$(gmx make_ndx -f solv_ions.gro -n index.ndx <<< "q" | sed -rn "s/([0-9]+) Protein[0-9: ]*atoms/\1/p"| head -1)
 >&2 echo 'Ligand Index:' $index_ligand
 
 
