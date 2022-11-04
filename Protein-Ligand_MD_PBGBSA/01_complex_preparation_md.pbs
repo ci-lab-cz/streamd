@@ -100,20 +100,27 @@ cp $script_path"/"*.mdp .
 #ligand prep
 >&2 echo 'Script running:***************************** 2. Ligand preparation *********************************'
 ## Using new version of gmx change python version so first need to run amber to prepare ligand and then load the new gmx
-if [ $(cut -d '/' -f2 <<<$lfile | cut -d'.' -f2) != gro ]
+if [ $(awk -F'/' '{print $NF}' <<<$lfile |  awk -F. '{print $NF}') != gro ]
  then
   #prepare tleap - add ff from relevant conda env path
   cp $script_path"/tleap.in" .
-  sed -i "1s/.*/source "$(echo $CONDA_PREFIX | sed 's/\//\\\//g')"\/dat\/leap\/cmd\/leaprc\.gaff/" tleap.in 
-  
-  charge=$( python $script_path"/"getcharge.py -i $lfile)
-  antechamber -i $lfile -fi mdl -o ligand.mol2 -fo mol2 -c bcc -pf y -s 2 -nc $charge -rn "UNL"
+  sed -i "1s/.*/source "$(echo $CONDA_PREFIX | sed 's/\//\\\//g')"\/dat\/leap\/cmd\/leaprc\.gaff/" tleap.in
+  if [ $(awk -F'/' '{print $NF}' <<<$lfile |  awk -F. '{print $NF}') != mol2 ]
+  then
+   charge=$( python $script_path"/"getcharge.py -i $lfile)
+   antechamber -i $lfile -fi mdl -o ligand.mol2 -fo mol2 -c bcc -pf y -s 2 -nc $charge -rn "UNL"
+  else
+   cp $lfile ligand.mol2
+   >&2 echo 'Script running: Using prepared ligand *.mol2 file'
+  fi
   parmchk2 -i ligand.mol2 -f mol2 -o ligand.frcmod
   tleap -f tleap.in
   python $script_path"/"pmed_amb2gmx.py -p ligand.prmtop -x ligand.inpcrd -o ligand
  else
-  cp $LNAME.gro ligand.gro
-  cp $LNAME.top ligand.top
+#put into dir
+  input_dirname=${lfile%/*}"
+  cp $input_dirname\/$LNAME.gro ligand.gro
+  cp $input_dirname\/$LNAME.top ligand.top
   >&2 echo 'Script running: Using prepared ligand *.gro file'
 fi
 
