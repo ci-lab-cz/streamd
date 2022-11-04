@@ -77,6 +77,18 @@ index_ligand=$(gmx make_ndx -f solv_ions.gro -n index.ndx <<< "q" | sed -rn "s/(
 index_protein=$(gmx make_ndx -f solv_ions.gro -n index.ndx <<< "q" | sed -rn "s/([0-9]+) Protein[0-9: ]*atoms/\1/p"| head -1)
 >&2 echo 'Ligand Index:' $index_ligand
 
+cp $script_path/mmpbsa.in .
+
+>&2 echo # $script_path/mmpbsa.in
+>&2 cat mmpbsa.in
+
+if test -f FINAL_RESULTS_MMPBSA.dat ; then
+tec_dat=$(stat --printf=%z FINAL_RESULTS_MMPBSA.dat | grep -oE  '[0-9-]{8} [0-9:]{8}' | sed -E 's/[[:space:]]|\:/-/g')
+mv FINAL_RESULTS_MMPBSA.dat FINAL_RESULTS_MMPBSA_$tec_dat\.dat
+test -f gmx_MMPBSA.log && mv gmx_MMPBSA.log gmx_MMPBSA_$tec_dat\.log
+fi
+
+
 
 >&2 echo 'Script running:***************************** 2. MMP(G)BSA Running  *********************************'
 mpirun -np $NP gmx_MMPBSA MPI -O -i $script_path/mmpbsa.in -cs $tpr -ci $index -cg 1 $index_ligand -ct $xtc -cp $topol -nogui 
