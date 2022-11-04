@@ -11,7 +11,8 @@
 #            wdir - working directory. This argument can be skipped, if so current directory will be used.
 #
 #
-# Example call: qsub -v wdir=$(pwd) 03_sum_result_pbsa.pbs
+# Example call: qsub -v wdir=$(pwd) 03_sum_result_pbsa.pbs 
+# PBS_O_WORKDIR=$(pwd) bash ~/md-scripts/Protein-Ligand_MD_PBGBSA/03_sum_result_pbsa.pbs
 #
 #
 #PBS -l select=1:ncpus=128:ompthreads=2
