@@ -33,11 +33,11 @@ test -f Sum_Result_GENERALIZED_BORN.csv && mv Sum_Result_GENERALIZED_BORN.csv Su
 test -f Sum_Result_IE.csv && mv Sum_Result_IE.csv Sum_Result_IE_$tec_dat\.csv
 fi
 
-find * -name 'FINAL_RESULTS_MMPBSA.dat' | sort -n | xargs -I {1} bash -c "echo -n {1}','; sed -n '/POISSON BOLTZMANN/,/DELTA G binding/p' {1} | grep 'DELTA G binding'"  \
- | sed 's/DELTA G binding =  *//g' | sed 's/ *//g' | sed 's/\+\/\-/,/g' | sed 's/\/FINAL_RESULTS_MMPBSA.dat//g' | sed  '1ifname,deltaG,SD' > Sum_Result_POISSON_BOLTZMANN.csvg
+find * -name 'FINAL_RESULTS_MMPBSA.dat' | sort -n | xargs -I {1} bash -c "echo -n {1}','; sed -n '/POISSON BOLTZMANN/,/ΔG binding/p' {1} | grep 'ΔG binding'"  \
+ | sed 's/ΔG binding =  *//g' | sed 's/ *//g' | sed 's/\+\/\-/,/g' | sed 's/\/FINAL_RESULTS_MMPBSA.dat//g' | sed  '1ifname,deltaG,SD' > Sum_Result_POISSON_BOLTZMANN.csv
 
-find * -name 'FINAL_RESULTS_MMPBSA.dat' | sort -n | xargs -I {1} bash -c "echo -n {1}','; sed -n '/GENERALIZED BORN/,/DELTA G binding/p' {1} | grep 'DELTA G binding'"  \
- | sed 's/DELTA G binding =  *//g' | sed 's/ *//g' | sed 's/\+\/\-/,/g' | sed 's/\/FINAL_RESULTS_MMPBSA.dat//g' | sed  '1ifname,deltaG,SD' > Sum_Result_GENERALIZED_BORN.csv
+find * -name 'FINAL_RESULTS_MMPBSA.dat' | sort -n | xargs -I {1} bash -c "echo -n {1}','; sed -n '/GENERALIZED BORN/,/ΔG binding/p' {1} | grep 'ΔG binding'"  \
+ | sed 's/ΔG binding =  *//g' | sed 's/ *//g' | sed 's/\+\/\-/,/g' | sed 's/\/FINAL_RESULTS_MMPBSA.dat//g' | sed  '1ifname,deltaG,SD' > Sum_Result_GENERALIZED_BORN.csv
 
 find * -name 'FINAL_RESULTS_MMPBSA.dat' | sort -n | xargs -I {1} bash -c "echo -n {1}','; grep '^IE[ 0-9.]*' {1}"  \
  | sed 's/[[:space:]]\{1,\}/,/g' | sed 's/\/FINAL_RESULTS_MMPBSA.dat//g' | sed 's/IE,//g' | sed  '1ifname,IE,SD,SEM' > Sum_Result_IE.csv
