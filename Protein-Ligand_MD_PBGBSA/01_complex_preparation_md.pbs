@@ -214,8 +214,8 @@ gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname NA -nname CL -neutra
 index_ligand=$(gmx make_ndx -f solv_ions.gro <<< "q" | sed -rn "s/([0-9]+) "$LNAME_gro"[0-9: ]*atoms/\1/p"| head -1)
 >&2 echo 'Ligand Index:' $index_ligand
 
-gmx make_ndx -f solv_ions.gro -o index.ndx << INPUT 
-1|$index_ligand
+gmx make_ndx -f solv_ions.gro -o index.ndx << INPUT
+"Protein"|$index_ligand
 q
 INPUT
 
