@@ -276,6 +276,7 @@ fi
 gmx trjconv -s md_out.tpr -f md_out.xtc -pbc nojump -o md_out_noj_noPBC.xtc <<< "System"
 #gmx trjconv -s md_out.tpr -f md_out.xtc -o md_out_noPBC.xtc -pbc mol -center <<< "Protein  System"
 gmx trjconv -s md_out.tpr -f md_out_noj_noPBC.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "Protein_UNL  System"
+# use it for PBSA https://github.com/Valdes-Tresanco-MS/gmx_MMPBSA/issues/33
 gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc -n index.ndx <<< "Protein_UNL  System"
 
 if (( $mdtime >= 50 ))
