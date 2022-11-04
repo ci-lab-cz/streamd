@@ -28,7 +28,7 @@
 # Example call: qsub -v tpr=md_out.tpr,xtc=md_fit.xtc,script_path=path,wdir=$(pwd) 02_pbsa.pbs
 #  
 #
-#PBS -l select=1:ncpus=128:mpiprocs=128:ompthreads=2
+#PBS -l select=1:ncpus=128:mpiprocs=128
 #PBS -k oe
 
 if [ -z $gromacs_version ];
