@@ -26,6 +26,12 @@ if [ -z $wdir ]
 fi
 
 cd $wdir
+if test -f Sum_Result_GENERALIZED_BORN.csv; then
+tec_dat=$(stat --printf=%z Sum_Result_GENERALIZED_BORN.csv | grep -oE  '[0-9-]{8} [0-9:]{8}' | sed -E 's/[[:space:]]|\:/-/g')
+test -f Sum_Result_POISSON_BOLTZMANN.csv && mv Sum_Result_POISSON_BOLTZMANN.csv Sum_Result_POISSON_BOLTZMANN_$tec_dat\.csv
+test -f Sum_Result_GENERALIZED_BORN.csv && mv Sum_Result_GENERALIZED_BORN.csv Sum_Result_GENERALIZED_BORN_$tec_dat\.csv
+test -f Sum_Result_IE.csv && mv Sum_Result_IE.csv Sum_Result_IE_$tec_dat\.csv
+fi
 
 find * -name 'FINAL_RESULTS_MMPBSA.dat' | sort -n | xargs -I {1} bash -c "echo -n {1}','; sed -n '/POISSON BOLTZMANN/,/DELTA G binding/p' {1} | grep 'DELTA G binding'"  \
  | sed 's/DELTA G binding =  *//g' | sed 's/ *//g' | sed 's/\+\/\-/,/g' | sed 's/\/FINAL_RESULTS_MMPBSA.dat//g' | sed  '1ifname,deltaG,SD' > Sum_Result_POISSON_BOLTZMANN.csvg
