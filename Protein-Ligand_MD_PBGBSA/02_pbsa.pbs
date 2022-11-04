@@ -91,7 +91,7 @@ fi
 
 
 >&2 echo 'Script running:***************************** 2. MMP(G)BSA Running  *********************************'
-mpirun -np $NP gmx_MMPBSA MPI -O -i $script_path/mmpbsa.in -cs $tpr -ci $index -cg 1 $index_ligand -ct $xtc -cp $topol -nogui 
+mpirun -np $NP gmx_MMPBSA MPI -O -i mmpbsa.in  -cs $tpr -ci $index -cg $index_protein $index_ligand -ct $xtc -cp $topol -nogui
 ## terms per time -eo energ_term.csv
 
 #test -f gmx_MMPBSA.log && mv gmx_MMPBSA.log gmx_MMPBSA_1.log
