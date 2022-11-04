@@ -272,10 +272,10 @@ else
   tu="ps"
 fi
 
-gmx trjconv -s md_out.tpr -f md_out.xtc -o md_out_noPBC.xtc -pbc mol -center <<< "Protein  System"
-gmx trjconv -s md_out.tpr -f md_out.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "Protein_UNL  System"
-#use it for PBSA https://github.com/Valdes-Tresanco-MS/gmx_MMPBSA/issues/33
-gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -o md_fit.xtc -n index.ndx -fit rot+trans  <<< "Protein_UNL  System"
+gmx trjconv -s md_out.tpr -f md_out.xtc -pbc nojump -o md_out_noj_noPBC.xtc <<< "System"
+#gmx trjconv -s md_out.tpr -f md_out.xtc -o md_out_noPBC.xtc -pbc mol -center <<< "Protein  System"
+gmx trjconv -s md_out.tpr -f md_out_noj_noPBC.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "Protein_UNL  System"
+gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc -n index.ndx <<< "Protein_UNL  System"
 
 if (( $mdtime >= 50 ))
 then
@@ -284,17 +284,17 @@ else
   dtstep=50
 fi
 
-gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "System"
+gmx trjconv -s md_out.tpr -f md_fit.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "System"
 
-gmx rms -s md_out.tpr -f md_out_noPBC.xtc -o rmsd.xvg -n index.ndx -tu $tu <<< "Backbone  Backbone"
-gmx rms -s em.tpr -f md_out_noPBC.xtc -o rmsd_xtal.xvg -n index.ndx -tu $tu <<< "Backbone  Backbone"
+gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd.xvg -n index.ndx -tu $tu <<< "Backbone  Backbone"
+gmx rms -s em.tpr -f md_fit.xtc -o rmsd_xtal.xvg -n index.ndx -tu $tu <<< "Backbone  Backbone"
 
-gmx rms -s md_out.tpr -f md_out_noPBC.xtc -o rmsd_$LNAME_gro\.xvg -n index.ndx  -tu $tu <<< "Backbone  $index_ligand_noH"
-gmx rms -s em.tpr -f md_out_noPBC.xtc -o rmsd_$LNAME_gro\_xtal.xvg -n index.ndx -tu $tu <<< "Backbone  $index_ligand_noH"
+gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd_$LNAME_gro\.xvg -n index.ndx  -tu $tu <<< "Backbone  $index_ligand_noH"
+gmx rms -s em.tpr -f md_fit.xtc -o rmsd_$LNAME_gro\_xtal.xvg -n index.ndx -tu $tu <<< "Backbone  $index_ligand_noH"
 
-gmx gyrate -s md_out.tpr -f md_out_noPBC.xtc -n index.ndx -o gyrate.xvg <<< "Protein"
+gmx gyrate -s md_out.tpr -f md_fit.xtc -n index.ndx -o gyrate.xvg <<< "Protein"
 
-gmx rmsf -s md_out.tpr -f md_out_noPBC.xtc -n index.ndx -o rmsf.xvg -oq rmsf.pdb -res <<< "Protein"
+gmx rmsf -s md_out.tpr -f md_fit.xtc -n index.ndx -o rmsf.xvg -oq rmsf.pdb -res <<< "Protein"
 
 
 >&2 echo 'Script running:***************************** FINISH *********************************'
