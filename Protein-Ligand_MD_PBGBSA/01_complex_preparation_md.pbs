@@ -296,6 +296,7 @@ gmx gyrate -s md_out.tpr -f md_fit.xtc -n index.ndx -o gyrate.xvg <<< "Protein"
 
 gmx rmsf -s md_out.tpr -f md_fit.xtc -n index.ndx -o rmsf.xvg -oq rmsf.pdb -res <<< "Protein"
 
+gmx trjconv -s md_out.tpr -f md_fit.xtc -o frame.pdb -b 10 -e 11  -n index.ndx <<< "System"
 
 >&2 echo 'Script running:***************************** FINISH *********************************'
 cp ~/$PBS_JOBNAME.{e,o}${PBS_JOBID%.*} .
