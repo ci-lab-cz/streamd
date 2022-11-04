@@ -83,6 +83,7 @@ PNAME="$(awk -F'/' '{print $NF}' <<<$pfile | cut -d'.' -f1)"
 >&2 echo "Script Path" $script_path
 >&2 echo "MDtime:" $mdtime "ns"
 
+mkdir -p $wdir
 cd $wdir
 
 # Will Change mdp files
@@ -162,8 +163,7 @@ gmx mdrun -deffnm md_out -s md_out.tpr
 # RMSD
 >&2 echo 'Script running:***************************** 12. MD analysis *********************************'
 
-
-#can change later
+# set tstep
 if (( $mdtime >= 10 ))
 then
   tu="ns"
@@ -171,10 +171,9 @@ else
   tu="ps"
 fi
 
-gmx trjconv -s md_out.tpr -f md_out.xtc -o md_out_noPBC.xtc -pbc mol -center <<< "Protein  System"
-gmx trjconv -s md_out.tpr -f md_out.xtc -o md_centermolsnoPBC.xtc -pbc mol -center  <<< "Protein  System"
-#use it for PBSA https://github.com/Valdes-Tresanco-MS/gmx_MMPBSA/issues/33
-gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -o md_fit.xtc -fit rot+trans  <<< "Protein  System"
+gmx trjconv -s md_out.tpr -f md_out.xtc -pbc nojump -o md_out_noj_noPBC.xtc <<< "System"
+gmx trjconv -s md_out.tpr -f md_out_noj_noPBC.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "Protein  System"
+gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc -n index.ndx <<< "Protein  System"
 
 if (( $mdtime >= 50 ))
 then
@@ -183,15 +182,16 @@ else
   dtstep=50
 fi
 
-gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "System"
+gmx trjconv -s md_out.tpr -f md_fit.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "System"
 
-gmx rms -s md_out.tpr -f md_out_noPBC.xtc -o rmsd.xvg  <<< "Backbone  Backbone"
-gmx rms -s em.tpr -f md_out_noPBC.xtc -o rmsd_xtal.xvg <<< "Backbone  Backbone"
+gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd.xvg -n index.ndx -tu $tu <<< "Backbone  Backbone"
+gmx rms -s em.tpr -f md_fit.xtc -o rmsd_xtal.xvg -n index.ndx -tu $tu <<< "Backbone  Backbone"
 
-gmx gyrate -s md_out.tpr -f md_out_noPBC.xtc -o gyrate.xvg <<< "Protein"
+gmx gyrate -s md_out.tpr -f md_fit.xtc -n index.ndx -o gyrate.xvg <<< "Protein"
 
-gmx rmsf -s md_out.tpr -f md_out_noPBC.xtc -o rmsf.xvg -oq rmsf.pdb -res <<< "Protein"
+gmx rmsf -s md_out.tpr -f md_fit.xtc -n index.ndx -o rmsf.xvg -oq rmsf.pdb -res <<< "Protein"
 
+gmx trjconv -s md_out.tpr -f md_fit.xtc -o frame.pdb -b 10 -e 11  -n index.ndx <<< "System"
 
 >&2 echo 'Script running:***************************** FINISH *********************************'
 cp ~/$PBS_JOBNAME.{e,o}${PBS_JOBID%.*} .
