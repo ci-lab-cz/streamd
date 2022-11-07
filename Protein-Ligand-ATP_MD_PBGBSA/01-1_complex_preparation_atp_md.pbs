@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Authors: 
+# Authors:
 # Based on Olena Mokshyna's script.
 # Aleksandra Ivanova
 # Date : 20.02.2022
@@ -22,11 +22,11 @@
 #            mdtime - time in ns
 #            script_path - dir contains *.mdp files (ions.mdp, minim.mdp, npt.mdp, nvt.mdp, md.mdp).
 #
-#                         
-#            Additional arguments:
-#            wdir - working dir. Can be skipped. This argument can be skipped, if so current directory will be used.            
 #
-# Example call: qsub -v lfile=lig.mol,pfile=protein.pdb,script_path=path,mdtime=5 01_complex_preparation.pbs
+#            Additional arguments:
+#            wdir - working dir. Can be skipped. This argument can be skipped, if so current directory will be used.
+#
+# Example call: qsub -v lfile=lig.mol,pfile=protein.pdb,cfrfile=cofactor.mol,script_path=path,mdtime=5 01_complex_preparation.pbs
 # wdir=$(pwd)
 #
 
@@ -54,8 +54,14 @@ if [ -z $lfile ];
   exit 1
 fi
 
+if [ -z $cfrfile ];
+  then
+  >&2 echo 'cfrfile is not set. Script will be interrupted'
+  exit 1
+fi
+
 if [ -z $pfile ];
-  then 
+  then
   >&2 echo 'pfile argument is not set. Script will be interrupted'
   exit 1
 fi
@@ -72,7 +78,7 @@ if [ -z $script_path ];
   exit 1
 fi
 
-if [ -z $wdir ]; 
+if [ -z $wdir ];
   then wdir=$PBS_O_WORKDIR
 fi
 
@@ -85,21 +91,26 @@ fi
 LNAME="$(awk -F'/' '{print $NF}' <<<$lfile | cut -d'.' -f1)"
 PNAME="$(awk -F'/' '{print $NF}' <<<$pfile | cut -d'.' -f1)"
 
+#cofactor file
+CFRNAME="$(awk -F'/' '{print $NF}' <<<$cfrfile | cut -d'.' -f1)"
+
 >&2 echo "GROMACS Version:" $gromacs_version
 >&2 echo "Ligand:" $LNAME $lfile
+>&2 echo "Cofactor:" $CNAME $cfrfile
 >&2 echo "Protein:" $PNAME $pfile
 >&2 echo "WORKDIR:" $wdir $(pwd)
 >&2 echo "Script Path" $script_path
 >&2 echo "MDtime:" $mdtime "ns"
 
 mkdir -p $wdir
+
 cd $wdir
 
 # Will Change mdp files
 cp $script_path"/"*.mdp .
 
 #ligand prep
->&2 echo 'Script running:***************************** 2. Ligand preparation *********************************'
+>&2 echo 'Script running:***************************** 2.1 Ligand preparation *********************************'
 ## Using new version of gmx change python version so first need to run amber to prepare ligand and then load the new gmx
 if [ $(awk -F'/' '{print $NF}' <<<$lfile |  awk -F. '{print $NF}') != gro ]
  then
@@ -124,6 +135,38 @@ if [ $(awk -F'/' '{print $NF}' <<<$lfile |  awk -F. '{print $NF}') != gro ]
   cp $input_dirname\/$LNAME.top ligand.top
   >&2 echo 'Script running: Using prepared ligand *.gro file'
 fi
+>&2 echo 'Script running:***************************** 2.2 Cofactor preparation *********************************'
+if [ $(awk -F'/' '{print $NF}' <<<$cfrfile |  awk -F. '{print $NF}') != gro ]
+ then
+  cp $script_path"/tleap.in" tleap_cofactor.in
+  sed -i "1s/.*/source "$(echo $CONDA_PREFIX | sed 's/\//\\\//g')"\/dat\/leap\/cmd\/leaprc\.gaff/" tleap_cofactor.in
+  sed -i 's/ligand/cofactor/g' tleap_cofactor.in
+  
+  charge_cfr=$( python $script_path"/"getcharge.py -i $cfrfile)
+  antechamber -i $cfrfile -fi mdl -o cofactor.mol2 -fo mol2 -c bcc -pf y -s 2 -nc $charge_cfr -rn "CFR"
+  parmchk2 -i cofactor.mol2 -f mol2 -o cofactor.frcmod
+  tleap -f tleap_cofactor.in
+  python $script_path"/"pmed_amb2gmx.py -p cofactor.prmtop -x cofactor.inpcrd -o cofactor
+ else
+  input_dirname=${cfrfile%/*}"
+  cp $input_dirname\/$CFRNAME.gro cofactor.gro
+  cp $input_dirname\/$CFRNAME.top cofactor.top
+  >&2 echo 'Script running: Using prepared cofactor *.gro file'
+fi
+
+# make new all.itp
+cp ligand.top ligand.itp
+cp cofactor.top cofactor.itp
+## combine [atomtypes] from ligand.itp and cofactor.itp
+{ sed -n -e '/atomtypes/,+1 p' ligand.itp && { { sed -n -e '/atomtypes/,/moleculetype/ p' ligand.itp | head -n-3 |tail -n +3 && sed -n -e '/atomtypes/,/moleculetype/ p' cofactor.itp | head -n-3 |tail -n +3  ; } | sort | uniq ; } ;} > all.itp
+
+## remove atomtypes fields from *.itp
+sed -ni -e '/atomtypes/,/moleculetype/d; p' ligand.itp
+## add [moleculetype] name of field which we have removed the last step
+sed -i  "/\; Name            nrexcl/i\[ moleculetype ]" ligand.itp
+
+sed -ni -e '/atomtypes/,/moleculetype/d; p' cofactor.itp
+sed -i  "/\; Name            nrexcl/i\[ moleculetype ]" cofactor.itp
 
 # target preparation
 >&2 echo 'Script running:***************************** 3. Target preparation *********************************'
@@ -140,37 +183,56 @@ fi
 
 # 2.5 Ligand preparation
 #create itps
-cp ligand.top ligand.itp
+
 sed -i '/system/,+2 d' ligand.itp
 sed -i '/molecules/,+2 d' ligand.itp
 sed -i '/defaults/,+2 d' ligand.itp
 
+sed -i '/system/,+2 d' cofactor.itp
+sed -i '/molecules/,+2 d' cofactor.itp
+sed -i '/defaults/,+2 d' cofactor.itp
+
 # restraints
 gmx genrestr -f ligand.gro -o posre_ligand.itp -fc 1000 1000 1000 <<< 2
+gmx genrestr -f cofactor.gro -o posre_cofactor.itp -fc 1000 1000 1000 <<< 2
 sed -i  "/\; Include topology for ions/i\; Ligand position restraints\n#ifdef POSRES_LIG\n#include \posre_ligand.itp\\n#endif\n" topol.top
+sed -i "/\; Include topology for ions/i\; Ligand position restraints\n#ifdef POSRES_CFR\n#include \"posre_cofactor.itp\"\n#endif\n" topol.top
+
 
 # complex
 >&2 echo 'Script running:***************************** 4. Complex preparation *********************************'
+#{ head -2 ligand.gro && tail -n+3 $PNAME.gro; } > tmp
+
 cp ligand.gro tmp.gro
 sed -i '1,2d' tmp.gro #remove first two
-sed -i '$ d' tmp.gro #and last line of gro file
+sed -i '$ d' tmp.gro #and last line of gro file (containing?)
 
-cp $PNAME.gro complex.gro
-{ head -n-1 complex.gro && cat tmp.gro && tail -n1 complex.gro; } > tmp #insert ligand.gro into complex.gro
-mv tmp complex.gro
+cp cofactor.gro tmp2.gro
+sed -i '1,2d' tmp2.gro
+sed -i '$ d' tmp2.gro
+
+{ head -n-1 $PNAME.gro && cat tmp.gro && tail -n1 $PNAME.gro; } > tmp #insert ligand.gro into complex.gro
+{ head -n-1 tmp && cat tmp2.gro && tail -n1 tmp; } > complex.gro #insert cofactor.gro into complex.gro
 
 #THIS STEP IS VERY IMPORTANT! If something goes wrong here there will be bunch of errors later
 L_NATOMS=$(head -2 ligand.gro | tail -1)
-C_NATOMS=$(($(head -2 complex.gro | tail -1) + $L_NATOMS)) #get general number of atoms in complex
+CFR_NATOMS=$(head -2 cofactor.gro | tail -1)
+C_NATOMS=$(($(head -2 complex.gro | tail -1) + $L_NATOMS + $CFR_NATOMS)) #get general number of atoms in complex
+
 sed -i '2s/.*/'"$C_NATOMS"'/' complex.gro #substitute second line with general num of atoms
 
 #Another IMPORTANT step - be sure to check that *itp is not included in the wrong part
-# add ligand.itp to topol.top 
+# add *.itp to topol.top !Note: the order is important: 1) all.itp 2)ligand.itp 3)cofactor.itp
+sed -i '/\; Include forcefield parameters/{N;N;s/$/\n; Include cofactor topology\n#include \"cofactor\.itp\"\n/}' topol.top
 sed -i '/\; Include forcefield parameters/{N;N;s/$/\n; Include ligand topology\n#include \"ligand\.itp\"\n/}' topol.top
+sed -i '/\; Include forcefield parameters/{N;N;s/$/\n; Include all topology\n#include \"all\.itp\"\n/}' topol.top
 
 #Add ligand to the [ molecules ] directive.
-LNAME_gro=$(head -1 tmp.gro | awk '{print $1;}' |  cut -c2-) #extract ligand name from $LNAME.gro; usually name looks like 1JZ4 - you need to remove first number
+#LNAME_gro=$(head -1 tmp.gro | awk '{print $1;}' |  cut -c2-) #extract ligand name from $LNAME.gro; usually name looks like 1JZ4 - you need to remove first number
+LNAME_gro="UNL"
+CFRNAME_gro="CFR"
 echo "$LNAME_gro"'             1' >> topol.top #and insert ligand and number of ligand molecules into the last line of topol.top
+echo "$CFRNAME_gro"'             1' >> topol.top #and insert ligand and number of ligand molecules into the last line of topol.top
 
 # need to check! only CHARMM FF
 #if FF provides any other files (i.e. *prm file for CHARMM FF) it should be included at the TOP of topol.top
@@ -179,13 +241,20 @@ if [ -e ligand.prm ]
   then
     sed -i "/\moleculetype/i\; Include ligand parameters\n#include \"ligand\.prm\"\n" topol.top
   else
-    >&2 echo "Script running: No *prm file was provided, so nothing was included in topol.top"
+    >&2 echo "Script running: No ligand.prm file was provided, so nothing was included in topol.top"
+fi
+
+if [ -e cofactor.prm ]
+  then
+    sed -i "/\moleculetype/i\; Include cofactor parameters\n#include \"cofactor\.prm\"\n" topol.top
+  else
+    >&2 echo "Script running: No cofactor.prm file was provided, so nothing was included in topol.top"
 fi
 
 
 # Change ligand name in *mdp file (coupling groups).
 ## tc-grps  = Protein_UNL Water_and_ions; two coupling groups - more accurate
-sed -i 's/tc-grps..*/tc-grps                 = Protein_'$LNAME_gro' Water_and_ions; two coupling groups/' *.mdp
+sed -i 's/tc-grps..*/tc-grps                 = Protein_'$LNAME_gro'_'$CFRNAME_gro' Water_and_ions; two coupling groups/' *.mdp
 # Change MD simulation time
 ##nsteps                  = 5000000    ; 2 * 5000000 = 10000000 fs = 10000 ps (10 ns), 25000000*2 fs = 50 ns 100000000
 mdsteps=$(awk "BEGIN {picoseconds=$mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2; print steps}")
@@ -203,7 +272,7 @@ gmx solvate -cp newbox.gro -cs spc216.gro -p topol.top -o solv.gro
 >&2 echo 'Script running:***************************** 6. Ions *********************************'
 #use grompp to assemble *tpr file () using any *mdp file
 #here one can use *mdp for energy minization (as recommended in Justin's tutorials)
-gmx grompp -f ions.mdp -c solv.gro -p topol.top -o ions.tpr 
+gmx grompp -f ions.mdp -c solv.gro -p topol.top -o ions.tpr
 #-maxwarn 10
 #FATAL error SDMSO type not found -> try renaming to SDmso
 
@@ -214,9 +283,11 @@ gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname NA -nname CL -neutra
 >&2 echo 'Script running:***************************** 7. Group indexing *********************************'
 index_ligand=$(gmx make_ndx -f solv_ions.gro <<< "q" | sed -rn "s/([0-9]+) "$LNAME_gro"[0-9: ]*atoms/\1/p"| head -1)
 >&2 echo 'Ligand Index:' $index_ligand
+index_cofactor=$(gmx make_ndx -f solv_ions.gro <<< "q" | sed -rn "s/([0-9]+) "$CFRNAME_gro"[0-9: ]*atoms/\1/p"| head -1)
+>&2 echo 'Cofactor Index:' $index_cofactor
 
 gmx make_ndx -f solv_ions.gro -o index.ndx << INPUT
-"Protein"|$index_ligand
+"Protein"|$index_ligand|$index_cofactor
 q
 INPUT
 
@@ -276,8 +347,7 @@ fi
 gmx trjconv -s md_out.tpr -f md_out.xtc -pbc nojump -o md_out_noj_noPBC.xtc <<< "System"
 #gmx trjconv -s md_out.tpr -f md_out.xtc -o md_out_noPBC.xtc -pbc mol -center <<< "Protein  System"
 gmx trjconv -s md_out.tpr -f md_out_noj_noPBC.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "Protein_UNL  System"
-# use it for PBSA https://github.com/Valdes-Tresanco-MS/gmx_MMPBSA/issues/33
-gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc -n index.ndx <<< "Protein_UNL  System"
+gmx trjconv -s md_out.tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc  -n index.ndx <<< "Protein_UNL  System"
 
 if (( $mdtime >= 50 ))
 then

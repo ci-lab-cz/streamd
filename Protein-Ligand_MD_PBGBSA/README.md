@@ -92,7 +92,9 @@ Before to run do not forget to set appropriate number of cpu (Default:128) in ea
 ``module load parallel``
 Absolute path:
 ```
-parallel -j1  "qsub -v lfile= {1},pfile= path/protein_H_full.pdb,script_path=path/scripts,wdir=/workdir/{1/.},mdtime=1 ../../scripts/01_complex_preparation_md.pbs" ::: path/ligands/*.mol
+parallel -j1  "qsub -v lfile= {1},pfile= path/protein_H_full.pdb,script_path=path/scripts,wdir=/workdir/{1/.},mdtime=1  /home/md-scripts/Protein-Ligand_MD_PBGBSA/01_complex_preparation_md.pbs" ::: path/ligands/*.mol
+OR
+for i in mols/*.mol; do echo $i; molfile=${i##*/}; molname=${molfile%.*}; echo $molname; qsub -A OPEN-25-38  -l walltime=48:00:00 -v lfile=$(pwd)/$i,pfile=$(pwd)/4o2b_full_clean_ready_H_HIS.pdb,script_path=/home/md-scripts/scripts/,wdir=$molname,mdtime=10,gromacs_version='GROMACS/2021.4-foss-2020b-PLUMED-2.7.3'  /home/md-scripts/Protein-Ligand_MD_PBGBSA/01-1_complex_preparation_md.pbs ;done
 ```
 Relative path can be set as well, but remember that script will be running from working directory and all relative paths should consider it.
 Like:
