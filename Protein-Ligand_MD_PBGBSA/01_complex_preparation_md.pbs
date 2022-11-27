@@ -119,7 +119,7 @@ if [ $(awk -F'/' '{print $NF}' <<<$lfile |  awk -F. '{print $NF}') != gro ]
   python $script_path"/"pmed_amb2gmx.py -p ligand.prmtop -x ligand.inpcrd -o ligand
  else
 #put into dir
-  input_dirname=${lfile%/*}"
+  input_dirname=${lfile%/*}
   cp $input_dirname\/$LNAME.gro ligand.gro
   cp $input_dirname\/$LNAME.top ligand.top
   >&2 echo 'Script running: Using prepared ligand *.gro file'
