@@ -25,7 +25,7 @@ conda install -c conda-forge ambertools=21 compilers
 conda install -c conda-forge rdkit
 
 python -m pip install git+https://github.com/ParmEd/ParmEd.git@16fb236    
-python -m pip install gmx_MMPBSA==1.4.3
+python -m pip install gmx_MMPBSA
 
 ```
 
