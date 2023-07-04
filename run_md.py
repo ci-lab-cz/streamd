@@ -94,6 +94,8 @@ def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir
     # copy system_lig itp
     for sys_lig in system_ligs:
         new_sys_lig = os.path.join(tec_wdir, os.path.basename(sys_lig))
+        if os.path.isfile(f'{new_sys_lig}.itp'):
+            os.remove(f'{new_sys_lig}.itp')
         shutil.copy(f'{sys_lig}.itp', f'{new_sys_lig}.itp')
         system_ligs_tec.append(new_sys_lig)
         edit_topology_file(os.path.join(tec_wdir, "topol.top"), pattern="; Include forcefield parameters",
@@ -285,6 +287,9 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
     dask_client = init_dask_client(hostfile)
 
     if protein is not None:
+        if not os.path.isfile(protein):
+            raise FileExistsError(f'{protein} does not exist')
+
         pname, p_ext = os.path.splitext(os.path.basename(protein))
         print(pname, p_ext)
         # check if exists
@@ -297,6 +302,9 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
 
     system_ligs = []
     if system_lfile is not None:
+        if not os.path.isfile(system_lfile):
+            raise FileExistsError(f'{system_lfile} does not exist')
+
         mols = supply_mols(system_lfile)
 
         for res1 in calc_dask(prep_ligand, mols, dask_client, ncpu=args.ncpu,
