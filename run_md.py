@@ -121,9 +121,8 @@ def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir
             os.remove(f'{new_sys_lig}.itp')
         shutil.copy(f'{sys_lig}.itp', f'{new_sys_lig}.itp')
         system_ligs_tec.append(new_sys_lig)
-        edit_topology_file(os.path.join(tec_wdir, "topol.top"), pattern="; Include forcefield parameters",
-                           add=f'; Include {os.path.basename(sys_lig)} topology\n#include "{new_sys_lig}.itp"\n',
-                           how='after', n=3)
+
+    add_ligands_to_topol([var_lig]+system_ligs_tec, topol=os.path.join(tec_wdir, "topol.top"))
 
     itp_lig_list = [f'{i}.itp' for i in [var_lig]+system_ligs_tec]
     # make all itp
@@ -171,6 +170,22 @@ def edit_topology_file(topol_file, pattern, add, how='before', n=0):
         output.write(data)
 
 
+def add_ligands_to_topol(all_lig_vars, topol):
+    itp_include_list, posre_include_list, mol_include_list = [], [], []
+    for tec_lig in all_lig_vars:
+        mol_id = os.path.basename(tec_lig)
+        itp_include_list.append(f'; Include {mol_id} topology\n#include "{tec_lig}.itp"\n')
+        posre_include_list.append(f'; {mol_id} position restraints\n#ifdef POSRES_{mol_id}\n#include "{os.path.join(os.path.dirname(tec_lig), f"posre_{mol_id}.itp")}"\n#endif\n')
+        mol_include_list.append(f'{mol_id}             1')
+
+    edit_topology_file(topol, pattern="; Include forcefield parameters",
+                add='\n'.join(itp_include_list), how='after', n=3)
+    #reverse order since add before pattern
+    edit_topology_file(topol, pattern="; Include topology for ions",
+                add='\n'.join(posre_include_list[::-1]), how='before')
+    edit_topology_file(topol, pattern='; Compound        #mols', add='\n'.join(mol_include_list), how='after', n=2)
+
+
 def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, add_to_system=False):
     mol_id = mol.GetProp('_Name')
 
@@ -198,9 +213,6 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, 
     mol_file = os.path.join(wdir_ligand_tec, f'{mol_id}.mol')
     if not add_to_system:
         shutil.copy(os.path.join(wdir_md, "topol.top"), os.path.join(wdir_md_tec, "topol.top"))
-        edit_topology_file(os.path.join(wdir_md_tec, "topol.top"), pattern="; Include forcefield parameters",
-                           add=f'; Include {mol_id} topology\n#include "{os.path.join(wdir_md_tec, mol_id)}.itp"\n',
-                           how='after', n=3)
 
     Chem.MolToMolFile(mol, mol_file)
 
@@ -212,9 +224,6 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, 
     shutil.copy(os.path.join(wdir_ligand_tec, f'{mol_id}.itp'), os.path.join(wdir_md_tec, f'{mol_id}.itp'))
     shutil.copy(os.path.join(wdir_ligand_tec, f'{mol_id}.gro'), os.path.join(wdir_md_tec, f'{mol_id}.gro'))
     shutil.copy(os.path.join(wdir_ligand_tec, f'posre_{mol_id}.itp'), os.path.join(wdir_md_tec, f'posre_{mol_id}.itp'))
-
-    edit_topology_file(os.path.join(wdir_md_tec, "topol.top"), pattern="; Include topology for ions",
-                       add=f'; {mol_id} position restraints\n#ifdef POSRES_{mol_id}\n#include "{os.path.join(wdir_md_tec, f"posre_{mol_id}.itp")}"\n#endif\n')
 
     return os.path.join(wdir_md_tec, mol_id)
 
