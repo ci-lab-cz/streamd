@@ -91,6 +91,13 @@ def edit_mdp(mdp_path, couple_group, mdtime):
 
 def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir, mdtime):
     tec_wdir = os.path.dirname(var_lig)
+
+    if os.path.isfile(os.path.join(tec_wdir, "all.itp")) and os.path.isfile(os.path.join(tec_wdir, 'complex.gro')) \
+        and os.path.isfile(os.path.join(tec_wdir, 'solv_ions.gro')) and os.path.isfile(os.path.join(tec_wdir, 'index.ndx')):
+        sys.stdout.write(f'{tec_wdir}. Complex files exist. Skip complex preparation step\n')
+        sys.stdout.flush()
+        return tec_wdir
+
     system_ligs_tec = []
     # copy system_lig itp
     for sys_lig in system_ligs:
@@ -172,7 +179,7 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, 
         wdir_md_tec = os.path.join(wdir_md, 'ligands', mol_id)
 
     if os.path.isfile(os.path.join(wdir_md_tec, mol_id) + '.itp'):
-        print(f'{mol_id}.itp file already exist. Skip mol')
+        sys.stdout.write(f'{mol_id}.itp file already exist. Mol preparation step will be skipped for such molecule\n')
         return os.path.join(wdir_md_tec, mol_id)
 
     os.makedirs(wdir_ligand_tec, exist_ok=True)
