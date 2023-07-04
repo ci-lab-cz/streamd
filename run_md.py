@@ -137,9 +137,16 @@ def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir
     for mdp_file in glob(os.path.join(script_path, '*.mdp')):
         shutil.copy(mdp_file, tec_wdir)
 
-
-    subprocess.run(f'wdir={tec_wdir} bash {os.path.join(project_dir, "solv_ions.sh")}', shell=True)
-    subprocess.run(f'cd {tec_wdir}; gmx make_ndx -f solv_ions.gro <<< "q"', shell=True)
+    try:
+        subprocess.check_output(f'wdir={tec_wdir} bash {os.path.join(project_dir, "solv_ions.sh")}', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{tec_wdir}\t{e}\n')
+        return False
+    try:
+        subprocess.check_output(f'cd {tec_wdir}; gmx make_ndx -f solv_ions.gro <<< "q"', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{tec_wdir}\t{e}\n')
+        return False
 
     index_list = get_index(os.path.join(tec_wdir, 'index.ndx'))
     # index_list.index('Protein')} | {index_list.index(l_name)} | {index_list.index(c_name)
@@ -150,8 +157,7 @@ def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir
         return False
 
     edit_mdp(mdp_path=tec_wdir, couple_group=couple_group, mdtime=mdtime)
-    print(var_lig, 'ready')
-
+    return tec_wdir
 
 
 def edit_topology_file(topol_file, pattern, add, how='before', n=0):
@@ -216,10 +222,12 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, 
 
     Chem.MolToMolFile(mol, mol_file)
 
-    subprocess.run(f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_tec} name={mol_id} bash {os.path.join(project_dir, "lig_prep.sh")}', shell=True)
-
-    edit_topology_file(os.path.join(wdir_md_tec, "topol.top"), pattern='; Compound        #mols',
-                       add=f'{mol_id}             1', how='after', n=2)
+    try:
+        subprocess.check_output(f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_tec} name={mol_id} bash {os.path.join(project_dir, "lig_prep.sh")}', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{mol_id}\t{e}\n')
+        sys.stderr.flush()
+        return False
 
     shutil.copy(os.path.join(wdir_ligand_tec, f'{mol_id}.itp'), os.path.join(wdir_md_tec, f'{mol_id}.itp'))
     shutil.copy(os.path.join(wdir_ligand_tec, f'{mol_id}.gro'), os.path.join(wdir_md_tec, f'{mol_id}.gro'))
