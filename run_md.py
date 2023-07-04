@@ -100,7 +100,7 @@ def make_group_ndx(query, wdir):
 
 def edit_mdp(mdp_path, couple_group, mdtime):
     subprocess.run(f"sed -i 's/tc-grps..*/tc-grps                 = {couple_group} Water_and_ions; two coupling groups/' {os.path.join(mdp_path, '*.mdp')}", shell=True)
-    steps = mdtime * 1000 * 1000 / 2  # picoseconds=$mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
+    steps = int(mdtime * 1000 * 1000 / 2)  # picoseconds=$mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
     subprocess.run(f"sed -i 's/nsteps..*/nsteps                  = {steps}        ;/' {os.path.join(mdp_path, 'md.mdp')}", shell=True)
 
 
@@ -114,7 +114,7 @@ def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir
         return tec_wdir
 
     system_ligs_tec = []
-    # copy system_lig itp
+    # copy system_lig itp to ligand_md_wdir
     for sys_lig in system_ligs:
         new_sys_lig = os.path.join(tec_wdir, os.path.basename(sys_lig))
         if os.path.isfile(f'{new_sys_lig}.itp'):
@@ -190,7 +190,7 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, 
     mol_id = mol.GetProp('_Name')
 
     if len(mol_id) > 3:
-        print(f'Error mol_id {mol_id}. Mol_id should be less then 3. Will be used only the first 3 letters.')
+        print(f'Wrong mol_id {mol_id}. Mol_id should be less then 3. Will be used only the first 3 letters.')
         mol_id = mol_id[:3]
 
     if addH:
@@ -239,7 +239,7 @@ def supply_mols(fname):
         mol = Chem.MolFromMolFile(fname, removeHs=False)
         if mol:
             if not mol.HasProp('_Name'):
-                mol.SetProp('_Name', f'ID{n}')
+                mol.SetProp('_Name', f'{os.path.basename(fname)}'[:3])
             yield mol
 
 
