@@ -533,11 +533,11 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=''' ''')
     parser.add_argument('-p', '--protein', metavar='FILENAME', required=True, type=filepath_type,
-                        help='input file with compound. Supported formats: *.pdb')
+                        help='input file with compound. Supported formats: *.pdb or gro')
     parser.add_argument('-l', '--ligand', metavar='FILENAME', required=True, type=filepath_type,
-                        help='input file with compound. Supported formats: *.mol')
+                        help='input file with compound. Supported formats: *.mol or sdf or gro')
     parser.add_argument('--cofactor', metavar='FILENAME', required=True, type=filepath_type,
-                        help='input file with compound. Supported formats: *.mol')
+                        help='input file with compound. Supported formats: *.mol or sdf or gro')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
@@ -545,8 +545,8 @@ if __name__ == '__main__':
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
                         help='number of CPU per server. Use all cpus by default.')
-    parser.add_argument('-t', '--time', metavar='INTEGER', required=False, default=1, type=float,
-                        help='Time of MD simulation')
+    parser.add_argument('-t', '--time', metavar='ns', required=False, default=1, type=float,
+                        help='Time of MD simulation in ns')
 
     args = parser.parse_args()
 
