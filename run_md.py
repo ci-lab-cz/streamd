@@ -82,6 +82,21 @@ def get_index(index_file):
                 index_list.append(line.replace('[','').replace(']','').strip())
     return index_list
 
+def make_group_ndx(query, wdir):
+    try:
+        subprocess.check_output(f'''
+        cd {wdir}
+        gmx make_ndx -f solv_ions.gro -n index.ndx << INPUT
+        {query}
+        q
+        INPUT
+        ''', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{wdir}\t{e}\n')
+        sys.stderr.flush()
+        return False
+    return True
+
 
 def edit_mdp(mdp_path, couple_group, mdtime):
     subprocess.run(f"sed -i 's/tc-grps..*/tc-grps                 = {couple_group} Water_and_ions; two coupling groups/' {os.path.join(mdp_path, '*.mdp')}", shell=True)
@@ -132,13 +147,8 @@ def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir
     # make couple_index_group
     couple_group_reg_ind = '|'.join([str(index_list.index(i)) for i in ['Protein']+[os.path.basename(var_lig)]+[os.path.basename(j) for j in system_ligs]])
     couple_group = '_'.join([i for i in ['Protein']+[os.path.basename(var_lig)]+[os.path.basename(j) for j in system_ligs]])
-    subprocess.run(f"""
-       cd {tec_wdir}
-       gmx make_ndx -f solv_ions.gro -o index.ndx << INPUT
-       {couple_group_reg_ind}
-       q
-       INPUT    
-       """, shell=True)
+    if make_group_ndx(couple_group_reg_ind, tec_wdir):
+        return False
 
     edit_mdp(mdp_path=tec_wdir, couple_group=couple_group, mdtime=mdtime)
     print(var_lig, 'ready')
