@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import shutil
 from glob import glob
 from multiprocessing import cpu_count
@@ -241,13 +242,88 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, ncpu=1, **kwa
                 except StopIteration:
                     continue
 
+def run_equilibration(wdir, project_dir):
+    if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
+        sys.stdout.write(f'{wdir}. Checkpoint files after Equilibration exist. '
+                         f'Equilibration step will be skipped ')
+        sys.stdout.flush()
+        return wdir
+
+    try:
+        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "equlibration.sh")}', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{wdir}\t{e}\n')
+        sys.stderr.flush()
+        return False
+    return wdir
+
+def run_simulation(wdir, project_dir):
+    try:
+        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "md.sh")}', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{wdir}\t{e}\n')
+        sys.stderr.flush()
+        return False
+    return wdir
+
+def md_lig_rmsd_analysis(mol_id, wdir, tu):
+    index_list = get_index(os.path.join(wdir, 'index.ndx'))
+    if f'{mol_id}_&_!H*' not in index_list:
+        if not make_group_ndx(query=f'{index_list.index(mol_id)} & ! a H*', wdir=wdir):
+            return False
+    index_ligand_noH = index_list.index(f'{mol_id}_&_!H*')
+
+    try:
+        subprocess.check_output(f'''
+        cd {wdir}
+        gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd_{mol_id}.xvg -n index.ndx  -tu {tu} <<< "Backbone  {index_ligand_noH}"''', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{wdir}\t{e}\n')
+        sys.stderr.flush()
+
+
+def run_md_analysis(wdir, system_lig_molid_list, mdtime, project_dir):
+    index_list = get_index(os.path.join(wdir, 'index.ndx'))
+    mol_id = os.path.basename(wdir)
+
+    if f'Protein_{mol_id}' not in index_list:
+        if not make_group_ndx(query=f'"Protein"|{index_list.index(mol_id)}', wdir=wdir):
+            return False
+        index_list = get_index(os.path.join(wdir, 'index.ndx'))
+
+    index_protein_ligand = index_list.index(f'Protein_{mol_id}')
+
+    tu = 'ps' if mdtime <= 10 else 'ns'
+    dtstep = 50 if mdtime <= 10 else 100
+
+    try:
+        subprocess.check_output(f'wdir={wdir} index_protein_ligand={index_protein_ligand} tu={tu} dtstep={dtstep} bash {os.path.join(project_dir, "md_analysis.sh")}', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{wdir}\t{e}\n')
+        sys.stderr.flush()
+        return False
+
+    for system_ligand in system_lig_molid_list:
+        md_lig_rmsd_analysis(mol_id=system_ligand, wdir=wdir, tu=tu)
+
+    return wdir
+
 
 def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=None,
-         gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3", hostfile=None, ncpu=1):
+         gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3", hostfile=None, ncpu=1,
+         topol=None, posre_protein=None):
+    global dask_client
+
     if wdir is None:
         wdir = os.getcwd()
 
-    subprocess.run(f'module load {gromacs_version}', shell=True)
+    try:
+        subprocess.check_output(f'module load {gromacs_version}', shell=True)
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(e)
+        sys.stderr.flush()
+        return False
+
     project_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
 
@@ -281,7 +357,7 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
     # start dask cluster if hostfile was supplied
     if hostfile:
         cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
-        subprocess.run(cmd, shell=True)
+        subprocess.check_output(cmd, shell=True)
         time.sleep(10)
 
     dask_client = init_dask_client(hostfile)
@@ -291,16 +367,26 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
             raise FileExistsError(f'{protein} does not exist')
 
         pname, p_ext = os.path.splitext(os.path.basename(protein))
-        print(pname, p_ext)
-        # check if exists
-        if p_ext != '.gro':
-            subprocess.run(f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh '
+        if p_ext != '.gro' or topol is None or posre_protein is None:
+            try:
+                subprocess.check_output(f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh '
                       f'-i {os.path.join(wdir_md, "posre.itp")} '
                       f'-p {os.path.join(wdir_md, "topol.top")}'
                       f'<<< 6', shell=True)
-
+            except subprocess.CalledProcessError as e:
+                sys.stderr.write(e)
+                sys.stderr.flush()
+                return False
+        else:
+            if not os.path.isfile(os.path.join(wdir_protein, protein)):
+                shutil.copy(protein, os.path.join(wdir_protein, protein))
+            if not os.path.isfile(os.path.join(wdir_md, 'topol.top')):
+                shutil.copy(topol, os.path.join(wdir_md, 'topol.top'))
+            if not os.path.isfile(os.path.join(wdir_md, 'posre.itp')):
+                shutil.copy(posre_protein, os.path.join(wdir_md, 'posre.itp'))
 
     system_ligs = []
+    # os.path.join(wdir_md_tec, mol_id)
     if system_lfile is not None:
         if not os.path.isfile(system_lfile):
             raise FileExistsError(f'{system_lfile} does not exist')
@@ -311,50 +397,99 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
                                           script_path=script_path, project_dir=project_dir,
                                           wdir_ligand=wdir_cofactor, wdir_md=wdir_md,
                                           addH=True, add_to_system=True):
+            if res1 is False:
+                sys.stderr.write(f'Error with system ligand preparation:{res1}. The calculation will be interrupted\n')
+                if dask_client:
+                    dask_client.shutdown()
+                return False
+
             system_ligs.append(res1)
+    system_ligs = sorted(system_ligs)
 
     var_ligs = []
-    if lfile is not None:
+    # os.path.join(wdir_md_tec, mol_id)
+    if lfile is not None and os.path.isfile(lfile):
+        if not os.path.isfile(lfile):
+            raise FileExistsError(f'{lfile} does not exist')
+
         mols = supply_mols(lfile)
+        if mols is None:
+            return False
 
         for res1 in calc_dask(prep_ligand, mols, dask_client, ncpu=args.ncpu,
                               script_path=script_path, project_dir=project_dir,
                               wdir_ligand=wdir_ligand, wdir_md=wdir_md, addH=True,
                               add_to_system=False):
-            var_ligs.append(res1)
+            if res1:
+                var_ligs.append(res1)
 
     # make all itp and create complex
+    var_complex_prepared = []
+    # os.path.dirname(var_lig)
     for res1 in calc_dask(run_complex_prep, iter(var_ligs), dask_client, system_ligs=system_ligs,
                           protein_gro=os.path.join(wdir_protein, f'{pname}.gro'),
                           script_path=script_path, project_dir=project_dir, mdtime=mdtime):
-        pass
+        if res1:
+            var_complex_prepared.append(res1)
 
     if dask_client:
         dask_client.shutdown()
 
     # run on all cpus
-
-    multiplicator = 1
+    multiplicator = ncpu
     n_workers = n_servers * multiplicator
     n_threads = math.ceil(ncpu / multiplicator)
 
     # start dask cluster if hostfile was supplied
     if hostfile:
         cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
-        subprocess.run(cmd, shell=True)
+        subprocess.check_output(cmd, shell=True)
         time.sleep(10)
 
     dask_client = init_dask_client(hostfile)
 
-    for res1 in calc_dask(lambda x: subprocess.run(f'wdir={x} bash {os.path.join(project_dir, "equlibration.sh")}', shell=True), iter([os.path.dirname(i) for i in var_ligs]),
-                          dask_client):
-        pass
+    var_eq = []
+    #os.path.dirname(var_lig)
+    for res1 in calc_dask(run_equilibration, iter(var_complex_prepared),
+                          dask_client, project_dir=project_dir):
+        if res1:
+            var_eq.append(res1)
+
+    # print(var_eq)
+
+    var_md = []
+    # os.path.dirname(var_lig)
+    for res1 in calc_dask(run_simulation, iter(var_eq),
+                          dask_client, project_dir=project_dir):
+        if res1:
+            var_md.append(res1)
+
+    if dask_client:
+        dask_client.shutdown()
+
+    # run on 1 cpus
+    multiplicator = 1
+    n_workers = n_servers * multiplicator
+    n_threads = math.ceil(ncpu / multiplicator)
+    # start dask cluster if hostfile was supplied
+    if hostfile:
+        cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
+        subprocess.check_output(cmd, shell=True)
+        time.sleep(10)
+
+    dask_client = init_dask_client(hostfile)
+
+    var_md_analysis = []
+    # os.path.dirname(var_lig)
+    for res1 in calc_dask(run_md_analysis, iter(var_md),
+                          dask_client, mdtime=mdtime, system_lig_molid_list=[os.path.basename(i) for i in system_ligs], project_dir=project_dir):
+        if res1:
+            var_md_analysis.append(res1)
 
 
-    # run
-
-    # for var_lig in var_ligs:
-    # prep_complex(var_lig, system_ligs, protein_gro, script_path)
+    sys.stdout.write(f'\nSimulation of {var_md} were successfully finished\n')
+    sys.stdout.write(f'\nAnalysis of md simulation of {var_md_analysis} were successfully finished\n')
+    sys.stdout.flush()
 
     if dask_client:
         dask_client.shutdown()
@@ -376,7 +511,15 @@ if __name__ == '__main__':
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
                         help='number of CPU per server. Use all cpus by default.')
+    parser.add_argument('-t', '--time', metavar='INTEGER', required=False, default=1, type=float,
+                        help='Time of MD simulation')
 
     args = parser.parse_args()
 
-    main(protein=args.protein, lfile=args.ligand, system_lfile=args.cofactor, hostfile=args.hostfile, ncpu=args.ncpu)
+    try:
+        global dask_client
+        dask_client=False
+        main(protein=args.protein, lfile=args.ligand, mdtime=args.time, system_lfile=args.cofactor, hostfile=args.hostfile, ncpu=args.ncpu)
+    finally:
+        if dask_client:
+            dask_client.shutdown()
