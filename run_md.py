@@ -578,7 +578,7 @@ if __name__ == '__main__':
                         help='input file with compound. Supported formats: *.pdb or gro')
     parser.add_argument('-l', '--ligand', metavar='FILENAME', required=True, type=filepath_type,
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
-    parser.add_argument('--cofactor', metavar='FILENAME', required=True, type=filepath_type,
+    parser.add_argument('--cofactor', metavar='FILENAME', default=None, type=filepath_type,
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
