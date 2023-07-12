@@ -125,59 +125,81 @@ def edit_mdp(md_file, pattern, replace):
 
 
 def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir, mdtime):
-    tec_wdir = os.path.dirname(var_lig)
+    cur_wdir = os.path.dirname(var_lig)
 
-    if os.path.isfile(os.path.join(tec_wdir, "all.itp")) and os.path.isfile(os.path.join(tec_wdir, 'complex.gro')) \
-        and os.path.isfile(os.path.join(tec_wdir, 'solv_ions.gro')) and os.path.isfile(os.path.join(tec_wdir, 'index.ndx')):
-        sys.stdout.write(f'{tec_wdir}. Complex files exist. Skip complex preparation step\n')
+    if os.path.isfile(os.path.join(cur_wdir, "all.itp")) and os.path.isfile(os.path.join(cur_wdir, 'complex.gro')) \
+        and os.path.isfile(os.path.join(cur_wdir, 'solv_ions.gro')) and os.path.isfile(os.path.join(cur_wdir, 'index.ndx')):
+        sys.stdout.write((f'{cur_wdir}. Complex files exist. Skip complex preparation step\n')
         sys.stdout.flush()
-        return tec_wdir
+        return cur_wdir
 
-    system_ligs_tec = []
+    system_ligs_cur = []
     # copy system_lig itp to ligand_md_wdir
     for sys_lig in system_ligs:
-        new_sys_lig = os.path.join(tec_wdir, os.path.basename(sys_lig))
-        if os.path.isfile(f'{new_sys_lig}.itp'):
-            os.remove(f'{new_sys_lig}.itp')
+        new_sys_lig = os.path.join(cur_wdir, os.path.basename(sys_lig))
         shutil.copy(f'{sys_lig}.itp', f'{new_sys_lig}.itp')
-        system_ligs_tec.append(new_sys_lig)
+        system_ligs_cur.append(new_sys_lig)
 
-    add_ligands_to_topol([var_lig]+system_ligs_tec, topol=os.path.join(tec_wdir, "topol.top"))
+    add_ligands_to_topol([var_lig]+system_ligs_cur, topol=os.path.join(cur_wdir, "topol.top"))
 
-    itp_lig_list = [f'{i}.itp' for i in [var_lig]+system_ligs_tec]
+    itp_lig_list = [f'{i}.itp' for i in [var_lig]+system_ligs_cur]
     # make all itp
-    make_all_itp(itp_lig_list, out_file=os.path.join(tec_wdir, 'all.itp'))
-    edit_topology_file(topol_file=os.path.join(tec_wdir, "topol.top"), pattern="; Include forcefield parameters",
-                       add=f'; Include all topology\n#include "{os.path.join(tec_wdir, "all.itp")}"\n', how='after', n=3)
+    make_all_itp(itp_lig_list, out_file=os.path.join(cur_wdir, 'all.itp'))
+    edit_topology_file(topol_file=os.path.join(cur_wdir, "topol.top"), pattern="; Include forcefield parameters",
+                       add=f'; Include all topology\n#include "{os.path.join(cur_wdir, "all.itp")}"\n', how='after', n=3)
     # complex
     gro_lig_list = [f'{i}.gro' for i in [var_lig] + system_ligs]
     complex_preparation(protein_gro=protein_gro,
                         ligand_gro_list=gro_lig_list,
-                        out_file=os.path.join(tec_wdir, 'complex.gro'))
-    for mdp_file in glob(os.path.join(script_path, '*.mdp')):
-        shutil.copy(mdp_file, tec_wdir)
+                        out_file=os.path.join(cur_wdir, 'complex.gro'))
+    for mdp_fname in ['ions.mdp','minim.mdp']:
+        mdp_file = os.path.join(script_path, mdp_fname)
+        shutil.copy(mdp_file, cur_wdir)
 
     try:
-        subprocess.check_output(f'wdir={tec_wdir} bash {os.path.join(project_dir, "solv_ions.sh")}', shell=True)
+        subprocess.check_output(f'wdir={cur_wdir} bash {os.path.join(project_dir, "solv_ions.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{tec_wdir}\t{e}\n')
-        return False
+        sys.stderr.write((f'{cur_wdir}\t{e}\n')
+        return None
     try:
-        subprocess.check_output(f'cd {tec_wdir}; gmx make_ndx -f solv_ions.gro <<< "q"', shell=True)
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{tec_wdir}\t{e}\n')
-        return False
+        subprocess.check_output(f'''
+        cd {cur_wdir}
+        gmx make_ndx -f solv_ions.gro << INPUT
+        q
+        INPUT
+        ''', shell=True)
 
-    index_list = get_index(os.path.join(tec_wdir, 'index.ndx'))
+    except subprocess.CalledProcessError as e:
+        sys.stderr.write(f'{cur_wdir}\t{e}\n')
+        return None
+    index_list = get_index(os.path.join(cur_wdir, 'index.ndx'))
     # index_list.index('Protein')} | {index_list.index(l_name)} | {index_list.index(c_name)
     # make couple_index_group
-    couple_group_reg_ind = '|'.join([str(index_list.index(i)) for i in ['Protein']+[os.path.basename(var_lig)]+[os.path.basename(j) for j in system_ligs]])
-    couple_group = '_'.join([i for i in ['Protein']+[os.path.basename(var_lig)]+[os.path.basename(j) for j in system_ligs]])
-    if make_group_ndx(couple_group_reg_ind, tec_wdir):
-        return False
+    couple_group_ind = '|'.join([str(index_list.index(i)) for i in
+                                     ['Protein'] + [os.path.basename(var_lig)] + [os.path.basename(j) for j in
+                                                                                  system_ligs]])
+    couple_group = '_'.join(
+        [i for i in ['Protein'] + [os.path.basename(var_lig)] + [os.path.basename(j) for j in system_ligs]])
 
-    edit_mdp(mdp_path=tec_wdir, couple_group=couple_group, mdtime=mdtime)
-    return tec_wdir
+    for mdp_fname in ['nvt.mdp','npt.mdp', 'md.mdp']:
+        mdp_file = os.path.join(script_path, mdp_fname)
+        shutil.copy(mdp_file, cur_wdir)
+        md_fname = os.path.basename(mdp_file)
+        if md_fname in ['nvt.mdp', 'npt.mdp', 'md.mdp']:
+            edit_mdp(md_file=os.path.join(cur_wdir, md_fname),
+                     pattern='tc-grps',
+                     replace=f'tc-grps                 = {couple_group} Water_and_ions; two coupling groups')
+        if md_fname == 'md.mdp':
+            # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
+            steps = int(mdtime * 1000 * 1000 / 2)
+            edit_mdp(md_file=os.path.join(cur_wdir, md_fname),
+                     pattern='nsteps',
+                     replace=f'nsteps                  = {steps}        ;')
+
+    if not make_group_ndx(couple_group_ind, cur_wdir):
+        return None
+
+    return cur_wdir
 
 
 def edit_topology_file(topol_file, pattern, add, how='before', n=0):
