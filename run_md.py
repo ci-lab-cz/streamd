@@ -8,7 +8,7 @@ import math
 import time
 import subprocess
 from rdkit import Chem
-
+from dask.distributed import Client
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -20,18 +20,30 @@ def filepath_type(x):
     else:
         return x
 
-def init_dask_client(hostfile=None):
-    if hostfile is not None:
-        from dask.distributed import Client
+def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
+    '''
 
+    :param n_tasks_per_node: number of task on a single server
+    :param ncpu: number of cpu on a single server
+    :param hostfile:
+    :return:
+    '''
+    if hostfile:
         with open(hostfile) as f:
             hosts = [line.strip() for line in f]
-        dask_client = Client(hosts[0] + ':8786', connection_limit=2048)
-        # dask_client = Client()   # to test dask locally
+            n_servers = sum(1 if line.strip() else 0 for line in f)
     else:
-        from dask.distributed import Client
+        n_servers = 1
+
+    n_workers = n_servers * n_tasks_per_node
+    n_threads = math.ceil(ncpu / n_tasks_per_node)
+    if hostfile is not None:
+        cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
+        subprocess.check_output(cmd, shell=True)
+        time.sleep(10)
+        dask_client = Client(hosts[0] + ':8786', connection_limit=2048)
+    else:
         dask_client = Client()   # to run dask on a single server (local cluster)
-        # dask_client = None
     return dask_client
 
 
@@ -419,113 +431,82 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
             if not os.path.isfile(os.path.join(wdir_md, 'posre.itp')):
                 shutil.copy(posre_protein, os.path.join(wdir_md, 'posre.itp'))
 
-    system_ligs = []
-    # os.path.join(wdir_md_tec, mol_id)
-    if system_lfile is not None:
-        if not os.path.isfile(system_lfile):
-            raise FileExistsError(f'{system_lfile} does not exist')
 
-        mols = supply_mols(system_lfile)
+    # Part 1. Preparation. Run on each cpu
+    dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
+    try:
+        system_ligs = []
+        # os.path.join(wdir_md_cur, mol_id)
+        if system_lfile is not None:
+            if not os.path.isfile(system_lfile):
+                raise FileExistsError(f'{system_lfile} does not exist')
 
-        for res1 in calc_dask(prep_ligand, mols, dask_client, ncpu=args.ncpu,
-                                          script_path=script_path, project_dir=project_dir,
-                                          wdir_ligand=wdir_cofactor, wdir_md=wdir_md,
-                                          addH=True, add_to_system=True):
-            if res1 is False:
-                sys.stderr.write(f'Error with system ligand preparation:{res1}. The calculation will be interrupted\n')
-                if dask_client:
-                    dask_client.shutdown()
-                return False
+            mols = supply_mols(system_lfile)
+            for res in calc_dask(prep_ligand, mols, dask_client,
+                                              script_path=script_path, project_dir=project_dir,
+                                              wdir_ligand=wdir_cofactor,
+                                              addH=True):
+                if not res:   # TODO: return empty line or None if calculation failed
+                    sys.stderr.write(f'Error with system ligand (cofactor) preparation. The calculation will be interrupted\n')
+                    return
 
-            system_ligs.append(res1)
-    system_ligs = sorted(system_ligs)
+                system_ligs.append(res)
+        system_ligs = sorted(system_ligs)
 
-    var_ligs = []
-    # os.path.join(wdir_md_tec, mol_id)
-    if lfile is not None and os.path.isfile(lfile):
-        if not os.path.isfile(lfile):
-            raise FileExistsError(f'{lfile} does not exist')
+        var_ligs = []
+        # os.path.join(wdir_md_cur, mol_id)
+        if lfile is not None:
+            if not os.path.isfile(lfile):
+                raise FileExistsError(f'{lfile} does not exist')
 
-        mols = supply_mols(lfile)
-        if mols is None:
-            return False
+            mols = supply_mols(lfile)
+            for res in calc_dask(prep_ligand, mols, dask_client,
+                                  script_path=script_path, project_dir=project_dir,
+                                  wdir_ligand=wdir_ligand, addH=True):
+                if res:
+                    var_ligs.append(res)
 
-        for res1 in calc_dask(prep_ligand, mols, dask_client, ncpu=args.ncpu,
-                              script_path=script_path, project_dir=project_dir,
-                              wdir_ligand=wdir_ligand, wdir_md=wdir_md, addH=True,
-                              add_to_system=False):
-            if res1:
-                var_ligs.append(res1)
 
-    # make all itp and create complex
-    var_complex_prepared = []
-    # os.path.dirname(var_lig)
-    for res1 in calc_dask(run_complex_prep, iter(var_ligs), dask_client, system_ligs=system_ligs,
-                          protein_gro=os.path.join(wdir_protein, f'{pname}.gro'),
-                          script_path=script_path, project_dir=project_dir, mdtime=mdtime):
-        if res1:
-            var_complex_prepared.append(res1)
-
-    if dask_client:
+        # make all itp and create complex
+        var_complex_prepared = []
+        # os.path.dirname(var_lig)
+        for res in calc_dask(run_complex_prep, var_ligs, dask_client, system_ligs=system_ligs,
+                              protein_gro=os.path.join(wdir_protein, f'{pname}.gro'),  # TODO: pname may be not inited
+                              script_path=script_path, project_dir=project_dir, mdtime=mdtime):
+            if res:
+                var_complex_prepared.append(res)
+    finally:
         dask_client.shutdown()
 
-    # run on all cpus
-    multiplicator = ncpu
-    n_workers = n_servers * multiplicator
-    n_threads = math.ceil(ncpu / multiplicator)
+    # Part 2. Equilibration and MD simulation. Run on all cpu
+    dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+    try:
+        var_eq = []
+        #os.path.dirname(var_lig)
+        for res in calc_dask(run_equilibration, var_complex_prepared, dask_client, project_dir=project_dir):
+            if res:
+                var_eq.append(res)
 
-    # start dask cluster if hostfile was supplied
-    if hostfile:
-        cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
-        subprocess.check_output(cmd, shell=True)
-        time.sleep(10)
+        var_md = []
+        # os.path.dirname(var_lig)
+        for res in calc_dask(run_simulation, var_eq, dask_client, project_dir=project_dir):
+            if res:
+                var_md.append(res)
 
-    dask_client = init_dask_client(hostfile)
-
-    var_eq = []
-    #os.path.dirname(var_lig)
-    for res1 in calc_dask(run_equilibration, iter(var_complex_prepared),
-                          dask_client, project_dir=project_dir):
-        if res1:
-            var_eq.append(res1)
-
-    # print(var_eq)
-
-    var_md = []
-    # os.path.dirname(var_lig)
-    for res1 in calc_dask(run_simulation, iter(var_eq),
-                          dask_client, project_dir=project_dir):
-        if res1:
-            var_md.append(res1)
-
-    if dask_client:
+    finally:
         dask_client.shutdown()
 
-    # run on 1 cpus
-    multiplicator = 1
-    n_workers = n_servers * multiplicator
-    n_threads = math.ceil(ncpu / multiplicator)
-    # start dask cluster if hostfile was supplied
-    if hostfile:
-        cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
-        subprocess.check_output(cmd, shell=True)
-        time.sleep(10)
-
-    dask_client = init_dask_client(hostfile)
-
-    var_md_analysis = []
-    # os.path.dirname(var_lig)
-    for res1 in calc_dask(run_md_analysis, iter(var_md),
-                          dask_client, mdtime=mdtime, system_lig_molid_list=[os.path.basename(i) for i in system_ligs], project_dir=project_dir):
-        if res1:
-            var_md_analysis.append(res1)
-
-
-    sys.stdout.write(f'\nSimulation of {var_md} were successfully finished\n')
-    sys.stdout.write(f'\nAnalysis of md simulation of {var_md_analysis} were successfully finished\n')
-    sys.stdout.flush()
-
-    if dask_client:
+    # Part 3. MD Analysis. Run on each cpu
+    dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
+    try:
+        var_md_analysis = []
+        # os.path.dirname(var_lig)
+        for res in calc_dask(run_md_analysis, var_md,
+                              dask_client, mdtime=mdtime,
+                              system_lig_molid_list=[os.path.basename(i) for i in system_ligs], project_dir=project_dir):
+            if res:
+                var_md_analysis.append(res)
+    finally:
         dask_client.shutdown()
 
 
