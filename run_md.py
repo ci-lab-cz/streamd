@@ -125,46 +125,51 @@ def edit_mdp(md_file, pattern, replace):
         out.write(''.join(new_mdp))
 
 
-def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir, mdtime):
-    cur_wdir = os.path.dirname(var_lig)
+def run_complex_prep(var_lig_data, system_lig_data, protein_name, wdir_protein, wdir_md, script_path, project_dir, mdtime):
+    wdir_md_cur = prep_md_files(var_lig_data=var_lig_data, protein_name=protein_name, system_lig_data=system_lig_data, wdir_protein=wdir_protein, wdir_md=wdir_md)
 
-    if os.path.isfile(os.path.join(cur_wdir, "all.itp")) and os.path.isfile(os.path.join(cur_wdir, 'complex.gro')) \
-        and os.path.isfile(os.path.join(cur_wdir, 'solv_ions.gro')) and os.path.isfile(os.path.join(cur_wdir, 'index.ndx')):
-        sys.stdout.write((f'{cur_wdir}. Complex files exist. Skip complex preparation step\n')
-        sys.stdout.flush()
-        return cur_wdir
+    wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
+    protein_gro = os.path.join(wdir_protein, f'{protein_name}.gro')
 
-    system_ligs_cur = []
+    if os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) and os.path.isfile(os.path.join(wdir_md_cur, 'complex.gro')) \
+        and os.path.isfile(os.path.join(wdir_md_cur, 'solv_ions.gro')) and os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
+        logging.warning(f'{wdir_md_cur}. Complex files exist. Skip complex preparation step\n')
+        return wdir_md_cur
+
+    all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.itp')],\
+                                                     [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.gro')],\
+                                                     [os.path.join(wdir_var_ligand_cur, f'posre_{var_lig_molid}.itp')],\
+                                                     [var_lig_molid], [var_lig_resid]
     # copy system_lig itp to ligand_md_wdir
-    for sys_lig in system_ligs:
-        new_sys_lig = os.path.join(cur_wdir, os.path.basename(sys_lig))
-        shutil.copy(f'{sys_lig}.itp', f'{new_sys_lig}.itp')
-        system_ligs_cur.append(new_sys_lig)
+    for wdir_system_ligand_cur, system_lig_molid, system_lig_resid in system_lig_data:
+        shutil.copy(os.path.join(wdir_system_ligand_cur,f'{system_lig_molid}.itp'), os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
+        all_itp_list.append(os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
+        all_gro_list.append(os.path.join(wdir_system_ligand_cur, f'{system_lig_molid}.gro'))
+        all_posres_list.append(os.path.join(wdir_system_ligand_cur, f'posre_{system_lig_molid}.itp'))
+        all_resids.append(system_lig_resid)
 
-    add_ligands_to_topol([var_lig]+system_ligs_cur, topol=os.path.join(cur_wdir, "topol.top"))
+    add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol=os.path.join(wdir_md_cur, "topol.top"))
 
-    itp_lig_list = [f'{i}.itp' for i in [var_lig]+system_ligs_cur]
     # make all itp
-    make_all_itp(itp_lig_list, out_file=os.path.join(cur_wdir, 'all.itp'))
-    edit_topology_file(topol_file=os.path.join(cur_wdir, "topol.top"), pattern="; Include forcefield parameters",
-                       add=f'; Include all topology\n#include "{os.path.join(cur_wdir, "all.itp")}"\n', how='after', n=3)
+    make_all_itp(all_itp_list, out_file=os.path.join(wdir_md_cur, 'all.itp'))
+    edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"), pattern="; Include forcefield parameters",
+                       add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n', how='after', n=3)
     # complex
-    gro_lig_list = [f'{i}.gro' for i in [var_lig] + system_ligs]
     complex_preparation(protein_gro=protein_gro,
-                        ligand_gro_list=gro_lig_list,
-                        out_file=os.path.join(cur_wdir, 'complex.gro'))
+                        ligand_gro_list=all_gro_list,
+                        out_file=os.path.join(wdir_md_cur, 'complex.gro'))
     for mdp_fname in ['ions.mdp','minim.mdp']:
         mdp_file = os.path.join(script_path, mdp_fname)
-        shutil.copy(mdp_file, cur_wdir)
+        shutil.copy(mdp_file, wdir_md_cur)
 
     try:
-        subprocess.check_output(f'wdir={cur_wdir} bash {os.path.join(project_dir, "solv_ions.sh")}', shell=True)
+        subprocess.check_output(f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "solv_ions.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
         sys.stderr.write((f'{cur_wdir}\t{e}\n')
         return None
     try:
         subprocess.check_output(f'''
-        cd {cur_wdir}
+        cd {wdir_md_cur}
         gmx make_ndx -f solv_ions.gro << INPUT
         q
         INPUT
@@ -173,34 +178,30 @@ def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f'{cur_wdir}\t{e}\n')
         return None
-    index_list = get_index(os.path.join(cur_wdir, 'index.ndx'))
-    # index_list.index('Protein')} | {index_list.index(l_name)} | {index_list.index(c_name)
+    index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
     # make couple_index_group
-    couple_group_ind = '|'.join([str(index_list.index(i)) for i in
-                                     ['Protein'] + [os.path.basename(var_lig)] + [os.path.basename(j) for j in
-                                                                                  system_ligs]])
-    couple_group = '_'.join(
-        [i for i in ['Protein'] + [os.path.basename(var_lig)] + [os.path.basename(j) for j in system_ligs]])
+    couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
+    couple_group = '_'.join(['Protein']+all_resids)
 
     for mdp_fname in ['nvt.mdp','npt.mdp', 'md.mdp']:
         mdp_file = os.path.join(script_path, mdp_fname)
-        shutil.copy(mdp_file, cur_wdir)
+        shutil.copy(mdp_file, wdir_md_cur)
         md_fname = os.path.basename(mdp_file)
         if md_fname in ['nvt.mdp', 'npt.mdp', 'md.mdp']:
-            edit_mdp(md_file=os.path.join(cur_wdir, md_fname),
+            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
                      pattern='tc-grps',
                      replace=f'tc-grps                 = {couple_group} Water_and_ions; two coupling groups')
         if md_fname == 'md.mdp':
             # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
             steps = int(mdtime * 1000 * 1000 / 2)
-            edit_mdp(md_file=os.path.join(cur_wdir, md_fname),
+            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
                      pattern='nsteps',
                      replace=f'nsteps                  = {steps}        ;')
 
-    if not make_group_ndx(couple_group_ind, cur_wdir):
+    if not make_group_ndx(couple_group_ind, wdir_md_cur):
         return None
 
-    return cur_wdir
+    return wdir_md_cur
 
 
 def edit_topology_file(topol_file, pattern, add, how='before', n=0):
@@ -219,100 +220,108 @@ def edit_topology_file(topol_file, pattern, add, how='before', n=0):
         output.write(data)
 
 
-def add_ligands_to_topol(all_lig_vars, topol):
-    itp_include_list, posre_include_list, mol_include_list = [], [], []
-    for cur_lig in all_lig_vars:
-        mol_id = os.path.basename(cur_lig)
-        itp_include_list.append(f'; Include {mol_id} topology\n#include "{cur_lig}.itp"\n')
-        posre_include_list.append(f'; {mol_id} position restraints\n#ifdef POSRES_{mol_id}\n#include "{os.path.join(os.path.dirname(cur_lig), f"posre_{mol_id}.itp")}"\n#endif\n')
-        mol_include_list.append(f'{mol_id}             1')
+def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
+    itp_include_list, posres_include_list, resid_include_list = [], [], []
+    for itp, posres, resid in zip(all_itp_list, all_posres_list, all_resids):
+        itp_include_list.append(f'; Include {resid} topology\n'
+                                f'#include "{itp}"\n')
+        posres_include_list.append(f'; {resid} position restraints\n#ifdef POSRES_{resid}\n'
+                                  f'#include "{posres}"\n#endif\n')
+        resid_include_list.append(f'{resid}             1')
 
     edit_topology_file(topol, pattern="; Include forcefield parameters",
                 add='\n'.join(itp_include_list), how='after', n=3)
     #reverse order since add before pattern
     edit_topology_file(topol, pattern="; Include topology for ions",
-                add='\n'.join(posre_include_list[::-1]), how='before')
-    edit_topology_file(topol, pattern='; Compound        #mols', add='\n'.join(mol_include_list), how='after', n=2)
+                add='\n'.join(posres_include_list[::-1]), how='before')
+    edit_topology_file(topol, pattern='; Compound        #mols', add='\n'.join(resid_include_list), how='after', n=2)
 
 
-def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, add_to_system=False):
-    mol_id = mol.GetProp('_Name')
-    system_mol_id = mol.GetProp('system_id')
+def prep_ligand(mol, script_path, project_dir, wdir_ligand, addH=True):
+    molid = mol.GetProp('_Name')
+    resid = mol.GetProp('resid')
     if addH:
-        mol = Chem.AddHs(mol, addCoords = True)
+        mol = Chem.AddHs(mol, addCoords=True)
 
-    wdir_ligand_tec = os.path.join(wdir_ligand, mol_id)
+    wdir_ligand_cur = os.path.join(wdir_ligand, molid)
+    os.makedirs(wdir_ligand_cur, exist_ok=True)
 
-    if add_to_system:
-        wdir_md_tec = wdir_md
-    else:
-        wdir_md_tec = os.path.join(wdir_md, 'ligands', mol_id)
-
-    if os.path.isfile(os.path.join(wdir_md_tec, mol_id) + '.itp'):
-        sys.stdout.write(f'{mol_id}.itp file already exist. Mol preparation step will be skipped for such molecule\n')
-        return os.path.join(wdir_md_tec, mol_id)
-
-    os.makedirs(wdir_ligand_tec, exist_ok=True)
-    os.makedirs(wdir_md_tec, exist_ok=True)
-
-    mol_file = os.path.join(wdir_ligand_tec, f'{mol_id}.mol')
-    if not add_to_system:
-        shutil.copy(os.path.join(wdir_md, "topol.top"), os.path.join(wdir_md_tec, "topol.top"))
-
+    mol_file = os.path.join(wdir_ligand_cur, f'{molid}.mol')
     Chem.MolToMolFile(mol, mol_file)
 
     try:
-        subprocess.check_output(f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} name={system_mol_id} bash {os.path.join(project_dir, "lig_prep.sh")}',
+        subprocess.check_output(f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} name={resid} bash {os.path.join(project_dir, "lig_prep.sh")}',
                                 shell=True)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f'{mol_id}\t{e}\n')
         sys.stderr.flush()
-        return False
+        return None
 
-    shutil.copy(os.path.join(wdir_ligand_tec, f'{mol_id}.itp'), os.path.join(wdir_md_tec, f'{mol_id}.itp'))
-    shutil.copy(os.path.join(wdir_ligand_tec, f'{mol_id}.gro'), os.path.join(wdir_md_tec, f'{mol_id}.gro'))
-    shutil.copy(os.path.join(wdir_ligand_tec, f'posre_{mol_id}.itp'), os.path.join(wdir_md_tec, f'posre_{mol_id}.itp'))
+    # create log for molid resid corresponding
+    with open(os.path.join(wdir_ligand_cur, 'resid.txt'), 'w') as out:
+        out.write(f'{molid}\t{resid}')
 
-    return os.path.join(wdir_md_tec, mol_id)
+    return wdir_ligand_cur, molid, resid
+
+def prep_md_files(var_lig_data, protein_name, system_lig_data, wdir_protein, wdir_md):
+    def copy_md_files_to_wdir(molid, wdir_copy_from, wdir_copy_to):
+        shutil.copy(os.path.join(wdir_copy_from, f'{molid}.itp'), os.path.join(wdir_copy_to, f'{molid}.itp'))
+        shutil.copy(os.path.join(wdir_copy_from, f'{molid}.gro'), os.path.join(wdir_copy_to, f'{molid}.gro'))
+        shutil.copy(os.path.join(wdir_copy_from, f'posre_{molid}.itp'),
+                    os.path.join(wdir_copy_to, f'posre_{molid}.itp'))
+
+    wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
+    wdir_md_cur = os.path.join(wdir_md, f'{protein_name}_{var_lig_molid}')
+    os.makedirs(wdir_md_cur, exist_ok=True)
+
+    shutil.copy(os.path.join(wdir_protein, "topol.top"), os.path.join(wdir_md_cur, "topol.top"))
+    shutil.copy(os.path.join(wdir_protein, "posre.itp"), os.path.join(wdir_md_cur, "posre.itp"))
+
+    copy_md_files_to_wdir(var_lig_molid, wdir_copy_from=wdir_var_ligand_cur, wdir_copy_to=wdir_md_cur)
+
+    for wdir_system_ligand_cur, system_lig_molid, system_lig_resid in system_lig_data:
+        copy_md_files_to_wdir(system_lig_molid, wdir_copy_from=wdir_system_ligand_cur, wdir_copy_to=wdir_md_cur)
+
+    return wdir_md_cur
 
 
-def supply_mols(fname, uniq_system_id=None):
-    def create_random_id():
+def supply_mols(fname, set_resid=None):
+    def create_random_resid():
         # gro
         ascii_uppercase_digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
         return ''.join(random.choices(ascii_uppercase_digits, k=3))
 
-    def add_mol_id(mol, n, input_fname, uniq_system_id, used_system_mol_ids):
-        if uniq_system_id is None:
-            sys_mol_id = create_random_id()
-            while sys_mol_id == 'UNL' or sys_mol_id in used_system_mol_ids:
-                sys_mol_id = create_random_id()
-            mol.SetProp('system_id', sys_mol_id)
+    def add_resid(mol, n, input_fname, set_resid, used_resids):
+        if set_resid is None:
+            cur_resid = create_random_resid()
+            while cur_resid == 'UNL' or cur_resid in used_resids:
+                cur_resid = create_random_resid()
+            mol.SetProp('resid', cur_resid)
         else:
-            mol.SetProp('system_id', uniq_system_id)
+            mol.SetProp('resid', set_resid)
 
         if not mol.HasProp('_Name'):
             mol.SetProp('_Name', f'{input_fname}_ID{n}')
         return mol
 
-    used_system_mol_ids = []
+    used_resids = []
 
     if fname.endswith('.sdf'):
         for n, mol in enumerate(Chem.SDMolSupplier(fname, removeHs=False)):
             if mol:
-                mol = add_mol_id(mol, n, input_fname=os.path.basename(fname).strip('.sdf'),
-                                 uniq_system_id=uniq_system_id,
-                                 used_system_mol_ids=used_system_mol_ids)
-                used_system_mol_ids.append(mol.GetProp('system_id'))
+                mol = add_resid(mol, n, input_fname=os.path.basename(fname).strip('.sdf'),
+                                set_resid=set_resid,
+                                used_resids=used_resids)
+                used_resids.append(mol.GetProp('resid'))
                 yield mol
 
     if fname.endswith('.mol'):
         mol = Chem.MolFromMolFile(fname, removeHs=False)
         if mol:
-            mol = add_mol_id(mol, n=1, input_fname=os.path.basename(fname).strip('.mol'),
-                             uniq_system_id=uniq_system_id,
-                             used_system_mol_ids=used_system_mol_ids)
-            used_system_mol_ids.append(mol.GetProp('system_id'))
+            mol = add_resid(mol, n=1, input_fname=os.path.basename(fname).strip('.mol'),
+                            set_resid=set_resid,
+                            used_resids=used_resids)
+            used_resids.append(mol.GetProp('resid'))
             yield mol
 
 
@@ -365,32 +374,32 @@ def run_simulation(wdir, project_dir):
         return False
     return wdir
 
-def md_lig_rmsd_analysis(mol_id, wdir, tu):
+def md_lig_rmsd_analysis(molid, resid, wdir, tu):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
-    if f'{mol_id}_&_!H*' not in index_list:
-        if not make_group_ndx(query=f'{index_list.index(mol_id)} & ! a H*', wdir=wdir):
-            return False
-    index_ligand_noH = index_list.index(f'{mol_id}_&_!H*')
+    if f'{resid}_&_!H*' not in index_list:
+        if not make_group_ndx(query=f'{index_list.index(resid)} & ! a H*', wdir=wdir):
+            return None
+        index_list = get_index(os.path.join(wdir, 'index.ndx'))
+    index_ligand_noH = index_list.index(f'{resid}_&_!H*')
 
     try:
         subprocess.check_output(f'''
         cd {wdir}
-        gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd_{mol_id}.xvg -n index.ndx  -tu {tu} <<< "Backbone  {index_ligand_noH}"''', shell=True)
+        gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd_{molid}.xvg -n index.ndx  -tu {tu} <<< "Backbone  {index_ligand_noH}"''', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{wdir}\t{e}\n')
-        sys.stderr.flush()
+        logging.error(f'{wdir}\t{e}\n')
 
 
-def run_md_analysis(wdir, system_lig_molid_list, mdtime, project_dir):
+def run_md_analysis(wdir, system_lig_molid_list, system_lig_resid_list, mdtime, project_dir):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
-    mol_id = os.path.basename(wdir)
+    resid = 'UNL'
 
-    if f'Protein_{mol_id}' not in index_list:
-        if not make_group_ndx(query=f'"Protein"|{index_list.index(mol_id)}', wdir=wdir):
-            return False
+    if f'Protein_{resid}' not in index_list:
+        if not make_group_ndx(query=f'"Protein"|{index_list.index(resid)}', wdir=wdir):
+            return None
         index_list = get_index(os.path.join(wdir, 'index.ndx'))
 
-    index_protein_ligand = index_list.index(f'Protein_{mol_id}')
+    index_protein_ligand = index_list.index(f'Protein_{resid}')
 
     tu = 'ps' if mdtime <= 10 else 'ns'
     dtstep = 50 if mdtime <= 10 else 100
@@ -398,12 +407,13 @@ def run_md_analysis(wdir, system_lig_molid_list, mdtime, project_dir):
     try:
         subprocess.check_output(f'wdir={wdir} index_protein_ligand={index_protein_ligand} tu={tu} dtstep={dtstep} bash {os.path.join(project_dir, "md_analysis.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{wdir}\t{e}\n')
-        sys.stderr.flush()
-        return False
+        logging.error(f'{wdir}\t{e}\n')
+        return None
 
-    for system_ligand in system_lig_molid_list:
-        md_lig_rmsd_analysis(mol_id=system_ligand, wdir=wdir, tu=tu)
+    md_lig_rmsd_analysis(molid='ligand', resid=resid, wdir=wdir, tu=tu)
+
+    for system_ligand_molid, system_ligand_resid in zip(system_lig_molid_list, system_lig_resid_list):
+        md_lig_rmsd_analysis(molid=system_ligand_molid, resid=system_ligand_resid, wdir=wdir, tu=tu)
 
     return wdir
 
@@ -488,13 +498,12 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
     # Part 1. Preparation. Run on each cpu
     dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
     try:
-        system_ligs = []
-        # os.path.join(wdir_md_cur, mol_id)
+        system_lig_data = []
         if system_lfile is not None:
             if not os.path.isfile(system_lfile):
                 raise FileExistsError(f'{system_lfile} does not exist')
 
-            mols = supply_mols(system_lfile, uniq_system_id=None)
+            mols = supply_mols(system_lfile, set_resid=None)
             for res in calc_dask(prep_ligand, mols, dask_client,
                                               script_path=script_path, project_dir=project_dir,
                                               wdir_ligand=wdir_cofactor,
@@ -502,49 +511,48 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
                 if not res:   # TODO: return empty line or None if calculation failed
                     sys.stderr.write(f'Error with system ligand (cofactor) preparation. The calculation will be interrupted\n')
                     return
+                system_lig_data.append(res)
 
-                system_ligs.append(res)
-        system_ligs = sorted(system_ligs)
-
-        var_ligs = []
-        # os.path.join(wdir_md_cur, mol_id)
+        var_lig_data = []
+        # os.path.join(wdir_md_cur, molid)
         if lfile is not None:
             if not os.path.isfile(lfile):
                 raise FileExistsError(f'{lfile} does not exist')
 
-            mols = supply_mols(lfile, uniq_system_id='UNL')
+            mols = supply_mols(lfile, set_resid='UNL')
             for res in calc_dask(prep_ligand, mols, dask_client,
                                   script_path=script_path, project_dir=project_dir,
                                   wdir_ligand=wdir_ligand, addH=True):
                 if res:
-                    var_ligs.append(res)
+                    var_lig_data.append(res)
 
 
         # make all itp and create complex
-        var_complex_prepared = []
+        var_complex_prepared_dirs = []
         # os.path.dirname(var_lig)
-        for res in calc_dask(run_complex_prep, var_ligs, dask_client, system_ligs=system_ligs,
-                              protein_gro=os.path.join(wdir_protein, f'{pname}.gro'),  # TODO: pname may be not inited
+        for res in calc_dask(run_complex_prep, var_lig_data, dask_client, system_lig_data=system_lig_data,
+                              protein_name=pname,  # TODO: pname may be not inited
+                              wdir_protein=wdir_protein, wdir_md=wdir_md,
                               script_path=script_path, project_dir=project_dir, mdtime=mdtime):
             if res:
-                var_complex_prepared.append(res)
+                var_complex_prepared_dirs.append(res)
     finally:
         dask_client.shutdown()
 
     # Part 2. Equilibration and MD simulation. Run on all cpu
     dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
     try:
-        var_eq = []
+        var_eq_dirs = []
         #os.path.dirname(var_lig)
-        for res in calc_dask(run_equilibration, var_complex_prepared, dask_client, project_dir=project_dir):
+        for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir):
             if res:
-                var_eq.append(res)
+                var_eq_dirs.append(res)
 
-        var_md = []
+        var_md_dirs = []
         # os.path.dirname(var_lig)
-        for res in calc_dask(run_simulation, var_eq, dask_client, project_dir=project_dir):
+        for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir):
             if res:
-                var_md.append(res)
+                var_md_dirs.append(res)
 
     finally:
         dask_client.shutdown()
@@ -552,13 +560,13 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
     # Part 3. MD Analysis. Run on each cpu
     dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
     try:
-        var_md_analysis = []
+        var_md_analysis_dirs = []
         # os.path.dirname(var_lig)
-        for res in calc_dask(run_md_analysis, var_md,
-                              dask_client, mdtime=mdtime,
-                              system_lig_molid_list=[os.path.basename(i) for i in system_ligs], project_dir=project_dir):
+        for res in calc_dask(run_md_analysis, var_md_dirs,
+                              dask_client, mdtime=mdtime, system_lig_molid_list=[i[1] for i in system_lig_data],
+                              system_lig_resid_list=[i[2] for i in system_lig_data], project_dir=project_dir):
             if res:
-                var_md_analysis.append(res)
+                var_md_analysis_dirs.append(res)
     finally:
         dask_client.shutdown()
 
