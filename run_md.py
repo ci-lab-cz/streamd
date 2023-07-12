@@ -325,7 +325,8 @@ def supply_mols(fname, set_resid=None):
             yield mol
 
 
-def calc_dask(func, main_arg, dask_client, dask_report_fname=None, ncpu=1, **kwargs):
+def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
+    main_arg = iter(main_arg)
     Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
     if dask_client is not None:
         from dask.distributed import as_completed, performance_report
