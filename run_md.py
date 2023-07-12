@@ -6,6 +6,7 @@ from glob import glob
 from multiprocessing import cpu_count
 import math
 import time
+import random
 import subprocess
 from rdkit import Chem
 from dask.distributed import Client
@@ -236,11 +237,7 @@ def add_ligands_to_topol(all_lig_vars, topol):
 
 def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, add_to_system=False):
     mol_id = mol.GetProp('_Name')
-
-    if len(mol_id) > 3:
-        print(f'Wrong mol_id {mol_id}. Mol_id should be less then 3. Will be used only the first 3 letters.')
-        mol_id = mol_id[:3]
-
+    system_mol_id = mol.GetProp('system_id')
     if addH:
         mol = Chem.AddHs(mol, addCoords = True)
 
@@ -265,7 +262,8 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, 
     Chem.MolToMolFile(mol, mol_file)
 
     try:
-        subprocess.check_output(f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_tec} name={mol_id} bash {os.path.join(project_dir, "lig_prep.sh")}', shell=True)
+        subprocess.check_output(f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} name={system_mol_id} bash {os.path.join(project_dir, "lig_prep.sh")}',
+                                shell=True)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f'{mol_id}\t{e}\n')
         sys.stderr.flush()
@@ -278,18 +276,43 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, wdir_md, addH=True, 
     return os.path.join(wdir_md_tec, mol_id)
 
 
-def supply_mols(fname):
+def supply_mols(fname, uniq_system_id=None):
+    def create_random_id():
+        # gro
+        ascii_uppercase_digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        return ''.join(random.choices(ascii_uppercase_digits, k=3))
+
+    def add_mol_id(mol, n, input_fname, uniq_system_id, used_system_mol_ids):
+        if uniq_system_id is None:
+            sys_mol_id = create_random_id()
+            while sys_mol_id == 'UNL' or sys_mol_id in used_system_mol_ids:
+                sys_mol_id = create_random_id()
+            mol.SetProp('system_id', sys_mol_id)
+        else:
+            mol.SetProp('system_id', uniq_system_id)
+
+        if not mol.HasProp('_Name'):
+            mol.SetProp('_Name', f'{input_fname}_ID{n}')
+        return mol
+
+    used_system_mol_ids = []
+
     if fname.endswith('.sdf'):
         for n, mol in enumerate(Chem.SDMolSupplier(fname, removeHs=False)):
             if mol:
-                if not mol.HasProp('_Name'):
-                    mol.SetProp('_Name', f'ID{n}')
+                mol = add_mol_id(mol, n, input_fname=os.path.basename(fname).strip('.sdf'),
+                                 uniq_system_id=uniq_system_id,
+                                 used_system_mol_ids=used_system_mol_ids)
+                used_system_mol_ids.append(mol.GetProp('system_id'))
                 yield mol
+
     if fname.endswith('.mol'):
         mol = Chem.MolFromMolFile(fname, removeHs=False)
         if mol:
-            if not mol.HasProp('_Name'):
-                mol.SetProp('_Name', f'{os.path.basename(fname)}'[:3])
+            mol = add_mol_id(mol, n=1, input_fname=os.path.basename(fname).strip('.mol'),
+                             uniq_system_id=uniq_system_id,
+                             used_system_mol_ids=used_system_mol_ids)
+            used_system_mol_ids.append(mol.GetProp('system_id'))
             yield mol
 
 
@@ -471,7 +494,7 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
             if not os.path.isfile(system_lfile):
                 raise FileExistsError(f'{system_lfile} does not exist')
 
-            mols = supply_mols(system_lfile)
+            mols = supply_mols(system_lfile, uniq_system_id=None)
             for res in calc_dask(prep_ligand, mols, dask_client,
                                               script_path=script_path, project_dir=project_dir,
                                               wdir_ligand=wdir_cofactor,
@@ -489,7 +512,7 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
             if not os.path.isfile(lfile):
                 raise FileExistsError(f'{lfile} does not exist')
 
-            mols = supply_mols(lfile)
+            mols = supply_mols(lfile, uniq_system_id='UNL')
             for res in calc_dask(prep_ligand, mols, dask_client,
                                   script_path=script_path, project_dir=project_dir,
                                   wdir_ligand=wdir_ligand, addH=True):
