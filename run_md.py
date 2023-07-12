@@ -49,21 +49,23 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
 
 def make_all_itp(fileitp_list, out_file):
     atom_type_list = []
-    start_column = '[ atomtypes ]\n; name    at.num    mass    charge ptype  sigma      epsilon\n'
+    start_columns = None
+    #'[ atomtypes ]\n; name    at.num    mass    charge ptype  sigma      epsilon\n'
     for f in fileitp_list:
         with open(f) as input:
             data = input.read()
         start = data.find('[ atomtypes ]')
         end = data.find('[ moleculetype ]') - 1
         atom_type_list.extend(data[start:end].split('\n')[2:])
-        # start_columns = data[start:end].split('\n')[:2]
+        if start_columns is None:
+            start_columns = data[start:end].split('\n')[:2]
         new_data = data[:start] + data[end + 1:]
         with open(f, 'w') as itp_ouput:
             itp_ouput.write(new_data)
 
     atom_type_uniq = [i for i in set(atom_type_list) if i]
     with open(out_file, 'w') as ouput:
-        ouput.write(start_column)
+        ouput.write('\n'.join(start_columns)+'\n')
         ouput.write('\n'.join(atom_type_uniq)+'\n')
 
 
