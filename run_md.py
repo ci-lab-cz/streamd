@@ -112,10 +112,16 @@ def make_group_ndx(query, wdir):
     return True
 
 
-def edit_mdp(mdp_path, couple_group, mdtime):
-    subprocess.run(f"sed -i 's/tc-grps..*/tc-grps                 = {couple_group} Water_and_ions; two coupling groups/' {os.path.join(mdp_path, '*.mdp')}", shell=True)
-    steps = int(mdtime * 1000 * 1000 / 2)  # picoseconds=$mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
-    subprocess.run(f"sed -i 's/nsteps..*/nsteps                  = {steps}        ;/' {os.path.join(mdp_path, 'md.mdp')}", shell=True)
+def edit_mdp(md_file, pattern, replace):
+    new_mdp = []
+    with open(md_file) as inp:
+        for line in inp.readlines():
+            if line.startswith(pattern):
+                new_mdp.append(f'{replace.strip()}\n')
+            else:
+                new_mdp.append(line)
+    with open(md_file, 'w') as out:
+        out.write(''.join(new_mdp))
 
 
 def run_complex_prep(var_lig, system_ligs, protein_gro, script_path, project_dir, mdtime):
