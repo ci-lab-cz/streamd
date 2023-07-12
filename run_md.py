@@ -220,10 +220,10 @@ def edit_topology_file(topol_file, pattern, add, how='before', n=0):
 
 def add_ligands_to_topol(all_lig_vars, topol):
     itp_include_list, posre_include_list, mol_include_list = [], [], []
-    for tec_lig in all_lig_vars:
-        mol_id = os.path.basename(tec_lig)
-        itp_include_list.append(f'; Include {mol_id} topology\n#include "{tec_lig}.itp"\n')
-        posre_include_list.append(f'; {mol_id} position restraints\n#ifdef POSRES_{mol_id}\n#include "{os.path.join(os.path.dirname(tec_lig), f"posre_{mol_id}.itp")}"\n#endif\n')
+    for cur_lig in all_lig_vars:
+        mol_id = os.path.basename(cur_lig)
+        itp_include_list.append(f'; Include {mol_id} topology\n#include "{cur_lig}.itp"\n')
+        posre_include_list.append(f'; {mol_id} position restraints\n#ifdef POSRES_{mol_id}\n#include "{os.path.join(os.path.dirname(cur_lig), f"posre_{mol_id}.itp")}"\n#endif\n')
         mol_include_list.append(f'{mol_id}             1')
 
     edit_topology_file(topol, pattern="; Include forcefield parameters",
