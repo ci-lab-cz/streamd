@@ -124,22 +124,62 @@ def edit_mdp(md_file, pattern, replace):
     with open(md_file, 'w') as out:
         out.write(''.join(new_mdp))
 
+def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_time_ps, mdtime_ns):
+    if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
+        try:
+            subprocess.check_output(f'''
+            cd {wdir_md_cur}
+            gmx make_ndx -f solv_ions.gro << INPUT
+            q
+            INPUT
+            ''', shell=True)
 
-def run_complex_prep(var_lig_data, system_lig_data, protein_name, wdir_protein, wdir_md, script_path, project_dir, mdtime):
+        except subprocess.CalledProcessError as e:
+            logging.error(f'{wdir_md_cur}\t{e}\n')
+            return None
+
+    index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
+    # make couple_index_group
+    couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
+    couple_group = '_'.join(['Protein'] + all_resids)
+
+    for mdp_fname in ['nvt.mdp', 'npt.mdp', 'md.mdp']:
+        mdp_file = os.path.join(script_path, mdp_fname)
+        shutil.copy(mdp_file, wdir_md_cur)
+        md_fname = os.path.basename(mdp_file)
+
+        edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+                 pattern='tc-grps',
+                 replace=f'tc-grps                 = {couple_group} Water_and_ions; two coupling groups')
+        steps = 0
+        if md_fname == 'nvt.mdp':
+            steps = int(nvt_time_ps * 1000 / 2)
+        if md_fname == 'npt.mdp':
+            steps = int(npt_time_ps * 1000 / 2)
+        if md_fname == 'md.mdp':
+            # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
+            steps = int(mdtime_ns * 1000 * 1000 / 2)
+
+        edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+                 pattern='nsteps',
+                 replace=f'nsteps                  = {steps}        ;')
+
+    if not make_group_ndx(couple_group_ind, wdir_md_cur):
+        return None
+
+    return wdir_md_cur
+
+def run_complex_prep(var_lig_data, system_lig_data, protein_name, wdir_protein, wdir_md, script_path, project_dir, mdtime_ns, npt_time_ps, nvt_time_ps):
     wdir_md_cur = prep_md_files(var_lig_data=var_lig_data, protein_name=protein_name, system_lig_data=system_lig_data, wdir_protein=wdir_protein, wdir_md=wdir_md)
 
     wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
     protein_gro = os.path.join(wdir_protein, f'{protein_name}.gro')
 
-    if os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) and os.path.isfile(os.path.join(wdir_md_cur, 'complex.gro')) \
-        and os.path.isfile(os.path.join(wdir_md_cur, 'solv_ions.gro')) and os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
-        logging.warning(f'{wdir_md_cur}. Complex files exist. Skip complex preparation step\n')
-        return wdir_md_cur
-
     all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.itp')],\
                                                      [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.gro')],\
                                                      [os.path.join(wdir_var_ligand_cur, f'posre_{var_lig_molid}.itp')],\
-                                                     [var_lig_molid], [var_lig_resid]
+                                                     [var_lig_molid], \
+                                                     [var_lig_resid]
     # copy system_lig itp to ligand_md_wdir
     for wdir_system_ligand_cur, system_lig_molid, system_lig_resid in system_lig_data:
         shutil.copy(os.path.join(wdir_system_ligand_cur,f'{system_lig_molid}.itp'), os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
@@ -167,38 +207,10 @@ def run_complex_prep(var_lig_data, system_lig_data, protein_name, wdir_protein, 
     except subprocess.CalledProcessError as e:
         sys.stderr.write((f'{cur_wdir}\t{e}\n')
         return None
-    try:
-        subprocess.check_output(f'''
-        cd {wdir_md_cur}
-        gmx make_ndx -f solv_ions.gro << INPUT
-        q
-        INPUT
-        ''', shell=True)
 
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{cur_wdir}\t{e}\n')
-        return None
-    index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
-    # make couple_index_group
-    couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
-    couple_group = '_'.join(['Protein']+all_resids)
-
-    for mdp_fname in ['nvt.mdp','npt.mdp', 'md.mdp']:
-        mdp_file = os.path.join(script_path, mdp_fname)
-        shutil.copy(mdp_file, wdir_md_cur)
-        md_fname = os.path.basename(mdp_file)
-        if md_fname in ['nvt.mdp', 'npt.mdp', 'md.mdp']:
-            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
-                     pattern='tc-grps',
-                     replace=f'tc-grps                 = {couple_group} Water_and_ions; two coupling groups')
-        if md_fname == 'md.mdp':
-            # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
-            steps = int(mdtime * 1000 * 1000 / 2)
-            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
-                     pattern='nsteps',
-                     replace=f'nsteps                  = {steps}        ;')
-
-    if not make_group_ndx(couple_group_ind, wdir_md_cur):
+    if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=all_resids,
+                      script_path=script_path, nvt_time_ps=nvt_time_ps,
+                      npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns):
         return None
 
     return wdir_md_cur
