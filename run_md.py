@@ -403,7 +403,7 @@ def md_lig_rmsd_analysis(molid, resid, wdir, tu):
         logging.error(f'{wdir}\t{e}\n')
 
 
-def run_md_analysis(wdir, system_lig_molid_list, system_lig_resid_list, mdtime, project_dir):
+def run_md_analysis(wdir, deffnm, system_lig_molid_list, system_lig_resid_list, mdtime, project_dir):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
     resid = 'UNL'
 
@@ -418,7 +418,7 @@ def run_md_analysis(wdir, system_lig_molid_list, system_lig_resid_list, mdtime, 
     dtstep = 50 if mdtime <= 10 else 100
 
     try:
-        subprocess.check_output(f'wdir={wdir} index_protein_ligand={index_protein_ligand} tu={tu} dtstep={dtstep} bash {os.path.join(project_dir, "md_analysis.sh")}', shell=True)
+        subprocess.check_output(f'wdir={wdir} index_protein_ligand={index_protein_ligand} tu={tu} dtstep={dtstep} deffnm={deffnm} bash {os.path.join(project_dir, "md_analysis.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
         logging.error(f'{wdir}\t{e}\n')
         return None
@@ -606,17 +606,17 @@ def main(protein, wdir, lfile=None, system_lfile=None,
     else: # continue prev md]
         dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
         try:
-            var_md_continued_dirs = []
+            var_md_dirs = []
             deffnm = f'{deffnm_prev}_{mdtime_ns}'
             # os.path.dirname(var_lig)
             for res in calc_dask(continue_md_from_dir, wdir_to_continue_list, dask_client,
                                  deffnm_prev=deffnm_prev, deffnm_next=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir):
                 if res:
-                    var_md_continued_dirs.append(res)
+                    var_md_dirs.append(res)
 
         finally:
             dask_client.shutdown()
-        logging.info(f'Continue of simulation of {var_md_continued_dirs} were successfully finished\n')
+        logging.info(f'Continue of simulation of {var_md_dirs} were successfully finished\n')
 
     # Part 3. MD Analysis. Run on each cpu
     dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
@@ -624,8 +624,8 @@ def main(protein, wdir, lfile=None, system_lfile=None,
         var_md_analysis_dirs = []
         # os.path.dirname(var_lig)
         for res in calc_dask(run_md_analysis, var_md_dirs,
-                              dask_client, mdtime=mdtime, system_lig_molid_list=[i[1] for i in system_lig_data],
-                              system_lig_resid_list=[i[2] for i in system_lig_data], project_dir=project_dir):
+                             dask_client, deffn=deffnm, mdtime_ns=mdtime_ns, system_lig_molid_list=[i[1] for i in system_lig_data],
+                             system_lig_resid_list=[i[2] for i in system_lig_data], project_dir=project_dir):
             if res:
                 var_md_analysis_dirs.append(res)
     finally:
