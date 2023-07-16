@@ -652,7 +652,12 @@ if __name__ == '__main__':
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
                         help='number of CPU per server. Use all cpus by default.')
-    parser.add_argument('-t', '--time', metavar='ns', required=False, default=1, type=float,
+    parser.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
+                        help='Required if gro file of the protein is provided')
+    parser.add_argument('--posre', metavar='posre.itp', required=False, default=None, type=filepath_type,
+                        help='Required if gro file of the protein is provided')
+    ##
+    parser.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='Time of MD simulation in ns')
     parser.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
                         help='Set up NPT time equilibration in ns')
