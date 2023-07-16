@@ -10,6 +10,9 @@ import random
 import subprocess
 from rdkit import Chem
 from dask.distributed import Client
+import logging
+from datetime import datetime
+import re
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -44,7 +47,9 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
         time.sleep(10)
         dask_client = Client(hosts[0] + ':8786', connection_limit=2048)
     else:
-        dask_client = Client()   # to run dask on a single server (local cluster)
+        dask_client = Client(n_workers=n_workers, threads_per_worker=n_threads)   # to run dask on a single server
+
+    dask_client.forward_logging(level=logging.INFO)
     return dask_client
 
 
@@ -107,8 +112,7 @@ def make_group_ndx(query, wdir):
         INPUT
         ''', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{wdir}\t{e}\n')
-        sys.stderr.flush()
+        logging.error(f'{wdir}\t{e}\n')
         return False
     return True
 
@@ -205,7 +209,7 @@ def run_complex_prep(var_lig_data, system_lig_data, protein_name, wdir_protein, 
     try:
         subprocess.check_output(f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "solv_ions.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write((f'{cur_wdir}\t{e}\n')
+        logging.error(f'{wdir_md_cur}\t{e}\n')
         return None
 
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=all_resids,
@@ -265,8 +269,7 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, addH=True):
         subprocess.check_output(f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} name={resid} bash {os.path.join(project_dir, "lig_prep.sh")}',
                                 shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{mol_id}\t{e}\n')
-        sys.stderr.flush()
+        logging.error(f'{molid}\t{e}\n')
         return None
 
     # create log for molid resid corresponding
@@ -365,26 +368,23 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
 
 def run_equilibration(wdir, project_dir):
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
-        sys.stdout.write(f'{wdir}. Checkpoint files after Equilibration exist. '
+        logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                          f'Equilibration step will be skipped ')
-        sys.stdout.flush()
         return wdir
 
     try:
         subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "equlibration.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{wdir}\t{e}\n')
-        sys.stderr.flush()
-        return False
+        logging.error(f'{wdir}\t{e}\n')
+        return None
     return wdir
 
 def run_simulation(wdir, project_dir):
     try:
         subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "md.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(f'{wdir}\t{e}\n')
-        sys.stderr.flush()
-        return False
+        logging.error(f'{wdir}\t{e}\n')
+        return None
     return wdir
 
 def md_lig_rmsd_analysis(molid, resid, wdir, tu):
@@ -583,13 +583,17 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
     finally:
         dask_client.shutdown()
 
+    logging.info(f'\nSimulation of {var_md_dirs} were successfully finished\n')
+    logging.info(f'\nAnalysis of md simulation of {var_md_analysis_dirs} were successfully finished\n')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=''' ''')
     parser.add_argument('-p', '--protein', metavar='FILENAME', required=True, type=filepath_type,
                         help='input file with compound. Supported formats: *.pdb or gro')
-    parser.add_argument('-l', '--ligand', metavar='FILENAME', required=True, type=filepath_type,
+    parser.add_argument('-d', '--wdir', metavar='WDIR', default=None, type=filepath_type,
+                        help='')
+    parser.add_argument('-l', '--ligand', metavar='FILENAME', required=False, type=filepath_type,
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
     parser.add_argument('--cofactor', metavar='FILENAME', default=None, type=filepath_type,
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
@@ -605,10 +609,27 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    if args.wdir is None:
+        wdir = os.getcwd()
+    else:
+        wdir = args.wdir
+
+    log_file = os.path.join(wdir, f'log_{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}.log')
+
+    logging.basicConfig(filename=log_file,
+                        format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+                        level=logging.INFO)
+
+    logging.getLogger('distributed').setLevel('WARNING')
+    logging.getLogger('distributed.worker').setLevel('WARNING')
+    logging.getLogger('distributed.core').setLevel('WARNING')
+    logging.getLogger('bockeh').setLevel('WARNING')
+
+
+    logging.info(args)
     try:
         global dask_client
         dask_client=False
         main(protein=args.protein, lfile=args.ligand, mdtime=args.time, system_lfile=args.cofactor, hostfile=args.hostfile, ncpu=args.ncpu)
     finally:
-        if dask_client:
-            dask_client.shutdown()
+        logging.shutdown()
