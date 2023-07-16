@@ -430,145 +430,193 @@ def run_md_analysis(wdir, system_lig_molid_list, system_lig_resid_list, mdtime, 
 
     return wdir
 
+def get_prev_last_step(md_log):
+    with open(md_log) as inp:
+        data = inp.read()
+    last_step = re.findall('Writing checkpoint, step ([0-9]*) [A-Za-z0-9: ]*\n', data)
+    if last_step:
+        return int(last_step[0])
 
-def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=None,
-         gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3", hostfile=None, ncpu=1,
-         topol=None, posre_protein=None):
-    global dask_client
 
-    if wdir is None:
-        wdir = os.getcwd()
+def continue_md_from_dir(wdir_to_continue, deffnm_prev, deffnm_next, mdtime_ns, project_dir):
+    tpr = os.path.join(wdir_to_continue, f'{deffnm_prev}.tpr')
+    cpk = os.path.join(wdir_to_continue, f'{deffnm_prev}.cpk')
+    xtc = os.path.join(wdir_to_continue, f'{deffnm_prev}.xtc')
+    md_log = os.path.join(wdir_to_continue, f'{deffnm_prev}.log')
+    return continue_md(tpr=tpr, cpk=cpk, xtc=xtc, md_log=md_log, wdir=wdir_to_continue,
+                       mdtime_ns=mdtime_ns, deffnm_prev=deffnm_prev, deffnm_next=deffnm_next, project_dir=project_dir)
+
+
+def continue_md(tpr, cpk, xtc, md_log, wdir, mdtime_ns, deffnm_prev, deffnm_next, project_dir):
+    last_step = get_prev_last_step(md_log)
+    new_steps = int(mdtime_ns * 1000 * 1000 / 2) - last_step
+    if new_steps <= 0:
+
+        # l = logging.getLogger('root')
+        logging.error('Fail to continue MD simulation. New time equals or less then previously calculated simulation')
+        return None
+    try:
+        subprocess.check_output(f'wdir={wdir} tpr={tpr} cpk={cpk} new_mdsteps={new_steps} '
+                                f'deffnm_prev={deffnm_prev} deffnm_next={deffnm_next} xtc={xtc}  bash {os.path.join(project_dir, "continue_md.sh")}', shell=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(f'{wdir}\t{e}\n')
+        return None
+
+    return wdir
+
+
+
+def main(protein, wdir, lfile=None, system_lfile=None,
+         forcefield_num=6,
+         gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3",
+         mdtime_ns=1, npt_time_ps=100, nvt_time_ps=100,
+         topol=None, posre_protein=None,
+         tpr=None, cpt=None, md_log=None, wdir_to_continue_list=None, deffnm_prev='md_out',
+         hostfile=None, ncpu=1):
+    '''
+
+    :param protein:
+    :param lfile:
+    :param mdtime_ns:
+    :param system_lfile:
+    :param wdir:
+    :param md_param:
+    :param gromacs_version:
+    :param hostfile:
+    :param ncpu:
+    :param topol:
+    :param posre_protein:
+    :param forcefield_num:
+    :return:
+    '''
+    # TODO: add docstring with description of args
+
 
     try:
         subprocess.check_output(f'module load {gromacs_version}', shell=True)
     except subprocess.CalledProcessError as e:
-        sys.stderr.write(e)
-        sys.stderr.flush()
-        return False
+        logging.error(e)
+        return None
 
     project_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
 
-    # create dirs
-    wdir_protein = os.path.join(wdir, 'md_preparation', 'protein')
-    wdir_ligand = os.path.join(wdir, 'md_preparation', 'var_lig')
-    wdir_cofactor = os.path.join(wdir, 'md_preparation', 'system_lig')
+    if (tpr is None or cpt is None or md_log is None) and (wdir_to_continue_list is None or deffnm_prev is None):
+        # create dirs
+        wdir_protein = os.path.join(wdir, 'md_preparation', 'protein')
+        wdir_ligand = os.path.join(wdir, 'md_preparation', 'var_lig')
+        wdir_cofactor = os.path.join(wdir, 'md_preparation', 'system_lig')
 
-    wdir_md = os.path.join(wdir, 'md_preparation', 'md_files')
-    # wdir_md_system = os.path.join(wdir_md, 'system')
+        wdir_md = os.path.join(wdir, 'md_preparation', 'md_files')
 
-    os.makedirs(wdir_md, exist_ok=True)
-    os.makedirs(wdir_protein, exist_ok=True)
-    os.makedirs(wdir_ligand, exist_ok=True)
-    os.makedirs(wdir_cofactor, exist_ok=True)
+        os.makedirs(wdir_md, exist_ok=True)
+        os.makedirs(wdir_protein, exist_ok=True)
+        os.makedirs(wdir_ligand, exist_ok=True)
+        os.makedirs(wdir_cofactor, exist_ok=True)
+        # prepare all files and run md
 
-    # init dask
-    # determine number of servers. it is assumed that ncpu is identical on all servers
-    if hostfile:
-        with open(hostfile) as f:
-            n_servers = sum(1 if line.strip() else 0 for line in f)
-    else:
-        n_servers = 1
+        if protein is not None:
+            if not os.path.isfile(protein):
+                raise FileExistsError(f'{protein} does not exist')
 
-    # PART 1
-    # setup calculations with more workers than servers and adjust the number of threads accordingly
-    multiplicator = ncpu//2
-    n_workers = n_servers * multiplicator
-    n_threads = math.ceil(ncpu / multiplicator)
-
-    # start dask cluster if hostfile was supplied
-    if hostfile:
-        cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
-        subprocess.check_output(cmd, shell=True)
-        time.sleep(10)
-
-    dask_client = init_dask_client(hostfile)
-
-    if protein is not None:
-        if not os.path.isfile(protein):
-            raise FileExistsError(f'{protein} does not exist')
-
-        pname, p_ext = os.path.splitext(os.path.basename(protein))
-        if p_ext != '.gro' or topol is None or posre_protein is None:
-            try:
-                subprocess.check_output(f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh '
-                      f'-i {os.path.join(wdir_md, "posre.itp")} '
-                      f'-p {os.path.join(wdir_md, "topol.top")}'
-                      f'<<< 6', shell=True)
-            except subprocess.CalledProcessError as e:
-                sys.stderr.write(e)
-                sys.stderr.flush()
-                return False
-        else:
-            if not os.path.isfile(os.path.join(wdir_protein, protein)):
-                shutil.copy(protein, os.path.join(wdir_protein, protein))
-            if not os.path.isfile(os.path.join(wdir_md, 'topol.top')):
-                shutil.copy(topol, os.path.join(wdir_md, 'topol.top'))
-            if not os.path.isfile(os.path.join(wdir_md, 'posre.itp')):
-                shutil.copy(posre_protein, os.path.join(wdir_md, 'posre.itp'))
+            pname, p_ext = os.path.splitext(os.path.basename(protein))
+            if p_ext != '.gro' or topol is None or posre_protein is None:
+                try:
+                    subprocess.check_output(f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh '
+                          f'-i {os.path.join(wdir_protein, "posre.itp")} '
+                          f'-p {os.path.join(wdir_protein, "topol.top")}'
+                          f'<<< {forcefield_num}', shell=True)
+                except subprocess.CalledProcessError as e:
+                    logging.error(e)
+                    return None
+            else:
+                if not os.path.isfile(os.path.join(wdir_protein, protein)):
+                    shutil.copy(protein, os.path.join(wdir_protein, protein))
+                if not os.path.isfile(os.path.join(wdir_protein, 'topol.top')):
+                    shutil.copy(topol, os.path.join(wdir_protein, 'topol.top'))
+                if not os.path.isfile(os.path.join(wdir_protein, 'posre.itp')):
+                    shutil.copy(posre_protein, os.path.join(wdir_protein, 'posre.itp'))
 
 
-    # Part 1. Preparation. Run on each cpu
-    dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
-    try:
-        system_lig_data = []
-        if system_lfile is not None:
-            if not os.path.isfile(system_lfile):
-                raise FileExistsError(f'{system_lfile} does not exist')
+        # Part 1. Preparation. Run on each cpu
+        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
+        try:
+            system_lig_data = []
+            if system_lfile is not None:
+                if not os.path.isfile(system_lfile):
+                    raise FileExistsError(f'{system_lfile} does not exist')
 
-            mols = supply_mols(system_lfile, set_resid=None)
-            for res in calc_dask(prep_ligand, mols, dask_client,
-                                              script_path=script_path, project_dir=project_dir,
-                                              wdir_ligand=wdir_cofactor,
-                                              addH=True):
-                if not res:   # TODO: return empty line or None if calculation failed
-                    sys.stderr.write(f'Error with system ligand (cofactor) preparation. The calculation will be interrupted\n')
-                    return
-                system_lig_data.append(res)
+                mols = supply_mols(system_lfile, set_resid=None)
+                for res in calc_dask(prep_ligand, mols, dask_client,
+                                                  script_path=script_path, project_dir=project_dir,
+                                                  wdir_ligand=wdir_cofactor,
+                                                  addH=True):
+                    if not res:   # TODO: return empty line or None if calculation failed
+                        logging.error(f'Error with system ligand (cofactor) preparation. The calculation will be interrupted\n')
+                        return
+                    system_lig_data.append(res)
 
-        var_lig_data = []
-        # os.path.join(wdir_md_cur, molid)
-        if lfile is not None:
-            if not os.path.isfile(lfile):
-                raise FileExistsError(f'{lfile} does not exist')
+            var_lig_data = []
+            # os.path.join(wdir_md_cur, molid)
+            if lfile is not None:
+                if not os.path.isfile(lfile):
+                    raise FileExistsError(f'{lfile} does not exist')
 
-            mols = supply_mols(lfile, set_resid='UNL')
-            for res in calc_dask(prep_ligand, mols, dask_client,
-                                  script_path=script_path, project_dir=project_dir,
-                                  wdir_ligand=wdir_ligand, addH=True):
+                mols = supply_mols(lfile, set_resid='UNL')
+                for res in calc_dask(prep_ligand, mols, dask_client,
+                                      script_path=script_path, project_dir=project_dir,
+                                      wdir_ligand=wdir_ligand, addH=True):
+                    if res:
+                        var_lig_data.append(res)
+
+            # make all itp and create complex
+            var_complex_prepared_dirs = []
+            # os.path.dirname(var_lig)
+            for res in calc_dask(run_complex_prep, var_lig_data, dask_client, system_lig_data=system_lig_data,
+                                 protein_name=pname,  # TODO: pname may be not inited
+                                 wdir_protein=wdir_protein, wdir_md=wdir_md,
+                                 script_path=script_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
+                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps):
                 if res:
-                    var_lig_data.append(res)
+                    var_complex_prepared_dirs.append(res)
+        finally:
+            dask_client.shutdown()
 
+        # Part 2. Equilibration and MD simulation. Run on all cpu
+        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+        try:
+            var_eq_dirs = []
+            #os.path.dirname(var_lig)
+            for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir):
+                if res:
+                    var_eq_dirs.append(res)
 
-        # make all itp and create complex
-        var_complex_prepared_dirs = []
-        # os.path.dirname(var_lig)
-        for res in calc_dask(run_complex_prep, var_lig_data, dask_client, system_lig_data=system_lig_data,
-                              protein_name=pname,  # TODO: pname may be not inited
-                              wdir_protein=wdir_protein, wdir_md=wdir_md,
-                              script_path=script_path, project_dir=project_dir, mdtime=mdtime):
-            if res:
-                var_complex_prepared_dirs.append(res)
-    finally:
-        dask_client.shutdown()
+            var_md_dirs = []
+            # os.path.dirname(var_lig)
+            for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir):
+                if res:
+                    var_md_dirs.append(res)
 
-    # Part 2. Equilibration and MD simulation. Run on all cpu
-    dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
-    try:
-        var_eq_dirs = []
-        #os.path.dirname(var_lig)
-        for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir):
-            if res:
-                var_eq_dirs.append(res)
+        finally:
+            dask_client.shutdown()
 
-        var_md_dirs = []
-        # os.path.dirname(var_lig)
-        for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir):
-            if res:
-                var_md_dirs.append(res)
+        deffnm = 'md_out'
+        logging.info(f'Simulation of {var_md_dirs} were successfully finished\n')
 
-    finally:
-        dask_client.shutdown()
+    else: # continue prev md]
+        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+        try:
+            var_md_continued_dirs = []
+            deffnm = f'{deffnm_prev}_{mdtime_ns}'
+            # os.path.dirname(var_lig)
+            for res in calc_dask(continue_md_from_dir, wdir_to_continue_list, dask_client,
+                                 deffnm_prev=deffnm_prev, deffnm_next=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir):
+                if res:
+                    var_md_continued_dirs.append(res)
+
+        finally:
+            dask_client.shutdown()
+        logging.info(f'Continue of simulation of {var_md_continued_dirs} were successfully finished\n')
 
     # Part 3. MD Analysis. Run on each cpu
     dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
@@ -589,7 +637,7 @@ def main(protein, lfile=None, mdtime=1, system_lfile=None, wdir=None, md_param=N
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=''' ''')
-    parser.add_argument('-p', '--protein', metavar='FILENAME', required=True, type=filepath_type,
+    parser.add_argument('-p', '--protein', metavar='FILENAME', required=False, type=filepath_type,
                         help='input file with compound. Supported formats: *.pdb or gro')
     parser.add_argument('-d', '--wdir', metavar='WDIR', default=None, type=filepath_type,
                         help='')
@@ -606,6 +654,22 @@ if __name__ == '__main__':
                         help='number of CPU per server. Use all cpus by default.')
     parser.add_argument('-t', '--time', metavar='ns', required=False, default=1, type=float,
                         help='Time of MD simulation in ns')
+    parser.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
+                        help='Set up NPT time equilibration in ns')
+    parser.add_argument('--nvt_time', metavar='ps', required=False, default=100, type=int,
+                        help='Set up NVT time equilibration in ns')
+    #continue md
+    parser.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
+                        help='TPR file from the previous MD simulation')
+    parser.add_argument('--cpt', metavar='FILENAME', required=False, default=None, type=filepath_type,
+                        help='CPT file from previous simulation')
+    parser.add_argument('--md_log', metavar='FILENAME', required=False, default=None, type=filepath_type,
+                        help='Log file from previous simulation. Example: md_out.log')
+    parser.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+', type=filepath_type,
+                        help='wdir for previous simulation. Should consist of: tpr, cpt, md_log files')
+    parser.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
+                        help='preffix for md files. Used only if wdir_to_continue is used')
+
 
     args = parser.parse_args()
 
@@ -628,8 +692,9 @@ if __name__ == '__main__':
 
     logging.info(args)
     try:
-        global dask_client
-        dask_client=False
-        main(protein=args.protein, lfile=args.ligand, mdtime=args.time, system_lfile=args.cofactor, hostfile=args.hostfile, ncpu=args.ncpu)
+        main(protein=args.protein, lfile=args.ligand, system_lfile=args.cofactor,
+         topol=args.topol, posre_protein=args.posre,  mdtime_ns=args.md_time, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
+         wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
+         hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir)
     finally:
         logging.shutdown()
