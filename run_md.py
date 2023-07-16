@@ -95,12 +95,10 @@ def complex_preparation(protein_gro, ligand_gro_list, out_file):
 
 
 def get_index(index_file):
-    index_list = []
     with open(index_file) as input:
-        for line in input.readlines():
-            if line.startswith('['):
-                index_list.append(line.replace('[','').replace(']','').strip())
-    return index_list
+        data = input.read()
+    groups = [i.strip() for i in re.findall('\[(.*)\]', data)]
+    return groups
 
 def make_group_ndx(query, wdir):
     try:
