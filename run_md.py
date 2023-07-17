@@ -449,8 +449,6 @@ def continue_md(tpr, cpk, xtc, md_log, wdir, mdtime_ns, deffnm_prev, deffnm_next
     last_step = get_prev_last_step(md_log)
     new_steps = int(mdtime_ns * 1000 * 1000 / 2) - last_step
     if new_steps <= 0:
-
-        # l = logging.getLogger('root')
         logging.error('Fail to continue MD simulation. New time equals or less then previously calculated simulation')
         return None
     try:
