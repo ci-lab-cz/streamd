@@ -4,9 +4,9 @@ cd $wdir
 
 gmx trjconv -s $deffnm.tpr -f $deffnm.xtc -pbc nojump -o $deffnm\_noj_noPBC.xtc <<< "System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 #gmx trjconv -s $deffnm.tpr -f $deffnm.xtc -o $deffnm\_noPBC.xtc -pbc mol -center <<< "Protein  System"
-gmx trjconv -s $deffnm.tpr -f $deffnm\_noj_noPBC.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "$index_protein_ligand  System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
+gmx trjconv -s $deffnm.tpr -f $deffnm\_noj_noPBC.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "$index_group  System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 # use it for PBSA https://github.com/Valdes-Tresanco-MS/gmx_MMPBSA/issues/33
-gmx trjconv -s $deffnm.tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc -n index.ndx <<< "$index_protein_ligand  System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
+gmx trjconv -s $deffnm.tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc -n index.ndx <<< "$index_group  System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 
 gmx trjconv -s $deffnm.tpr -f md_fit.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 

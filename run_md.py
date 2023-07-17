@@ -150,9 +150,14 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
         shutil.copy(mdp_file, wdir_md_cur)
         md_fname = os.path.basename(mdp_file)
 
-        edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+        if couple_group!='Protein':
+            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
                  pattern='tc-grps',
                  replace=f'tc-grps                 = {couple_group} Water_and_ions; two coupling groups')
+        else:
+            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+                     pattern='tc-grps',
+                     replace=f'tc-grps                 = {couple_group} Non-Protein; two coupling groups')
         steps = 0
         if md_fname == 'nvt.mdp':
             steps = int(nvt_time_ps * 1000 / 2)
@@ -172,17 +177,22 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
 
     return wdir_md_cur
 
-def run_complex_prep(var_lig_data, system_lig_data, protein_name, wdir_protein, wdir_system_ligand, wdir_md, script_path, project_dir, mdtime_ns, npt_time_ps, nvt_time_ps):
+def run_complex_prep(var_lig_data, wdir_protein, system_lig_data, protein_name, wdir_system_ligand, wdir_md, script_path, project_dir, mdtime_ns, npt_time_ps, nvt_time_ps):
     wdir_md_cur = prep_md_files(var_lig_data=var_lig_data, protein_name=protein_name, system_lig_data=system_lig_data, wdir_protein=wdir_protein, wdir_md=wdir_md)
 
-    wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
     protein_gro = os.path.join(wdir_protein, f'{protein_name}.gro')
 
-    all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.itp')],\
+    if var_lig_data:
+        wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
+        all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.itp')],\
                                                      [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.gro')],\
                                                      [os.path.join(wdir_var_ligand_cur, f'posre_{var_lig_molid}.itp')],\
                                                      [var_lig_molid], \
                                                      [var_lig_resid]
+    else:
+        wdir_var_ligand_cur, var_lig_molid, var_lig_resid = [], [], []
+        all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [], [], [], [], []
+
     # copy system_lig itp to ligand_md_wdir
     for wdir_system_ligand_cur, system_lig_molid, system_lig_resid in system_lig_data:
         shutil.copy(os.path.join(wdir_system_ligand_cur,f'{system_lig_molid}.itp'), os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
@@ -191,23 +201,24 @@ def run_complex_prep(var_lig_data, system_lig_data, protein_name, wdir_protein, 
         all_posres_list.append(os.path.join(wdir_system_ligand_cur, f'posre_{system_lig_molid}.itp'))
         all_resids.append(system_lig_resid)
 
-    add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol=os.path.join(wdir_md_cur, "topol.top"))
+    if all_itp_list:
+        add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol=os.path.join(wdir_md_cur, "topol.top"))
+        # copy molid-resid pairs for variable ligand and all system ligands
+        with open(os.path.join(wdir_md_cur, 'all_ligand_resid.txt'), 'w') as out:
+            if os.path.isfile(os.path.join(wdir_var_ligand_cur, 'resid.txt')):
+                with open(os.path.join(wdir_var_ligand_cur, 'resid.txt')) as inp:
+                    out.write(inp.read())
+            if os.path.isfile(os.path.join(wdir_system_ligand, 'all_resid.txt')):
+                with open(os.path.join(wdir_system_ligand, 'all_resid.txt')) as inp:
+                    out.write(inp.read())
 
-    # copy molid-resid pairs for variable ligand and all system ligands
-    with open(os.path.join(wdir_md_cur, 'all_ligand_resid.txt'), 'w') as out:
-        with open(os.path.join(wdir_var_ligand_cur, 'resid.txt')) as inp:
-            out.write(inp.read())
-        if os.path.isfile(os.path.join(wdir_system_ligand, 'all_resid.txt')):
-            with open(os.path.join(wdir_system_ligand, 'all_resid.txt')) as inp:
-                out.write(inp.read())
-
-    if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")):
-        # make all itp
-        make_all_itp(all_itp_list, out_file=os.path.join(wdir_md_cur, 'all.itp'))
-        edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"), pattern="; Include forcefield parameters",
-                           add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n', how='after', n=3)
-    else:
-        logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip topol preparation step\n')
+        if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")):
+            # make all itp
+            make_all_itp(all_itp_list, out_file=os.path.join(wdir_md_cur, 'all.itp'))
+            edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"), pattern="; Include forcefield parameters",
+                               add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n', how='after', n=3)
+        else:
+            logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip topol preparation step\n')
 
     # complex
     if not os.path.isfile(os.path.join(wdir_md_cur, 'complex.gro')):
@@ -315,14 +326,19 @@ def prep_md_files(var_lig_data, protein_name, system_lig_data, wdir_protein, wdi
         shutil.copy(os.path.join(wdir_copy_from, f'posre_{molid}.itp'),
                     os.path.join(wdir_copy_to, f'posre_{molid}.itp'))
 
-    wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
-    wdir_md_cur = os.path.join(wdir_md, f'{protein_name}_{var_lig_molid}')
+    if var_lig_data:
+        wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
+        wdir_md_cur = os.path.join(wdir_md, f'{protein_name}_{var_lig_molid}')
+    else:
+        wdir_md_cur = os.path.join(wdir_md, protein_name)
+
     os.makedirs(wdir_md_cur, exist_ok=True)
 
     shutil.copy(os.path.join(wdir_protein, "topol.top"), os.path.join(wdir_md_cur, "topol.top"))
     shutil.copy(os.path.join(wdir_protein, "posre.itp"), os.path.join(wdir_md_cur, "posre.itp"))
 
-    copy_md_files_to_wdir(var_lig_molid, wdir_copy_from=wdir_var_ligand_cur, wdir_copy_to=wdir_md_cur)
+    if var_lig_data:
+        copy_md_files_to_wdir(var_lig_molid, wdir_copy_from=wdir_var_ligand_cur, wdir_copy_to=wdir_md_cur)
 
     for wdir_system_ligand_cur, system_lig_molid, system_lig_resid in system_lig_data:
         copy_md_files_to_wdir(system_lig_molid, wdir_copy_from=wdir_system_ligand_cur, wdir_copy_to=wdir_md_cur)
@@ -381,8 +397,8 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
         with (performance_report(filename=dask_report_fname) if dask_report_fname is not None else none_context):
             nworkers = len(dask_client.scheduler_info()['workers'])
             futures = []
-            for i, mol in enumerate(main_arg, 1):
-                futures.append(dask_client.submit(func, mol, **kwargs))
+            for i, arg in enumerate(main_arg, 1):
+                futures.append(dask_client.submit(func, arg, **kwargs))
                 if i == nworkers * 2:  # you may submit more tasks then workers (this is generally not necessary if you do not use priority for individual tasks)
                     break
             seq = as_completed(futures, with_results=True)
@@ -390,8 +406,8 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
                 yield results
                 del future
                 try:
-                    mol = next(main_arg)
-                    new_future = dask_client.submit(func, mol, **kwargs)
+                    arg = next(main_arg)
+                    new_future = dask_client.submit(func, arg, **kwargs)
                     seq.add(new_future)
                 except StopIteration:
                     continue
@@ -441,35 +457,39 @@ def md_lig_rmsd_analysis(molid, resid, wdir, tu):
 
 def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
-    resid = 'UNL'
 
-    if f'Protein_{resid}' not in index_list:
-        if not make_group_ndx(query=f'"Protein"|{index_list.index(resid)}', wdir=wdir):
-            return None
-        index_list = get_index(os.path.join(wdir, 'index.ndx'))
+    if os.path.isfile(os.path.join(wdir, 'all_ligand_resid.txt')):
+        with open(os.path.join(wdir, 'all_ligand_resid.txt')) as input:
+            ligands_data = input.readlines()
+    else:
+        ligands_data = []
 
-    index_protein_ligand = index_list.index(f'Protein_{resid}')
+    if ligands_data:
+        resid = 'UNL'
+        if f'Protein_{resid}' not in index_list:
+            if not make_group_ndx(query=f'"Protein"|{index_list.index(resid)}', wdir=wdir):
+                return None
+            index_list = get_index(os.path.join(wdir, 'index.ndx'))
+
+        index_group = index_list.index(f'Protein_{resid}')
+    else:
+        index_group = index_list.index('Protein')
 
     tu = 'ps' if mdtime_ns <= 10 else 'ns'
     dtstep = 50 if mdtime_ns <= 10 else 100
 
     try:
-        subprocess.check_output(f'wdir={wdir} index_protein_ligand={index_protein_ligand} tu={tu} dtstep={dtstep} deffnm={deffnm} bash {os.path.join(project_dir, "md_analysis.sh")}', shell=True)
+        subprocess.check_output(f'wdir={wdir} index_group={index_group} tu={tu} dtstep={dtstep} deffnm={deffnm} bash {os.path.join(project_dir, "md_analysis.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
         logging.error(f'{wdir}\t{e}\n')
         return None
 
     # molid resid pairs
-    if os.path.isfile(os.path.join(wdir, 'all_ligand_resid.txt')):
-        with open(os.path.join(wdir, 'all_ligand_resid.txt')) as input:
-            system_ligands_data = input.readlines()
-    else:
-        system_ligands_data = []
-
-    for system_ligand in system_ligands_data:
-        system_ligand_molid, system_ligand_resid = system_ligand.split('\t')
-        system_ligand_molid, system_ligand_resid = system_ligand_molid.strip(), system_ligand_resid.strip()
-        md_lig_rmsd_analysis(molid=system_ligand_molid, resid=system_ligand_resid, wdir=wdir, tu=tu)
+    # calc rmsd
+    for cur_ligand in ligands_data:
+        cur_ligand_molid, cur_ligand_resid = cur_ligand.split('\t')
+        cur_ligand_molid, cur_ligand_resid = cur_ligand_molid.strip(), cur_ligand_resid.strip()
+        md_lig_rmsd_analysis(molid=cur_ligand_molid, resid=cur_ligand_resid, wdir=wdir, tu=tu)
 
     return wdir
 
@@ -613,15 +633,28 @@ def main(protein, wdir, lfile=None, system_lfile=None,
 
             # make all.itp and create complex
             var_complex_prepared_dirs = []
-            for res in calc_dask(run_complex_prep, var_lig_data, dask_client, system_lig_data=system_lig_data,
-                                 protein_name=pname,
-                                 wdir_protein=wdir_protein,
-                                 wdir_system_ligand=wdir_system_ligand,
-                                 wdir_md=wdir_md,
-                                 script_path=script_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps):
+            if var_lig_data:
+                for res in calc_dask(run_complex_prep, var_lig_data, dask_client,
+                                     system_lig_data=system_lig_data,
+                                     protein_name=pname,
+                                     wdir_protein=wdir_protein,
+                                     wdir_system_ligand=wdir_system_ligand,
+                                     wdir_md=wdir_md,
+                                     script_path=script_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
+                                     npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps):
+                    if res:
+                        var_complex_prepared_dirs.append(res)
+            else:
+                res = run_complex_prep( var_lig_data=[], wdir_protein=wdir_protein,
+                                     system_lig_data=system_lig_data,
+                                     protein_name=pname,
+                                     wdir_system_ligand=wdir_system_ligand,
+                                     wdir_md=wdir_md,
+                                     script_path=script_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
+                                     npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps)
                 if res:
                     var_complex_prepared_dirs.append(res)
+
         finally:
             dask_client.shutdown()
 
@@ -644,7 +677,6 @@ def main(protein, wdir, lfile=None, system_lfile=None,
             dask_client.shutdown()
 
         deffnm = 'md_out'
-        logging.info(f'Simulation of {var_md_dirs} were successfully finished\n')
 
     else: # continue prev md]
         dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
@@ -659,7 +691,8 @@ def main(protein, wdir, lfile=None, system_lfile=None,
 
         finally:
             dask_client.shutdown()
-        logging.info(f'Continue of simulation of {var_md_dirs} were successfully finished\n')
+
+    logging.info(f'Continue of simulation of {var_md_dirs} were successfully finished\n')
 
     # Part 3. MD Analysis. Run on each cpu
     dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
@@ -673,7 +706,6 @@ def main(protein, wdir, lfile=None, system_lfile=None,
     finally:
         dask_client.shutdown()
 
-    logging.info(f'\nSimulation of {var_md_dirs} were successfully finished\n')
     logging.info(f'\nAnalysis of md simulation of {var_md_analysis_dirs} were successfully finished\n')
 
 
