@@ -259,6 +259,16 @@ def edit_topology_file(topol_file, pattern, add, how='before', n=0):
     with open(topol_file, 'w') as output:
         output.write(data)
 
+def get_n_line_of_protein_in_mol_section(topol_file):
+    with open(topol_file) as input:
+        data = input.read()
+    molecules_section = data[data.find('[ molecules ]'):]
+    last_protein_n_line = None
+    for n, line in enumerate(molecules_section.split('\n'), 1):
+        if line.startswith('Protein'):
+            last_protein_n_line = n
+    return last_protein_n_line
+
 
 def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
     itp_include_list, posres_include_list, resid_include_list = [], [], []
@@ -274,7 +284,10 @@ def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
     #reverse order since add before pattern
     edit_topology_file(topol, pattern="; Include topology for ions",
                 add='\n'.join(posres_include_list[::-1]), how='before')
-    edit_topology_file(topol, pattern='; Compound        #mols', add='\n'.join(resid_include_list), how='after', n=2)
+    # ligand molecule should be after protein (or all protein chains listed)
+    n_line_after_molecules_section = get_n_line_of_protein_in_mol_section(topol_file=topol)
+    edit_topology_file(topol, pattern='[ molecules ]', add='\n'.join(resid_include_list),
+                       how='after', n=n_line_after_molecules_section)
 
 
 def prep_ligand(mol, script_path, project_dir, wdir_ligand, addH=True):
