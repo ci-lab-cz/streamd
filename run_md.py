@@ -665,17 +665,17 @@ def main(protein, wdir, lfile=None, system_lfile=None,
                                      protein_name=pname,
                                      wdir_protein=wdir_protein,
                                      wdir_system_ligand=wdir_system_ligand,
-                                     wdir_md=wdir_md,
+                                     clean_previous=clean_previous, wdir_md=wdir_md,
                                      script_path=script_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
                                      npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps):
                     if res:
                         var_complex_prepared_dirs.append(res)
             else:
-                res = run_complex_prep( var_lig_data=[], wdir_protein=wdir_protein,
+                res = run_complex_prep(var_lig_data=[], wdir_protein=wdir_protein,
                                      system_lig_data=system_lig_data,
                                      protein_name=pname,
                                      wdir_system_ligand=wdir_system_ligand,
-                                     wdir_md=wdir_md,
+                                     clean_previous=clean_previous, wdir_md=wdir_md,
                                      script_path=script_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
                                      npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps)
                 if res:
@@ -747,6 +747,9 @@ if __name__ == '__main__':
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
     parser.add_argument('--not_add_H', action='store_true', default=False,
                         help='disable to add hydrogens to molecules before simulation.')
+    parser.add_argument('--clean_previous_md', action='store_true', default=False,
+                        help='Remove all previous prepared for the current system MD files.\n'
+                             'Prepared ligand and protein files will be used if it exists.')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
@@ -802,7 +805,7 @@ if __name__ == '__main__':
     logging.info(args)
     try:
         main(protein=args.protein, lfile=args.ligand, addH=not args.not_add_H,
-         system_lfile=args.cofactor,
+         clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
          topol=args.topol, posre_protein=args.posre,  mdtime_ns=args.md_time, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
          wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
          hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir)
