@@ -785,7 +785,7 @@ if __name__ == '__main__':
     else:
         wdir = args.wdir
 
-    log_file = os.path.join(wdir, f'log_{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}.log')
+    log_file = os.path.join(wdir, f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}.log')
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
