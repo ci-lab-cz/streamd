@@ -177,54 +177,49 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
 
     return wdir_md_cur
 
-def run_complex_prep(var_lig_data, wdir_protein, system_lig_data, protein_name, wdir_system_ligand, wdir_md, script_path, project_dir, mdtime_ns, npt_time_ps, nvt_time_ps):
-    wdir_md_cur = prep_md_files(var_lig_data=var_lig_data, protein_name=protein_name, system_lig_data=system_lig_data, wdir_protein=wdir_protein, wdir_md=wdir_md)
+def run_complex_prep(var_lig_data, wdir_protein, system_lig_data,
+                     protein_name, wdir_system_ligand, wdir_md,
+                     script_path, project_dir, mdtime_ns,
+                     npt_time_ps, nvt_time_ps, clean_previous=False):
+
+    wdir_md_cur, all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = \
+        prep_md_files(var_lig_data=var_lig_data, protein_name=protein_name, system_lig_data=system_lig_data,
+                                wdir_protein=wdir_protein, wdir_md=wdir_md, clean_previous=clean_previous)
 
     protein_gro = os.path.join(wdir_protein, f'{protein_name}.gro')
 
     if var_lig_data:
         wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
-        all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.itp')],\
-                                                     [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.gro')],\
-                                                     [os.path.join(wdir_var_ligand_cur, f'posre_{var_lig_molid}.itp')],\
-                                                     [var_lig_molid], \
-                                                     [var_lig_resid]
     else:
-        wdir_var_ligand_cur, var_lig_molid, var_lig_resid = [], [], []
-        all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [], [], [], [], []
+        wdir_var_ligand_cur, var_lig_molid, var_lig_resid = None, None, None
 
-    # copy system_lig itp to ligand_md_wdir
-    for wdir_system_ligand_cur, system_lig_molid, system_lig_resid in system_lig_data:
-        shutil.copy(os.path.join(wdir_system_ligand_cur,f'{system_lig_molid}.itp'), os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
-        all_itp_list.append(os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
-        all_gro_list.append(os.path.join(wdir_system_ligand_cur, f'{system_lig_molid}.gro'))
-        all_posres_list.append(os.path.join(wdir_system_ligand_cur, f'posre_{system_lig_molid}.itp'))
-        all_resids.append(system_lig_resid)
 
     if all_itp_list:
-        add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol=os.path.join(wdir_md_cur, "topol.top"))
-        # copy molid-resid pairs for variable ligand and all system ligands
-        with open(os.path.join(wdir_md_cur, 'all_ligand_resid.txt'), 'w') as out:
-            if os.path.isfile(os.path.join(wdir_var_ligand_cur, 'resid.txt')):
-                with open(os.path.join(wdir_var_ligand_cur, 'resid.txt')) as inp:
-                    out.write(inp.read())
-            if os.path.isfile(os.path.join(wdir_system_ligand, 'all_resid.txt')):
-                with open(os.path.join(wdir_system_ligand, 'all_resid.txt')) as inp:
-                    out.write(inp.read())
-
         if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")):
-            # make all itp
+            # make all itp and edit current itps
             make_all_itp(all_itp_list, out_file=os.path.join(wdir_md_cur, 'all.itp'))
-            edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"), pattern="; Include forcefield parameters",
-                               add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n', how='after', n=3)
         else:
             logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip topol preparation step\n')
+
+        add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol=os.path.join(wdir_md_cur, "topol.top"))
+        # copy molid-resid pairs for variable ligand and all system ligands
+        edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"), pattern="; Include forcefield parameters",
+                           add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n',
+                           how='after', n=3)
+
+        with open(os.path.join(wdir_md_cur, 'all_ligand_resid.txt'), 'w') as out:
+            if wdir_var_ligand_cur and os.path.isfile(os.path.join(wdir_var_ligand_cur, 'resid.txt')):
+                with open(os.path.join(wdir_var_ligand_cur, 'resid.txt')) as inp:
+                    out.write(inp.read())
+            if wdir_system_ligand and os.path.isfile(os.path.join(wdir_system_ligand, 'all_resid.txt')):
+                with open(os.path.join(wdir_system_ligand, 'all_resid.txt')) as inp:
+                    out.write(inp.read())
 
     # complex
     if not os.path.isfile(os.path.join(wdir_md_cur, 'complex.gro')):
         complex_preparation(protein_gro=protein_gro,
-                                ligand_gro_list=all_gro_list,
-                                out_file=os.path.join(wdir_md_cur, 'complex.gro'))
+                            ligand_gro_list=all_gro_list,
+                            out_file=os.path.join(wdir_md_cur, 'complex.gro'))
     else:
         logging.warning(f'{wdir_md_cur}. Prepared complex file exists. Skip complex preparation step\n')
 
@@ -319,12 +314,10 @@ def prep_ligand(mol, script_path, project_dir, wdir_ligand, addH=True):
 
     return wdir_ligand_cur, molid, resid
 
-def prep_md_files(var_lig_data, protein_name, system_lig_data, wdir_protein, wdir_md):
-    def copy_md_files_to_wdir(molid, wdir_copy_from, wdir_copy_to):
-        shutil.copy(os.path.join(wdir_copy_from, f'{molid}.itp'), os.path.join(wdir_copy_to, f'{molid}.itp'))
-        shutil.copy(os.path.join(wdir_copy_from, f'{molid}.gro'), os.path.join(wdir_copy_to, f'{molid}.gro'))
-        shutil.copy(os.path.join(wdir_copy_from, f'posre_{molid}.itp'),
-                    os.path.join(wdir_copy_to, f'posre_{molid}.itp'))
+def prep_md_files(var_lig_data, protein_name, system_lig_data, wdir_protein, wdir_md, clean_previous=False):
+    def copy_md_files_to_wdir(files, wdir_copy_to):
+        for file in files:
+            shutil.copy(file, os.path.join(wdir_copy_to, os.path.basename(file)))
 
     if var_lig_data:
         wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
@@ -332,18 +325,38 @@ def prep_md_files(var_lig_data, protein_name, system_lig_data, wdir_protein, wdi
     else:
         wdir_md_cur = os.path.join(wdir_md, protein_name)
 
+    if clean_previous and os.path.isdir(wdir_md_cur):
+        shutil.rmtree(wdir_md_cur)
+
     os.makedirs(wdir_md_cur, exist_ok=True)
 
-    shutil.copy(os.path.join(wdir_protein, "topol.top"), os.path.join(wdir_md_cur, "topol.top"))
-    shutil.copy(os.path.join(wdir_protein, "posre.itp"), os.path.join(wdir_md_cur, "posre.itp"))
+    # topol for protein for all chains
+    copy_md_files_to_wdir(glob(os.path.join(wdir_protein,'*.itp')), wdir_copy_to=wdir_md_cur)
+    copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
 
+    # prep ligands and cofactor
+    # copy ligand.itp to md_wdir_cur. Will be edited
     if var_lig_data:
-        copy_md_files_to_wdir(var_lig_molid, wdir_copy_from=wdir_var_ligand_cur, wdir_copy_to=wdir_md_cur)
+        wdir_var_ligand_cur, var_lig_molid, var_lig_resid = var_lig_data
+        all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [os.path.join(wdir_md_cur, f'{var_lig_molid}.itp')],\
+                                                     [os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.gro')],\
+                                                     [os.path.join(wdir_var_ligand_cur, f'posre_{var_lig_molid}.itp')],\
+                                                     [var_lig_molid], \
+                                                     [var_lig_resid]
+        copy_md_files_to_wdir([os.path.join(wdir_var_ligand_cur, f'{var_lig_molid}.itp')], wdir_copy_to=wdir_md_cur)
+    else:
+        all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids = [], [], [], [], []
 
+    # copy system_lig itp to ligand_md_wdir
     for wdir_system_ligand_cur, system_lig_molid, system_lig_resid in system_lig_data:
-        copy_md_files_to_wdir(system_lig_molid, wdir_copy_from=wdir_system_ligand_cur, wdir_copy_to=wdir_md_cur)
+        copy_md_files_to_wdir([os.path.join(wdir_system_ligand_cur, f'{system_lig_molid}.itp')], wdir_copy_to=wdir_md_cur)
+        all_itp_list.append(os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
+        all_gro_list.append(os.path.join(wdir_system_ligand_cur, f'{system_lig_molid}.gro'))
+        all_posres_list.append(os.path.join(wdir_system_ligand_cur, f'posre_{system_lig_molid}.itp'))
+        all_lig_molids.append(system_lig_molid)
+        all_resids.append(system_lig_resid)
 
-    return wdir_md_cur
+    return wdir_md_cur, all_itp_list, all_gro_list, all_posres_list, all_lig_molids, all_resids
 
 
 def supply_mols(fname, set_resid=None):
