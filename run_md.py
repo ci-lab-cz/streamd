@@ -554,7 +554,7 @@ def continue_md(tpr, cpk, xtc, md_log, wdir, mdtime_ns, deffnm_prev, deffnm_next
 
 
 def main(protein, wdir, lfile=None, system_lfile=None,
-         forcefield_num=6,
+         forcefield_num=6, addH=True,
          gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3",
          mdtime_ns=1, npt_time_ps=100, nvt_time_ps=100,
          topol=None, posre_protein=None,
@@ -639,7 +639,7 @@ def main(protein, wdir, lfile=None, system_lfile=None,
                 for res in calc_dask(prep_ligand, mols, dask_client,
                                                   script_path=script_path, project_dir=project_dir,
                                                   wdir_ligand=wdir_system_ligand,
-                                                  addH=True):
+                                                  addH=addH):
                     if not res:
                         logging.error(f'Error with system ligand (cofactor) preparation. The calculation will be interrupted\n')
                         return
@@ -653,7 +653,7 @@ def main(protein, wdir, lfile=None, system_lfile=None,
                 mols = supply_mols(lfile, set_resid='UNL')
                 for res in calc_dask(prep_ligand, mols, dask_client,
                                       script_path=script_path, project_dir=project_dir,
-                                      wdir_ligand=wdir_ligand, addH=True):
+                                      wdir_ligand=wdir_ligand, addH=addH):
                     if res:
                         var_lig_data.append(res)
 
@@ -745,6 +745,8 @@ if __name__ == '__main__':
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
     parser.add_argument('--cofactor', metavar='FILENAME', default=None, type=filepath_type,
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
+    parser.add_argument('--not_add_H', action='store_true', default=False,
+                        help='disable to add hydrogens to molecules before simulation.')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
@@ -799,7 +801,8 @@ if __name__ == '__main__':
 
     logging.info(args)
     try:
-        main(protein=args.protein, lfile=args.ligand, system_lfile=args.cofactor,
+        main(protein=args.protein, lfile=args.ligand, addH=not args.not_add_H,
+         system_lfile=args.cofactor,
          topol=args.topol, posre_protein=args.posre,  mdtime_ns=args.md_time, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
          wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
          hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir)
