@@ -768,9 +768,9 @@ if __name__ == '__main__':
     parser.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='Time of MD simulation in ns')
     parser.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
-                        help='Set up NPT time equilibration in ns')
+                        help='Set up NPT time equilibration in ps')
     parser.add_argument('--nvt_time', metavar='ps', required=False, default=100, type=int,
-                        help='Set up NVT time equilibration in ns')
+                        help='Set up NVT time equilibration in ps')
     #continue md
     parser.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='TPR file from the previous MD simulation')
