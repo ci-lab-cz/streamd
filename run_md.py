@@ -507,8 +507,12 @@ def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir):
     tu = 'ps' if mdtime_ns <= 10 else 'ns'
     dtstep = 50 if mdtime_ns <= 10 else 100
 
+    tpr = os.path.join(wdir, f'{deffnm}.tpr')
+    xtc = os.path.join(wdir, f'{deffnm}.xtc')
+
     try:
-        subprocess.check_output(f'wdir={wdir} index_group={index_group} tu={tu} dtstep={dtstep} deffnm={deffnm} bash {os.path.join(project_dir, "md_analysis.sh")}', shell=True)
+        subprocess.check_output(f'wdir={wdir} index_group={index_group} tu={tu} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} bash {os.path.join(project_dir, "md_analysis.sh")}',
+                                shell=True)
     except subprocess.CalledProcessError as e:
         logging.error(f'{wdir}\t{e}\n')
         return None
@@ -522,32 +526,49 @@ def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir):
 
     return wdir
 
-def get_prev_last_step(md_log):
-    with open(md_log) as inp:
-        data = inp.read()
-    last_step = re.findall('Writing checkpoint, step ([0-9]*) [A-Za-z0-9: ]*\n', data)
-    if last_step:
-        return int(last_step[0])
+# def get_prev_last_time(xtc):
+#     res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True)
+#     frames_step = re.findall('Step[ ]*([0-9 ]*)', res.stderr)
+#     if frames_step:
+#         frames, step = [int(i) for i in frames_step[0].split(' ') if i]
+#         frames = frames - 1
+#         time_ps = frames*step
+#         return time_ps
+
+def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir):
+    if tpr is None:
+        tpr = os.path.join(wdir_to_continue, f'{deffnm_prev}.tpr')
+    if cpt is None:
+        cpt = os.path.join(wdir_to_continue, f'{deffnm_prev}.cpt')
+    if xtc is None:
+        xtc = os.path.join(wdir_to_continue, f'{deffnm_prev}.xtc')
+
+    new_mdtime_ps = int(mdtime_ns * 1000)
+
+    # check previous existing files with the same name
+    for f in glob(os.path.join(wdir, f'{deffnm_next}*')):
+        n=1
+        for _ in glob(os.path.join(wdir, f'#{os.path.basename(f)}.*#')):
+            n+=1
+        new_f = os.path.join(wdir, f'#{os.path.basename(f)}.{n}#')
+        shutil.move(f, new_f)
+        logging.warning(f'Backup previous file {f} to {new_f}')
+
+    # last_time_ps = get_prev_last_time(xtc)
+    # new_steps = int(mdtime_ns * 1000 * 1000 / 2) - last_step
+    # logging.info(f'Continue from {2*last_step/(1000*1000)} ns. Add  {2*new_steps/(1000*1000)} ns. Result time {mdtime_ns}')
+    # if new_steps <= 0:
+    #     logging.error('Fail to continue MD simulation. New time equals or less then previously calculated simulation')
+    #     return None
+
+    return continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
+                       new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir)
 
 
-def continue_md_from_dir(wdir_to_continue, deffnm_prev, deffnm_next, mdtime_ns, project_dir):
-    tpr = os.path.join(wdir_to_continue, f'{deffnm_prev}.tpr')
-    cpk = os.path.join(wdir_to_continue, f'{deffnm_prev}.cpk')
-    xtc = os.path.join(wdir_to_continue, f'{deffnm_prev}.xtc')
-    md_log = os.path.join(wdir_to_continue, f'{deffnm_prev}.log')
-    return continue_md(tpr=tpr, cpk=cpk, xtc=xtc, md_log=md_log, wdir=wdir_to_continue,
-                       mdtime_ns=mdtime_ns, deffnm_prev=deffnm_prev, deffnm_next=deffnm_next, project_dir=project_dir)
-
-
-def continue_md(tpr, cpk, xtc, md_log, wdir, mdtime_ns, deffnm_prev, deffnm_next, project_dir):
-    last_step = get_prev_last_step(md_log)
-    new_steps = int(mdtime_ns * 1000 * 1000 / 2) - last_step
-    if new_steps <= 0:
-        logging.error('Fail to continue MD simulation. New time equals or less then previously calculated simulation')
-        return None
+def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir):
     try:
-        subprocess.check_output(f'wdir={wdir} tpr={tpr} cpk={cpk} new_mdsteps={new_steps} '
-                                f'deffnm_prev={deffnm_prev} deffnm_next={deffnm_next} xtc={xtc}  bash {os.path.join(project_dir, "continue_md.sh")}', shell=True)
+        subprocess.check_output(f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} '
+                                f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "continue_md.sh")}', shell=True)
     except subprocess.CalledProcessError as e:
         logging.error(f'{wdir}\t{e}\n')
         return None
@@ -557,12 +578,16 @@ def continue_md(tpr, cpk, xtc, md_log, wdir, mdtime_ns, deffnm_prev, deffnm_next
 
 
 def main(protein, wdir, lfile=None, system_lfile=None,
-         forcefield_num=6, addH=True,
+         forcefield_num=6, addH=True, clean_previous=False,
          gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3",
          mdtime_ns=1, npt_time_ps=100, nvt_time_ps=100,
          topol=None, posre_protein=None,
-         wdir_to_continue_list=None, deffnm_prev='md_out',
-         hostfile=None, ncpu=1):
+         wdir_to_continue_list=None,
+         tpr_prev = None, cpt_prev=None,
+         xtc_prev=None,
+         deffnm_prev='md_out',
+         hostfile=None, ncpu=1,
+         not_clean_log_files=False):
     '''
 
     :param protein:
@@ -706,22 +731,23 @@ def main(protein, wdir, lfile=None, system_lfile=None,
             dask_client.shutdown()
 
         deffnm = 'md_out'
+        logging.info(f'Simulation of {var_md_dirs} were successfully finished\n')
 
-    else: # continue prev md]
+    else: # continue prev md
         dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
         try:
             var_md_dirs = []
             deffnm = f'{deffnm_prev}_{mdtime_ns}'
             # os.path.dirname(var_lig)
             for res in calc_dask(continue_md_from_dir, wdir_to_continue_list, dask_client,
+                                 tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
                                  deffnm_prev=deffnm_prev, deffnm_next=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir):
                 if res:
                     var_md_dirs.append(res)
 
         finally:
             dask_client.shutdown()
-
-    logging.info(f'Continue of simulation of {var_md_dirs} were successfully finished\n')
+        logging.info(f'Continue of simulation of {var_md_dirs} were successfully finished\n')
 
     # Part 3. MD Analysis. Run on each cpu
     dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
@@ -736,6 +762,10 @@ def main(protein, wdir, lfile=None, system_lfile=None,
         dask_client.shutdown()
 
     logging.info(f'\nAnalysis of md simulation of {var_md_analysis_dirs} were successfully finished\n')
+
+    if not not_clean_log_files:
+        for f in glob(os.path.join(wdir_md,'*','#*#')):
+            os.remove(f)
 
 
 if __name__ == '__main__':
@@ -771,17 +801,22 @@ if __name__ == '__main__':
                         help='Set up NPT time equilibration in ps')
     parser.add_argument('--nvt_time', metavar='ps', required=False, default=100, type=int,
                         help='Set up NVT time equilibration in ps')
+    parser.add_argument('--not_clean_log_files',  action='store_true', default=False,
+                        help='Remove all backup prepared and md files')
     #continue md
     parser.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='TPR file from the previous MD simulation')
     parser.add_argument('--cpt', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='CPT file from previous simulation')
-    parser.add_argument('--md_log', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='Log file from previous simulation. Example: md_out.log')
+    parser.add_argument('--xtc', metavar='FILENAME', required=False, default=None, type=filepath_type,
+                        help='xtc file from previous simulation')
     parser.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+', type=filepath_type,
                         help='wdir for previous simulation. Should consist of: tpr, cpt, xtc, md_log files')
     parser.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
-                        help='preffix for previous md files. Used only if wdir_to_continue is used')
+                        help='preffix for previous md files. Used only if wdir_to_continue is used.\n'
+                             'Use if each --tpr, --cpt, --xtc arguments are not set up. '
+                             'Used as a part of new name for the next md files')
+
 
 
     args = parser.parse_args()
@@ -811,6 +846,7 @@ if __name__ == '__main__':
          clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
          topol=args.topol, posre_protein=args.posre,  mdtime_ns=args.md_time, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
          wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
-         hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir)
+         tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
+         hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, not_clean_log_files=args.not_clean_log_files)
     finally:
         logging.shutdown()
