@@ -145,19 +145,16 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
     couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
     couple_group = '_'.join(['Protein'] + all_resids)
 
+    non_couple_group = f'!{couple_group}'
+
     for mdp_fname in ['nvt.mdp', 'npt.mdp', 'md.mdp']:
         mdp_file = os.path.join(script_path, mdp_fname)
         shutil.copy(mdp_file, wdir_md_cur)
         md_fname = os.path.basename(mdp_file)
 
-        if couple_group!='Protein':
-            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+        edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
                  pattern='tc-grps',
-                 replace=f'tc-grps                 = {couple_group} Water_and_ions; two coupling groups')
-        else:
-            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
-                     pattern='tc-grps',
-                     replace=f'tc-grps                 = {couple_group} Non-Protein; two coupling groups')
+                 replace=f'tc-grps                 = {couple_group} {non_couple_group}; two coupling groups')
         steps = 0
         if md_fname == 'nvt.mdp':
             steps = int(nvt_time_ps * 1000 / 2)
@@ -173,6 +170,12 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
 
     if couple_group not in index_list:
         if not make_group_ndx(couple_group_ind, wdir_md_cur):
+            return None
+    if non_couple_group not in index_list:
+        # check if works test
+        index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
+        non_couple_group_ind = f'!{index_list.index(couple_group)}'
+        if not make_group_ndx(non_couple_group_ind, wdir_md_cur):
             return None
 
     return wdir_md_cur
