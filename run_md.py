@@ -781,11 +781,11 @@ def main(protein, wdir, lfile=None, system_lfile=None,
 
     if not not_clean_log_files:
         if wdir_to_continue_list is None:
-            for f in glob(os.path.join(wdir_md,'*','#*#')):
+            for f in glob(os.path.join(wdir_md, '*', '#*#')):
                 os.remove(f)
         else:
             for wdir_md in wdir_to_continue_list:
-                for f in glob(os.path.join(wdir_md, '*', '#*#')):
+                for f in glob(os.path.join(wdir_md, '#*#')):
                     os.remove(f)
 
 
