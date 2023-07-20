@@ -543,6 +543,11 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
     if xtc is None:
         xtc = os.path.join(wdir_to_continue, f'{deffnm_prev}.xtc')
 
+    for i in [tpr, cpt, xtc]:
+        if not os.path.isfile(i):
+            logging.error(f'No {i} file was found. Cannot continue the simulation. Calculations will be interrupted ')
+            return None
+
     new_mdtime_ps = int(mdtime_ns * 1000)
 
     # check previous existing files with the same name
@@ -553,13 +558,6 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
         new_f = os.path.join(wdir, f'#{os.path.basename(f)}.{n}#')
         shutil.move(f, new_f)
         logging.warning(f'Backup previous file {f} to {new_f}')
-
-    # last_time_ps = get_prev_last_time(xtc)
-    # new_steps = int(mdtime_ns * 1000 * 1000 / 2) - last_step
-    # logging.info(f'Continue from {2*last_step/(1000*1000)} ns. Add  {2*new_steps/(1000*1000)} ns. Result time {mdtime_ns}')
-    # if new_steps <= 0:
-    #     logging.error('Fail to continue MD simulation. New time equals or less then previously calculated simulation')
-    #     return None
 
     return continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
                        new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir)
@@ -764,8 +762,13 @@ def main(protein, wdir, lfile=None, system_lfile=None,
     logging.info(f'\nAnalysis of md simulation of {var_md_analysis_dirs} were successfully finished\n')
 
     if not not_clean_log_files:
-        for f in glob(os.path.join(wdir_md,'*','#*#')):
-            os.remove(f)
+        if wdir_to_continue_list is None:
+            for f in glob(os.path.join(wdir_md,'*','#*#')):
+                os.remove(f)
+        else:
+            for wdir_md in wdir_to_continue_list:
+                for f in glob(os.path.join(wdir_md, '*', '#*#')):
+                    os.remove(f)
 
 
 if __name__ == '__main__':
