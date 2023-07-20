@@ -588,21 +588,30 @@ def main(protein, wdir, lfile=None, system_lfile=None,
          not_clean_log_files=False):
     '''
 
-    :param protein:
-    :param lfile:
-    :param mdtime_ns:
-    :param system_lfile:
-    :param wdir:
-    :param md_param:
+    :param protein: protein file - pdb or gro format
+    :param wdir: None or path
+    :param lfile: None or file
+    :param system_lfile: None or file. Mol or sdf format
+    :param forcefield_num: int
+    :param addH: boolean. Add hydrogens by default
+    :param clean_previous: boolean. Remove all previous md files
     :param gromacs_version:
-    :param hostfile:
+    :param mdtime_ns: float. Time in ns
+    :param npt_time_ps: int. Time in ps
+    :param nvt_time_ps: int. Time in ps
+    :param topol: None or file
+    :param topol_itp_list: None or list of files
+    :param posre_list_protein: None or list of files
+    :param wdir_to_continue_list: list of paths
+    :param tpr_prev: None or file
+    :param cpt_prev: None or file
+    :param xtc_prev: None or file
+    :param deffnm_prev: md_out
+    :param hostfile: None or file
     :param ncpu:
-    :param topol:
-    :param posre_protein:
-    :param forcefield_num:
+    not_clean_log_files: boolean. Remove backup md files (starts with #)
     :return:
     '''
-    # TODO: add docstring with description of args
 
 
     try:
@@ -781,20 +790,23 @@ def main(protein, wdir, lfile=None, system_lfile=None,
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=''' ''')
+    parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
+    Allowed systems: Protein in water, Protein-Ligand-multiple Coenzymes, Protein-Ligand, Protein-multiple Coenzymes''')
     parser.add_argument('-p', '--protein', metavar='FILENAME', required=False, type=filepath_type,
-                        help='input file with compound. Supported formats: *.pdb or gro')
+                        help='input file of protein. Supported formats: *.pdb or gro')
     parser.add_argument('-d', '--wdir', metavar='WDIR', default=None, type=filepath_type,
-                        help='')
+                        help='Working directory. If not set the current directory will be used.')
     parser.add_argument('-l', '--ligand', metavar='FILENAME', required=False, type=filepath_type,
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
     parser.add_argument('--cofactor', metavar='FILENAME', default=None, type=filepath_type,
                         help='input file with compound. Supported formats: *.mol or sdf or gro')
+    parser.add_argument('--gromacs_version', metavar='STRING', default='GROMACS/2021.4-foss-2020b-PLUMED-2.7.3',
+                        help='gromacs_version')
     parser.add_argument('--not_add_H', action='store_true', default=False,
                         help='disable to add hydrogens to molecules before simulation.')
     parser.add_argument('--clean_previous_md', action='store_true', default=False,
-                        help='Remove all previous prepared for the current system MD files.\n'
-                             'Prepared ligand and protein files will be used if it exists.')
+                        help='remove all previous prepared for the current system MD files.\n'
+                             'Prepared ligand and protein files will be intact and reused if it exists.')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
@@ -804,31 +816,32 @@ if __name__ == '__main__':
                         help='number of CPU per server. Use all cpus by default.')
     parser.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
                         help='Required if gro file of the protein is provided')
-    parser.add_argument('--topol_itp', metavar='topol.top', required=False, nargs='+', default=None, type=filepath_type,
-                        help='If protain has multiple chain. Itp files for each chain are required')
+    parser.add_argument('--topol_itp', metavar='topol_chainA.itp topol_chainB.itp', required=False, nargs='+', default=None, type=filepath_type,
+                        help='if protein has multiple chain there are multiple topologies for each of them. Itp files for each chain are required')
     parser.add_argument('--posre', metavar='posre.itp', required=False, nargs='+', default=None, type=filepath_type,
-                        help='Required if gro file of the protein is provided. Can be multiple files for each chain')
+                        help='required if gro file of the protein is provided. Can be multiple files for each chain')
     parser.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
-                        help='Time of MD simulation in ns')
+                        help='time of MD simulation in ns')
     parser.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
-                        help='Set up NPT time equilibration in ps')
+                        help='time of NPT equilibration in ps')
     parser.add_argument('--nvt_time', metavar='ps', required=False, default=100, type=int,
-                        help='Set up NVT time equilibration in ps')
+                        help='time of NVT equilibration in ps')
     parser.add_argument('--not_clean_log_files',  action='store_true', default=False,
-                        help='Remove all backup prepared and md files')
+                        help='Not to remove all backups of md files')
     #continue md
     parser.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='TPR file from the previous MD simulation')
+                        help='tpr file from the previous MD simulation')
     parser.add_argument('--cpt', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='CPT file from previous simulation')
+                        help='cpt file from previous simulation')
     parser.add_argument('--xtc', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='xtc file from previous simulation')
     parser.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+', type=filepath_type,
-                        help='wdir for previous simulation. Should consist of: tpr, cpt, xtc, md_log files')
+                        help='''directories for the previous simulations. Use to extend or continue the simulation. '
+                             Should consist of: tpr, cpt, xtc files''')
     parser.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
-                        help='preffix for previous md files. Used only if wdir_to_continue is used.\n'
-                             'Use if each --tpr, --cpt, --xtc arguments are not set up. '
-                             'Used as a part of new name for the next md files')
+                        help='''preffix for the previous md files. Use to extend or continue the simulation.
+                        Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. 
+                        Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue''')
 
 
 
@@ -856,7 +869,8 @@ if __name__ == '__main__':
     logging.info(args)
     try:
         main(protein=args.protein, lfile=args.ligand, addH=not args.not_add_H,
-         clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
+         clean_previous=args.clean_previous_md,
+         gromacs_version= args.gromacs_version, system_lfile=args.cofactor,
          topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,  mdtime_ns=args.md_time, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
          wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
          tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
