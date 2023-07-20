@@ -579,7 +579,7 @@ def main(protein, wdir, lfile=None, system_lfile=None,
          forcefield_num=6, addH=True, clean_previous=False,
          gromacs_version="GROMACS/2021.4-foss-2020b-PLUMED-2.7.3",
          mdtime_ns=1, npt_time_ps=100, nvt_time_ps=100,
-         topol=None, posre_protein=None,
+         topol=None, topol_itp_list=None, posre_list_protein=None,
          wdir_to_continue_list=None,
          tpr_prev = None, cpt_prev=None,
          xtc_prev=None,
@@ -614,7 +614,7 @@ def main(protein, wdir, lfile=None, system_lfile=None,
     project_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
 
-    if (wdir_to_continue_list is None) and (protein is not None):
+    if wdir_to_continue_list is None:
         # create dirs
         wdir_protein = os.path.join(wdir, 'md_preparation', 'protein')
         wdir_ligand = os.path.join(wdir, 'md_preparation', 'var_lig')
@@ -631,8 +631,9 @@ def main(protein, wdir, lfile=None, system_lfile=None,
             raise FileExistsError(f'{protein} does not exist')
 
         pname, p_ext = os.path.splitext(os.path.basename(protein))
-        if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro'):
-            if p_ext != '.gro' or topol is None or posre_protein is None:
+        # check if already exist in the working directory
+        if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro') or not os.path.isfile(os.path.join(wdir_protein, "topol.top")):
+            if p_ext != '.gro' or topol is None or posre_list_protein is None:
                 try:
                     subprocess.check_output(f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh '
                           f'-i {os.path.join(wdir_protein, "posre.itp")} '
@@ -642,14 +643,22 @@ def main(protein, wdir, lfile=None, system_lfile=None,
                     logging.error(e)
                     return None
             else:
-                if not os.path.isfile(os.path.join(wdir_protein, protein)):
-                    shutil.copy(protein, os.path.join(wdir_protein, protein))
+                if not os.path.isfile(os.path.join(wdir_protein, os.path.basename(protein))):
+                    shutil.copy(protein, os.path.join(wdir_protein, os.path.basename(protein)))
                 if not os.path.isfile(os.path.join(wdir_protein, 'topol.top')):
                     shutil.copy(topol, os.path.join(wdir_protein, 'topol.top'))
-                if not os.path.isfile(os.path.join(wdir_protein, 'posre.itp')):
-                    shutil.copy(posre_protein, os.path.join(wdir_protein, 'posre.itp'))
+                # multiple chains
+                for posre_protein in posre_list_protein:
+                    if not os.path.isfile(os.path.join(wdir_protein, os.path.basename(posre_protein))):
+                            shutil.copy(posre_protein, os.path.join(wdir_protein, os.path.basename(posre_protein)))
+                if topol_itp_list is not None:
+                    for topol_itp in topol_itp_list:
+                        if not os.path.isfile(os.path.join(wdir_protein, os.path.basename(topol_itp))):
+                            shutil.copy(topol_itp, os.path.join(wdir_protein, os.path.basename(topol_itp)))
+
+
         else:
-            logging.warning(f'{os.path.join(wdir_protein, pname)}.gro protein file exists. '
+            logging.warning(f'{os.path.join(wdir_protein, pname)}.gro and topol.top files exist. '
                             f'Protein preparation step will be skipped.')
 
 
@@ -795,9 +804,10 @@ if __name__ == '__main__':
                         help='number of CPU per server. Use all cpus by default.')
     parser.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
                         help='Required if gro file of the protein is provided')
-    parser.add_argument('--posre', metavar='posre.itp', required=False, default=None, type=filepath_type,
-                        help='Required if gro file of the protein is provided')
-    ##
+    parser.add_argument('--topol_itp', metavar='topol.top', required=False, nargs='+', default=None, type=filepath_type,
+                        help='If protain has multiple chain. Itp files for each chain are required')
+    parser.add_argument('--posre', metavar='posre.itp', required=False, nargs='+', default=None, type=filepath_type,
+                        help='Required if gro file of the protein is provided. Can be multiple files for each chain')
     parser.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='Time of MD simulation in ns')
     parser.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
@@ -847,7 +857,7 @@ if __name__ == '__main__':
     try:
         main(protein=args.protein, lfile=args.ligand, addH=not args.not_add_H,
          clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
-         topol=args.topol, posre_protein=args.posre,  mdtime_ns=args.md_time, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
+         topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,  mdtime_ns=args.md_time, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
          wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
          tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
          hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, not_clean_log_files=args.not_clean_log_files)
