@@ -168,6 +168,7 @@ python run_md.py --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand
 ```
   
 **Output**   
+*each run creates a unique log file which contains name of the protein, ligand file and time of run.*  
 In the working directory (or in the current directory if wdir argument was not set up) will be created the next folders:
 ```
 md_preparation/
@@ -240,7 +241,7 @@ frame.pdb - a frame for topology
 ```
 - **Analysis data**  
 ```
-potential.xvg
+potential.xvg - m
 temperature.xvg
 pressure.xvg
 density.xvg
