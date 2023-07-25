@@ -2,6 +2,8 @@
 #  args: wdir index_protein_ligand tu dtstep
 cd $wdir
 
+>&2 echo 'Script running:***************************** Analysis of MD simulation *********************************'
+
 gmx trjconv -s $tpr -f $xtc -pbc nojump -o $deffnm\_noj_noPBC.xtc <<< "System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 #gmx trjconv -s $tpr -f $deffnm.xtc -o $deffnm\_noPBC.xtc -pbc mol -center <<< "Protein  System"
 gmx trjconv -s $tpr -f $deffnm\_noj_noPBC.xtc -o md_centermolsnoPBC.xtc -pbc mol -center -n index.ndx  <<< "$index_group  System" || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
