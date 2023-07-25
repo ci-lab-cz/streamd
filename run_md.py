@@ -202,7 +202,7 @@ def run_complex_prep(var_lig_data, wdir_protein, system_lig_data,
             # make all itp and edit current itps
             make_all_itp(all_itp_list, out_file=os.path.join(wdir_md_cur, 'all.itp'))
         else:
-            logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip topol preparation step\n')
+            logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip ligand all itp preparation step\n')
 
         add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol=os.path.join(wdir_md_cur, "topol.top"))
         # copy molid-resid pairs for variable ligand and all system ligands
@@ -552,9 +552,7 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
 
     # check previous existing files with the same name
     for f in glob(os.path.join(wdir, f'{deffnm_next}*')):
-        n=1
-        for _ in glob(os.path.join(wdir, f'#{os.path.basename(f)}.*#')):
-            n+=1
+        n = len(glob(os.path.join(wdir, f'#{os.path.basename(f)}.*#')))+1
         new_f = os.path.join(wdir, f'#{os.path.basename(f)}.{n}#')
         shutil.move(f, new_f)
         logging.warning(f'Backup previous file {f} to {new_f}')
