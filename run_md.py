@@ -9,7 +9,39 @@ import time
 import random
 import subprocess
 from rdkit import Chem
-from dask.distributed import Client
+from dask_init import init_dask_cluster, calc_dask
+from utils import filepath_type, get_index, make_group_ndx
+# logging_config = {
+#     "version": 1,
+#     "handlers": {
+#         "file": {
+#             "class": "logging.handlers.RotatingFileHandler",
+#             "filename": "dask.log",
+#             "level": "WARNING",
+#         },
+#         "console": {
+#             "class": "logging.StreamHandler",
+#             "level": "WARNING",
+#         }
+#     },
+#     "loggers": {
+#         "distributed.worker": {
+#             "level": "WARNING",
+#             "handlers": ["file"],
+#         },
+#         "distributed.scheduler": {
+#             "level": "WARNING",
+#             "handlers": ["file"],
+#         },
+#         "distributed.nanny": {
+#             "level": "WARNING",
+#             "handlers": ["file"],
+#         }
+#     }
+# }
+# dask.config.config['logging'] = logging_config
+
+
 import logging
 from datetime import datetime
 import re
