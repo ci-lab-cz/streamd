@@ -2,8 +2,10 @@ import logging
 import math
 import subprocess
 import time
+
 from dask.distributed import Client
 from rdkit import Chem
+
 
 def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
     '''
@@ -28,11 +30,10 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
         time.sleep(10)
         dask_client = Client(hosts[0] + ':8786', connection_limit=2048)
     else:
-        dask_client = Client(n_workers=n_workers, threads_per_worker=n_threads)   # to run dask on a single server
+        dask_client = Client(n_workers=n_workers, threads_per_worker=n_threads)  # to run dask on a single server
 
     dask_client.forward_logging(level=logging.INFO)
     return dask_client
-
 
 
 def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):

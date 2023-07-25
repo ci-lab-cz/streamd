@@ -1,5 +1,5 @@
 title                   = OPLS Lysozyme NPT equilibration 
-define                  = -DPOSRES  ; position restrain the protein
+define                  = -DPOSRES  ; position restrain the protein and ligand
 ; Run parameters
 integrator              = md        ; leap-frog integrator
 nsteps                  = 500000    ; 2 * 50000 = 100 ps, 1000 ps
