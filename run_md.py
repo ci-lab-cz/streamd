@@ -199,7 +199,7 @@ def main(protein, wdir, lfile, system_lfile,
                         return None
                     system_lig_wdirs.append(res)
 
-            var_lig_wdirs = []  # wdir_ligand_cur
+            var_lig_wdirs = []
             if lfile is not None:
                 if not os.path.isfile(lfile):
                     raise FileExistsError(f'{lfile} does not exist')
@@ -231,13 +231,11 @@ def main(protein, wdir, lfile, system_lfile,
         dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
         try:
             var_eq_dirs = []
-            # os.path.dirname(var_lig)
             for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir):
                 if res:
                     var_eq_dirs.append(res)
 
             var_md_dirs = []
-            # os.path.dirname(var_lig)
             for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir):
                 if res:
                     var_md_dirs.append(res)
@@ -353,9 +351,12 @@ if __name__ == '__main__':
         wdir = os.getcwd()
     else:
         wdir = args.wdir
+        if not os.path.isdir(wdir):
+            os.makedirs(wdir)
 
     log_file = os.path.join(wdir,
-                            f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}.log')
+                            f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
+                            f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}.log')
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
