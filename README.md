@@ -13,17 +13,20 @@
 *Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
 
 ```
-will be fixed
-
 conda update conda
-conda create -n gmxMMPBSA python=3.8 -y -q
-conda activate gmxMMPBSA
-conda install mpi4py
-conda install -c conda-forge ambertools=21 compilers
-conda install -c conda-forge rdkit
 
-python -m pip install git+https://github.com/ParmEd/ParmEd.git@16fb236    
+conda create -n gmxMMPBSA python=3.9 -y -q
+conda activate gmxMMPBSA
+
+
+conda install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 -y -q
+
+python -m pip install git+https://github.com/Valdes-Tresanco-MS/ParmEd.git@v3.4
+
 python -m pip install gmx_MMPBSA
+
+conda install -c conda-forge gromacs==2022.4 -y -q
+conda install -c conda-forge rdkit dask -y -q
 
 ```
 ## **Description**
@@ -33,8 +36,8 @@ python -m pip install gmx_MMPBSA
 - supports simulation for different systems:  
     - Protein in Water;  
     - Protein - Ligand;  
-    - Protein - Multiple coenzymes;  
-    - Protein - Ligand - Multiple coenzymes;  
+    - Protein - Cofactor (multiple);  
+    - Protein - Ligand - Cofactor (multiple);  
     
 - supports distributed computing using dask library
 - supports of running of parallel simulations on multiple servers
@@ -45,63 +48,44 @@ python -m pip install gmx_MMPBSA
 
 ### **USAGE**
 ```
-$ python run_md.py -h
-usage: run_md.py [-h] [-p FILENAME] [-d WDIR] [-l FILENAME]
-                 [--cofactor FILENAME] [--not_add_H] [--clean_previous_md]
-                 [--hostfile FILENAME] [-c INTEGER] [--topol topol.top]
-                 [--topol_itp topol.top [topol.top ...]]
-                 [--posre posre.itp [posre.itp ...]] [--md_time ns]
-                 [--npt_time ps] [--nvt_time ps] [--not_clean_log_files]
-                 [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
-                 [--wdir_to_continue DIRNAME [DIRNAME ...]]
-                 [--deffnm preffix for md files]
+ python ../md-scripts/run_md.py -h
+usage: run_md.py [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--topol topol.top]
+                 [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]] [--md_time ns] [--npt_time ps] [--nvt_time ps]
+                 [--not_clean_log_files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files]
 
-Run or continue MD simulation. Allowed systems: Protein in water, Protein - Ligand, 
-Protein - multiple Coenzymes, Protein - Ligand - multiple Coenzymes, 
+Run or continue MD simulation. Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple)
 
-options:
+optional arguments:
   -h, --help            show this help message and exit
   -p FILENAME, --protein FILENAME
-                        input file of the protein. Supported formats: *.pdb or gro
-  -d WDIR, --wdir WDIR  working directory. If not set the current directory will be used.
+                        input file of protein. Supported formats: *.pdb or gro
+  -d WDIR, --wdir WDIR  Working directory. If not set the current directory will be used.
   -l FILENAME, --ligand FILENAME
-                        input file with compounds. Supported formats: *.mol or sdf.
-                        If molecules have names it will be used for file names.  
-  --cofactor FILENAME   input file with compound. Supported formats: *.mol or sdf.
-                        If molecules have names it will be used for file names. 
-  --gromacs_version     Default: GROMACS/2021.4-foss-2020b-PLUMED-2.7.3 .
-  --not_add_H           disable to add hydrogens to molecules for simulation. By default always add
-  --clean_previous_md   remove all previous prepared for the current system MD files. 
-                        Prepared ligand and protein files will be intact and reused if it exists.
-  --hostfile FILENAME   text file with addresses of nodes of dask SSH cluster.
-                        The most typical, it can be passed as $PBS_NODEFILE
-                        variable from inside a PBS script. The first line in
-                        this file will be the address of the scheduler running
-                        on the standard port 8786. If omitted, calculations
-                        will run on a single machine as usual.
+                        input file with compound. Supported formats: *.mol or sdf
+  --cofactor FILENAME   input file with compound. Supported formats: *.mol or sdf
+  --clean_previous_md   remove a production MD simulation directory if it exists to re-initialize production MD setup
+  --hostfile FILENAME   text file with addresses of nodes of dask SSH cluster. The most typical, it can be passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file will be
+                        the address of the scheduler running on the standard port 8786. If omitted, calculations will run on a single machine as usual.
   -c INTEGER, --ncpu INTEGER
                         number of CPU per server. Use all cpus by default.
-  --topol topol.top     required if gro file of the protein is provided
-  --topol_itp topol.top [topol_chainA.itp topol_chainB.itp]
-                        if the protein has multiple chain there are multiple topologies for each of them.
-                        Itp files for each chain are required
+  --topol topol.top     topology file (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
+  --topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]
+                        Itp files for individual protein chains (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
   --posre posre.itp [posre.itp ...]
-                        required if gro file of the protein is provided. Can
-                        be multiple files for each chain.
+                        posre file(s) (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
   --md_time ns          time of MD simulation in ns
   --npt_time ps         time of NPT equilibration in ps
   --nvt_time ps         time of NVT equilibration in ps
-  --not_clean_log_files Not to remove all backups of md files
-  --tpr FILENAME        tpr file from the previous MD simulation. Use to extend or continue the simulation
-  --cpt FILENAME        cpt file from previous simulation. Use to extend or continue the simulation
-  --xtc FILENAME        xtc file from previous simulation. Use to extend or continue the simulation
+  --not_clean_log_files
+                        Not to remove all backups of md files
+  --tpr FILENAME        tpr file from the previous MD simulation
+  --cpt FILENAME        cpt file from previous simulation
+  --xtc FILENAME        xtc file from previous simulation
   --wdir_to_continue DIRNAME [DIRNAME ...]
-                        directories for the previous simulation. Use to extend or continue the simulation
-                        Should consist of: tpr, cpt, xtc files
+                        directories for the previous simulations. Use to extend or continue the simulation. ' Should consist of: tpr, cpt, xtc files
   --deffnm preffix for md files
-                        preffix for the previous md files. Use to extend or continue the simulation.
-                        Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. 
-                        Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue.
+                        preffix for the previous md files. Use to extend or continue the simulation. Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. Files
+                        deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue
 ```
 
 ### **Examples**
@@ -171,15 +155,16 @@ python run_md.py --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand
 *each run creates a unique log file which contains name of the protein, ligand file and time of run.*  
 In the working directory (or in the current directory if wdir argument was not set up) will be created the next folders:
 ```
-md_preparation/
-md_preparation/protein/
-md_preparation/var_lig/
-md_preparation/system_lig/
-md_preparation/md_files/
+md_files/
+- md_files/md_preparation/
+ -- md_files/md_preparation/protein/
+ -- md_files/md_preparation/var_lig/
+ -- md_files/md_preparation/system_lig/
+- md_files/md_run/
 ```
 
 ```
-md_preparation/protein/:
+md_files/md_preparation/protein/:
 protein.gro  posre.itp  topol.top
 
 OR for multiple chain protein:
@@ -193,7 +178,7 @@ topol_Protein_chain_B.itp
 ```
 
 ```
-md_preparation/var_lig/:
+md_files/md_preparation/var_lig/:
 all_resid.txt
 
 ligand_1/
@@ -207,7 +192,7 @@ ligand_2/
 ```
 
 ```
-md_preparation/system_lig/:
+md_files/md_preparation/system_lig/:
 all_resid.txt
 
 cofactor_1/
@@ -221,7 +206,7 @@ cofactor_2/
 ```
 
 ```
-md_preparation/md_files/
+md_files/md_run/md_files/
 
 protein_H_HIS_ligand_1/
 ligand_1.itp          density.xvg  em.trr      ions.tpr                md_out.edr         md_out.tpr             npt.cpt  npt.tpr  nvt.log    potential.xvg         rmsd.xvg       temperature.xvg
