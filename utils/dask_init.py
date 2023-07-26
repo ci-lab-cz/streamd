@@ -49,7 +49,7 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
             futures = []
             for i, arg in enumerate(main_arg, 1):
                 futures.append(dask_client.submit(func, arg, **kwargs))
-                if i == nworkers * 2:  # you may submit more tasks then workers (this is generally not necessary if you do not use priority for individual tasks)
+                if i == nworkers:  # you may submit more tasks then workers (this is generally not necessary if you do not use priority for individual tasks)
                     break
             seq = as_completed(futures, with_results=True)
             for i, (future, results) in enumerate(seq, 1):
