@@ -90,8 +90,7 @@ def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir):
 
 
 def main(protein, wdir, lfile, system_lfile,
-         clean_previous, load_gromacs,
-         mdtime_ns, npt_time_ps, nvt_time_ps,
+         clean_previous, mdtime_ns, npt_time_ps, nvt_time_ps,
          topol, topol_itp_list, posre_list_protein,
          wdir_to_continue_list, deffnm_prev,
          tpr_prev, cpt_prev, xtc_prev,
@@ -104,7 +103,6 @@ def main(protein, wdir, lfile, system_lfile,
     :param system_lfile: None or file. Mol or sdf format
     :param forcefield_num: int
     :param clean_previous: boolean. Remove all previous md files
-    :param gromacs_version:
     :param mdtime_ns: float. Time in ns
     :param npt_time_ps: int. Time in ps
     :param nvt_time_ps: int. Time in ps
@@ -121,12 +119,6 @@ def main(protein, wdir, lfile, system_lfile,
     not_clean_log_files: boolean. Remove backup md files (starts with #)
     :return:
     '''
-
-    try:
-        subprocess.check_output(load_gromacs, shell=True)
-    except subprocess.CalledProcessError as e:
-        logging.exception(e, stack_info=True)
-        return None
 
     project_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(project_dir, 'scripts')
@@ -312,8 +304,6 @@ if __name__ == '__main__':
     parser.add_argument('--cofactor', metavar='FILENAME', default=None,
                         type=partial(filepath_type, ext=('mol', 'sdf')),
                         help='input file with compound. Supported formats: *.mol or sdf')
-    parser.add_argument('--gromacs', metavar='STRING', default='module load GROMACS/2021.4-foss-2020b-PLUMED-2.7.3',
-                        help='gromacs set up')
     parser.add_argument('--clean_previous_md', action='store_true', default=False,
                         help='remove a production MD simulation directory if it exists to re-initialize production MD setup')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
@@ -381,8 +371,7 @@ if __name__ == '__main__':
     logging.info(args)
     try:
         main(protein=args.protein, lfile=args.ligand,
-             clean_previous=args.clean_previous_md,
-             load_gromacs=args.gromacs, system_lfile=args.cofactor,
+             clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
              topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre, mdtime_ns=args.md_time,
              npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
              wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
