@@ -293,7 +293,7 @@ if __name__ == '__main__':
                         type=partial(filepath_type, ext=('pdb', 'gro'), check_exist=True),
                         help='input file of protein. Supported formats: *.pdb or gro')
     parser.add_argument('-d', '--wdir', metavar='WDIR', default=None,
-                        type=partial(filepath_type, check_exist=False),
+                        type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory. If not set the current directory will be used.')
     parser.add_argument('-l', '--ligand', metavar='FILENAME', required=False,
                         type=partial(filepath_type, ext=('mol', 'sdf')),
@@ -350,8 +350,6 @@ if __name__ == '__main__':
         wdir = os.getcwd()
     else:
         wdir = args.wdir
-        if not os.path.isdir(wdir):
-            os.makedirs(wdir)
 
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'

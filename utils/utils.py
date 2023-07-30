@@ -4,8 +4,10 @@ import re
 import subprocess
 
 
-def filepath_type(x, ext=None, check_exist=True, exist_type='file'):
+def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=False):
     value = os.path.abspath(x) if x else x
+    if create_dir:
+        os.makedirs(value, exist_ok=True)
     if check_exist:
         if exist_type == 'file' and not os.path.isfile(value):
             raise FileExistsError(f'{value} does not exist')
