@@ -50,6 +50,17 @@ def run_simulation(wdir, project_dir):
 
 
 def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir):
+    def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir):
+        try:
+            subprocess.check_output(f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} '
+                                    f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}',
+                                    shell=True)
+        except subprocess.CalledProcessError as e:
+            logging.exception(f'{wdir}\n{e}', stack_info=True)
+            return None
+
+        return wdir
+
     if tpr is None:
         tpr = os.path.join(wdir_to_continue, f'{deffnm_prev}.tpr')
     if cpt is None:
@@ -75,18 +86,6 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
 
     return continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
                        new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir)
-
-
-def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir):
-    try:
-        subprocess.check_output(f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} '
-                                f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}',
-                                shell=True)
-    except subprocess.CalledProcessError as e:
-        logging.exception(f'{wdir}\n{e}', stack_info=True)
-        return None
-
-    return wdir
 
 
 def main(protein, wdir, lfile, system_lfile,
