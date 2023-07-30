@@ -18,7 +18,7 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
     if hostfile:
         with open(hostfile) as f:
             hosts = [line.strip() for line in f]
-            n_servers = sum(1 if line.strip() else 0 for line in f)
+            n_servers = sum(1 if h else 0 for h in hosts)
     else:
         n_servers = 1
 
@@ -26,7 +26,7 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
     n_threads = math.ceil(ncpu / n_tasks_per_node)
     if hostfile is not None:
         cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
-        subprocess.check_output(cmd, shell=True)
+        subprocess.run(cmd, shell=True)
         time.sleep(10)
         dask_client = Client(hosts[0] + ':8786', connection_limit=2048)
     else:
