@@ -2,10 +2,10 @@ import logging
 import os
 import subprocess
 
-from utils.utils import get_index, make_group_ndx, get_mol_resid_pair
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair
 
 
-def md_lig_rmsd_analysis(molid, resid, wdir, tu):
+def md_lig_rmsd_analysis(molid, resid, wdir, tu, bash_log):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
     if f'{resid}_&_!H*' not in index_list:
         if not make_group_ndx(query=f'{index_list.index(resid)} & ! a H*', wdir=wdir):
@@ -16,13 +16,14 @@ def md_lig_rmsd_analysis(molid, resid, wdir, tu):
     try:
         subprocess.check_output(f'''
         cd {wdir}
-        gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd_{molid}.xvg -n index.ndx  -tu {tu} <<< "Backbone  {index_ligand_noH}"''',
+        gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd_{molid}.xvg -n index.ndx  -tu {tu} <<< "Backbone  {index_ligand_noH}"
+        >> {bash_log} 2>&1''',
                                 shell=True)
     except subprocess.CalledProcessError as e:
         logging.exception(f'{wdir}\n{e}', stack_info=True)
 
 
-def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir):
+def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir, bash_log):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
     molid_resid_pairs_fname = os.path.join(wdir, 'all_ligand_resid.txt')
 
@@ -48,8 +49,8 @@ def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir):
 
     try:
         subprocess.check_output(
-            f'wdir={wdir} index_group={index_group} tu={tu} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} bash {os.path.join(project_dir, "scripts/script_sh/md_analysis.sh")}',
-            shell=True)
+            f'wdir={wdir} index_group={index_group} tu={tu} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} bash {os.path.join(project_dir, "scripts/script_sh/md_analysis.sh")}'
+            f'>> {bash_log} 2>&1', shell=True)
     except subprocess.CalledProcessError as e:
         logging.exception(f'{wdir}\n{e}', stack_info=True)
         return None
@@ -57,6 +58,6 @@ def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir):
     # molid resid pairs for all ligands in the MD system
     # calc rmsd
     for molid, resid in molid_resid_pairs:
-        md_lig_rmsd_analysis(molid=molid, resid=resid, wdir=wdir, tu=tu)
+        md_lig_rmsd_analysis(molid=molid, resid=resid, wdir=wdir, tu=tu, bash_log=bash_log)
 
     return wdir

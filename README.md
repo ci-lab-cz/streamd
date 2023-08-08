@@ -29,7 +29,7 @@ python -m pip install gmx_MMPBSA
 conda install -c conda-forge rdkit dask distributed -y -q
 
 pip install paramiko
-
+pip install asyncssh
 ```
 ## **Description**
 #### **Fully automatic pipeline for molecular dynamics**

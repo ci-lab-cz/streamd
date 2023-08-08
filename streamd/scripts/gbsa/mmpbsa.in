@@ -4,7 +4,7 @@ Sample input file for PB/GB calculation
 #according to what is better for your system.
 &general
 sys_name="PB_GB_IE",
-startframe=1, interval=5, verbose=2, PBRadii=3,
+startframe=1, interval=1, verbose=2, PBRadii=3,
 interaction_entropy=1, ie_segment=100, temperature=310
 /
 &gb

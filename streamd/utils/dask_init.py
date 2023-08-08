@@ -1,10 +1,16 @@
 import logging
 import math
-import subprocess
-import time
+import os
 
-from dask.distributed import Client
+from dask.distributed import Client, SSHCluster
 from rdkit import Chem
+
+def set_env(main_os_env):
+    os.environ["PATH"] = f'{main_os_env["PATH"]}:{os.environ["PATH"]}'
+    os.environ["CONDA_DEFAULT_ENV"] = main_os_env["CONDA_DEFAULT_ENV"]
+    os.environ["CONDA_PREFIX"] = main_os_env["CONDA_PREFIX"]
+    os.environ["CONDA_PROMPT_MODIFIER"] = main_os_env["CONDA_PROMPT_MODIFIER"]
+    os.environ["CONDA_SHLVL"] = main_os_env["CONDA_SHLVL"]
 
 
 def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
@@ -17,23 +23,37 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
     '''
     if hostfile:
         with open(hostfile) as f:
-            hosts = [line.strip() for line in f]
-            n_servers = sum(1 if h else 0 for h in hosts)
+            hosts = [line.strip() for line in f if line.strip()]
+            n_servers = len(hosts)
     else:
+        hosts = []
         n_servers = 1
 
-    n_workers = n_servers * n_tasks_per_node
+    # n_workers = n_servers * n_tasks_per_node
+    n_workers = n_tasks_per_node
     n_threads = math.ceil(ncpu / n_tasks_per_node)
     if hostfile is not None:
-        cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
-        subprocess.run(cmd, shell=True)
-        time.sleep(10)
-        dask_client = Client(hosts[0] + ':8786', connection_limit=2048)
+        # cmd = f'dask ssh --hostfile {hostfile} --nworkers {n_workers} --nthreads {n_threads} &'
+        # subprocess.run(cmd, shell=True)
+        # time.sleep(10)
+        logging.warning(f'Dask init,{n_tasks_per_node}, {ncpu}, {n_threads}, {n_workers}, {hosts},{n_servers}')
+        cluster = SSHCluster(
+            [hosts[0]]+hosts,
+            connect_options={"known_hosts": None},
+            worker_options={"nthreads": n_threads, 'n_workers': n_workers},
+            scheduler_options={"port": 0, "dashboard_address": ":8786"},
+            # scheduler_options={"dashboard_address": ":8786"}
+        )
+        # dask_client = Client(hosts[0] + ':8786', connection_limit=2048)
+        dask_client = Client(cluster)
+
     else:
+        cluster = None
         dask_client = Client(n_workers=n_workers, threads_per_worker=n_threads)  # to run dask on a single server
 
     dask_client.forward_logging(level=logging.INFO)
-    return dask_client
+    dask_client.run(set_env, main_os_env=os.environ.copy())
+    return dask_client, cluster
 
 
 def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
@@ -46,9 +66,12 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
         none_context = contextmanager(lambda: iter([None]))()
         with (performance_report(filename=dask_report_fname) if dask_report_fname is not None else none_context):
             nworkers = len(dask_client.scheduler_info()['workers'])
+            # logging.warning(f'dask {func}, {dask_client.scheduler_info()}, {nworkers}')
+            logging.warning(f'dask calc {func}, {nworkers}')
             futures = []
             for i, arg in enumerate(main_arg, 1):
                 futures.append(dask_client.submit(func, arg, **kwargs))
+                logging.warning(f'dask calc start {func}, {arg} {nworkers}')
                 if i == nworkers:  # you may submit more tasks then workers (this is generally not necessary if you do not use priority for individual tasks)
                     break
             seq = as_completed(futures, with_results=True)
@@ -57,6 +80,7 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
                 del future
                 try:
                     arg = next(main_arg)
+                    logging.warning(f'dask add {func}, {arg} {nworkers}')
                     new_future = dask_client.submit(func, arg, **kwargs)
                     seq.add(new_future)
                 except StopIteration:
