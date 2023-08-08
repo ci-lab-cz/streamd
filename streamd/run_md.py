@@ -8,25 +8,27 @@ from functools import partial
 from glob import glob
 from multiprocessing import cpu_count
 
-from md_analysis import run_md_analysis
-from preparation.complex_preparation import run_complex_preparation
-from preparation.ligand_preparation import prep_ligand, supply_mols
-from utils.dask_init import init_dask_cluster, calc_dask
-from utils.utils import filepath_type
+from streamd.md_analysis import run_md_analysis
+from streamd.preparation.complex_preparation import run_complex_preparation
+from streamd.preparation.ligand_preparation import prep_ligand, supply_mols_tuple
+from streamd.utils.dask_init import init_dask_cluster, calc_dask
+from streamd.utils.utils import filepath_type
+
 
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
 
 
-def run_equilibration(wdir, project_dir):
+def run_equilibration(wdir, project_dir, bash_log):
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
 
     try:
-        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}',
+        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}'
+                                f'>> {bash_log} 2>&1',
                                 shell=True)
     except subprocess.CalledProcessError as e:
         logging.exception(f'{wdir}\n{e}', stack_info=True)
@@ -34,7 +36,7 @@ def run_equilibration(wdir, project_dir):
     return wdir
 
 
-def run_simulation(wdir, project_dir):
+def run_simulation(wdir, project_dir, bash_log):
     if os.path.isfile(os.path.join(wdir, 'md_out.tpr')) and os.path.isfile(os.path.join(wdir, 'md_out.cpt')) \
             and os.path.isfile(os.path.join(wdir, 'md_out.xtc')) and os.path.isfile(os.path.join(wdir, 'md_out.log')):
         logging.warning(f'{wdir}. md_out.xtc and md_out.tpr exist. '
@@ -42,18 +44,20 @@ def run_simulation(wdir, project_dir):
                         f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
         return wdir
     try:
-        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}', shell=True)
+        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}'
+                                f'>> {bash_log} 2>&1', shell=True)
     except subprocess.CalledProcessError as e:
         logging.exception(f'{wdir}\n{e}', stack_info=True)
         return None
     return wdir
 
 
-def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir):
-    def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir):
+def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir, bash_log):
+    def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log):
         try:
             subprocess.check_output(f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} '
-                                    f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}',
+                                    f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}'
+                                    f'>> {bash_log} 2>&1',
                                     shell=True)
         except subprocess.CalledProcessError as e:
             logging.exception(f'{wdir}\n{e}', stack_info=True)
@@ -78,23 +82,23 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
     new_mdtime_ps = int(mdtime_ns * 1000)
 
     # check previous existing files with the same name
-    for f in glob(os.path.join(wdir, f'{deffnm_next}*')):
-        n = len(glob(os.path.join(wdir, f'#{os.path.basename(f)}.*#'))) + 1
-        new_f = os.path.join(wdir, f'#{os.path.basename(f)}.{n}#')
+    for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}*')):
+        n = len(glob(os.path.join(wdir_to_continue, f'#{os.path.basename(f)}.*#'))) + 1
+        new_f = os.path.join(wdir_to_continue, f'#{os.path.basename(f)}.{n}#')
         shutil.move(f, new_f)
         logging.warning(f'Backup previous file {f} to {new_f}')
 
     return continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
-                       new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir)
+                       new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir, bash_log=bash_log)
 
 
-def main(protein, wdir, lfile, system_lfile,
+def start(protein, wdir, lfile, system_lfile,
          clean_previous, mdtime_ns, npt_time_ps, nvt_time_ps,
          topol, topol_itp_list, posre_list_protein,
          wdir_to_continue_list, deffnm_prev,
          tpr_prev, cpt_prev, xtc_prev,
          hostfile, ncpu, not_clean_log_files,
-         forcefield_num=6):
+         forcefield_num=6, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -145,11 +149,14 @@ def main(protein, wdir, lfile, system_lfile,
                 os.path.join(wdir_protein, "topol.top")):
             if p_ext != '.gro' or topol is None or posre_list_protein is None:
                 try:
+                    logging.info('Start protein preparation')
                     subprocess.check_output(
                         f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh '
                         f'-i {os.path.join(wdir_protein, "posre.itp")} '
                         f'-p {os.path.join(wdir_protein, "topol.top")}'
-                        f'<<< {forcefield_num}', shell=True)
+                        f'<<< {forcefield_num}'
+                        f'>> {bash_log} 2>&1', shell=True)
+                    logging.info(f'Successfully finished protein preparation\n')
                 except subprocess.CalledProcessError as e:
                     logging.exception(e, stack_info=True)
                     return None
@@ -181,38 +188,43 @@ def main(protein, wdir, lfile, system_lfile,
                             f'Protein preparation step will be skipped.')
 
         # Part 1. Preparation. Run on each cpu
-        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
         try:
             system_lig_wdirs = []  # wdir_ligand_cur
             if system_lfile is not None:
+                logging.info('Start cofactor preparation')
                 if not os.path.isfile(system_lfile):
                     raise FileExistsError(f'{system_lfile} does not exist')
 
-                mols = supply_mols(system_lfile, preset_resid=None)
-                for res in calc_dask(prep_ligand, mols, dask_client,
+                mols_tuple = supply_mols_tuple(system_lfile, preset_resid=None)
+                for res in calc_dask(prep_ligand, mols_tuple, dask_client,
                                      script_path=script_path, project_dir=project_dir,
-                                     wdir_ligand=wdir_system_ligand):
+                                     wdir_ligand=wdir_system_ligand, conda_env_path=os.environ["CONDA_PREFIX"], bash_log=bash_log):
                     if not res:
-                        logging.exception('Error with cofactor preparation. The calculation will be interrupted\n',
+                        logging.exception('Error with cofactor preparation. The calculation will be interrupted',
                                           stack_info=True)
                         return None
                     system_lig_wdirs.append(res)
+                logging.info(f'Successfully finished {len(system_lig_wdirs)} cofactor preparation\n')
 
             var_lig_wdirs = []
             if lfile is not None:
+                logging.info('Start ligand preparation')
                 if not os.path.isfile(lfile):
                     raise FileExistsError(f'{lfile} does not exist')
 
-                mols = supply_mols(lfile, preset_resid='UNL')
-                for res in calc_dask(prep_ligand, mols, dask_client,
+                mols_tuple = supply_mols_tuple(lfile, preset_resid='UNL')
+                for res in calc_dask(prep_ligand, mols_tuple, dask_client,
                                      script_path=script_path, project_dir=project_dir,
-                                     wdir_ligand=wdir_ligand):
+                                     wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"], bash_log=bash_log):
                     if res:
                         var_lig_wdirs.append(res)
+                logging.info(f'Successfully finished {len(var_lig_wdirs)} ligand preparation\n')
             else:
                 var_lig_wdirs = [[]]  # run protein in water only simulation
 
             # make all.itp and create complex
+            logging.info('Start complex preparation')
             var_complex_prepared_dirs = []
 
             for res in calc_dask(run_complex_preparation, var_lig_wdirs, dask_client,
@@ -220,61 +232,77 @@ def main(protein, wdir, lfile, system_lfile,
                                  protein_name=pname, wdir_protein=wdir_protein,
                                  clean_previous=clean_previous, wdir_md=wdir_md,
                                  script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps):
+                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log):
                 if res:
                     var_complex_prepared_dirs.append(res)
+            logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
+
         finally:
             dask_client.shutdown()
+            if cluster:
+                cluster.close()
 
         # Part 2. Equilibration and MD simulation. Run on all cpu
-        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
         try:
+            logging.info('Start Equilibration steps')
             var_eq_dirs = []
-            for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir):
+            for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir, bash_log=bash_log):
                 if res:
                     var_eq_dirs.append(res)
+            logging.info(f'Successfully finished {len(var_eq_dirs)} Equilibration step\n')
 
             var_md_dirs = []
-            for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir):
+            logging.info('Start Simulation step')
+            for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir, bash_log=bash_log):
                 if res:
                     var_md_dirs.append(res)
 
         finally:
+            logging.warning('Oook. finishing. shutdown')
             dask_client.shutdown()
+            if cluster:
+                cluster.close()
 
         deffnm = 'md_out'
-        logging.info(f'Simulation of {var_md_dirs} were successfully finished\n')
+        logging.info(f'Simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
 
     else:  # continue prev md
-        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
         try:
+            logging.info('Start Continue Simulation step')
             var_md_dirs = []
             deffnm = f'{deffnm_prev}_{mdtime_ns}'
             # os.path.dirname(var_lig)
             for res in calc_dask(continue_md_from_dir, wdir_to_continue_list, dask_client,
                                  tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
                                  deffnm_prev=deffnm_prev, deffnm_next=deffnm, mdtime_ns=mdtime_ns,
-                                 project_dir=project_dir):
+                                 project_dir=project_dir, bash_log=bash_log):
                 if res:
                     var_md_dirs.append(res)
 
         finally:
             dask_client.shutdown()
-        logging.info(f'Continue of simulation of {var_md_dirs} were successfully finished\n')
+            if cluster:
+                cluster.close()
+        logging.info(f'Continue of simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
 
     # Part 3. MD Analysis. Run on each cpu
-    dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
+    dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
     try:
+        logging.info('Start Analysis of the simulations')
         var_md_analysis_dirs = []
         # os.path.dirname(var_lig)
         for res in calc_dask(run_md_analysis, var_md_dirs,
-                             dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir):
+                             dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log):
             if res:
                 var_md_analysis_dirs.append(res)
     finally:
         dask_client.shutdown()
+        if cluster:
+            cluster.close()
 
-    logging.info(f'\nAnalysis of md simulation of {var_md_analysis_dirs} were successfully finished\n')
+    logging.info(f'Analysis of md simulation of {len(var_md_analysis_dirs)} were successfully finished\nFinished: {var_md_analysis_dirs}')
 
     if not not_clean_log_files:
         if wdir_to_continue_list is None:
@@ -285,8 +313,7 @@ def main(protein, wdir, lfile, system_lfile,
                 for f in glob(os.path.join(wdir_md, '#*#')):
                     os.remove(f)
 
-
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
     Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple) ''')
     parser.add_argument('-p', '--protein', metavar='FILENAME', required=False,
@@ -351,9 +378,11 @@ if __name__ == '__main__':
     else:
         wdir = args.wdir
 
+    out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
-                            f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}.log')
+                            f'{out_time}.log')
+    bash_log = os.path.join(wdir,f'streamd_bash_{out_time}.log')
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
@@ -361,19 +390,21 @@ if __name__ == '__main__':
                                   logging.StreamHandler()])
 
     logging.getLogger('distributed').setLevel('WARNING')
+    logging.getLogger('asyncssh').setLevel('WARNING')
     logging.getLogger('distributed.worker').setLevel('WARNING')
     logging.getLogger('distributed.core').setLevel('WARNING')
     logging.getLogger('distributed.comm').setLevel('WARNING')
+    logging.getLogger('distributed.nanny').setLevel('CRITICAL')
     logging.getLogger('bockeh').setLevel('WARNING')
 
     logging.info(args)
     try:
-        main(protein=args.protein, lfile=args.ligand,
+        start(protein=args.protein, lfile=args.ligand,
              clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
              topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre, mdtime_ns=args.md_time,
              npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
              wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
              tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
-             hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, not_clean_log_files=args.not_clean_log_files)
+             hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, not_clean_log_files=args.not_clean_log_files, bash_log=bash_log)
     finally:
         logging.shutdown()
