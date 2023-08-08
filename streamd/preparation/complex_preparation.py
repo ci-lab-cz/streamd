@@ -3,8 +3,8 @@ import os
 import shutil
 import subprocess
 
-from preparation.ligand_preparation import make_all_itp
-from preparation.md_files_preparation import prep_md_files, add_ligands_to_topol, edit_topology_file, prepare_mdp_files
+from streamd.preparation.ligand_preparation import make_all_itp
+from streamd.preparation.md_files_preparation import prep_md_files, add_ligands_to_topol, edit_topology_file, prepare_mdp_files
 
 
 def complex_preparation(protein_gro, ligand_gro_list, out_file):
@@ -28,7 +28,7 @@ def complex_preparation(protein_gro, ligand_gro_list, out_file):
 
 def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
                             protein_name, wdir_protein, wdir_md, script_path, project_dir,
-                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous):
+                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, bash_log):
 
     wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
                                                wdir_system_ligand_list=wdir_system_ligand_list,
@@ -38,12 +38,13 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
     protein_gro = os.path.join(wdir_protein, f'{protein_name}.gro')
     # ligands and cofactors
     if md_files_dict['itp']:
-        if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")):
-            # make all itp and edit current itps
-            make_all_itp(md_files_dict['itp'], out_file=os.path.join(wdir_md_cur, 'all.itp'))
+        # make all itp and edit itps
+        if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) or not all([os.path.isfile(i) for i in md_files_dict['itp']]):
+            make_all_itp(fileitp_input_list=md_files_dict['itp_orig'], fileitp_output_list=md_files_dict['itp'], out_file=os.path.join(wdir_md_cur, 'all.itp'))
         else:
             logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip ligand all itp preparation step\n')
 
+        # edit topology
         add_ligands_to_topol(md_files_dict['itp'], md_files_dict['posres'], md_files_dict['resid'],
                              topol=os.path.join(wdir_md_cur, "topol.top"))
         # copy molid-resid pairs for variable ligand and all system ligands
@@ -70,7 +71,8 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
     if not os.path.isfile(os.path.join(wdir_md_cur, 'solv_ions.gro')):
         try:
             subprocess.check_output(
-                f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "scripts/script_sh/solv_ions.sh")}', shell=True)
+                f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "scripts/script_sh/solv_ions.sh")}'
+                f'>> {bash_log} 2>&1', shell=True)
         except subprocess.CalledProcessError as e:
             logging.exception(f'{wdir_md_cur}\n{e}', stack_info=True)
             return None

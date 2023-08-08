@@ -10,8 +10,8 @@ from multiprocessing import cpu_count
 
 import pandas as pd
 
-from utils.dask_init import init_dask_cluster, calc_dask
-from utils.utils import get_index, filepath_type
+from streamd.utils.dask_init import init_dask_cluster, calc_dask
+from streamd.utils.utils import get_index, filepath_type
 
 
 def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, deffnm, np, ligand_resid, out_time, clean_previous):
@@ -150,12 +150,12 @@ def get_mmpbsa_start_end_interval(mmpbsa):
     return startframe, endframe, interval
 
 
-def main(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand_resid, hostfile, out_time,
+def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand_resid, hostfile, out_time,
          gmxmmpbsa_out_files=None, clean_previous=False):
     if gmxmmpbsa_out_files is None and wdir_to_run is not None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
         startframe, endframe, interval = get_mmpbsa_start_end_interval(mmpbsa)
-        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
         try:
             var_number_of_frames = []
             for res in calc_dask(run_get_frames, wdir_to_run, dask_client=dask_client, xtc=xtc):
@@ -163,13 +163,15 @@ def main(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand
                     var_number_of_frames.append(res)
         finally:
             dask_client.close()
+            if cluster:
+                cluster.close()
 
         used_number_of_frames = math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
         n_tasks_per_node = ncpu // min(ncpu, used_number_of_frames)
 
         logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
         # run energy calculation
-        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=n_tasks_per_node, ncpu=ncpu)
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=n_tasks_per_node, ncpu=ncpu)
         try:
             var_gbsa_out_files = []
             for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
@@ -180,12 +182,14 @@ def main(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand
                     var_gbsa_out_files.append(res)
         finally:
             dask_client.close()
+            if cluster:
+                cluster.close()
     else:
         var_gbsa_out_files = gmxmmpbsa_out_files
 
     # collect energies
     if var_gbsa_out_files:
-        dask_client = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=len(var_gbsa_out_files), ncpu=ncpu)
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=len(var_gbsa_out_files), ncpu=ncpu)
         GBSA_output_res, PBSA_output_res = [], []
         try:
             for res in calc_dask(parse_gmxMMPBSA_output, var_gbsa_out_files, dask_client=dask_client):
@@ -194,6 +198,8 @@ def main(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand
                     PBSA_output_res.append(res['PBSA'])
         finally:
             dask_client.shutdown()
+            if cluster:
+                cluster.close()
 
         pd_gbsa = pd.DataFrame(GBSA_output_res)
         pd_pbsa = pd.DataFrame(PBSA_output_res)
@@ -207,7 +213,7 @@ def main(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand
         f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\nFinished: {var_gbsa_out_files}\n')
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='''Run GBSA/PBSA calculation using gmx_gbsa tool''')
     parser.add_argument('--wdir_to_run', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),
@@ -265,7 +271,7 @@ if __name__ == '__main__':
 
     logging.info(args)
     try:
-        main(tpr=args.tpr, xtc=args.xtc, topol=args.topol,
+        start(tpr=args.tpr, xtc=args.xtc, topol=args.topol,
              index=args.index, wdir=wdir, wdir_to_run=args.wdir_to_run,
              mmpbsa=args.mmpbsa, deffnm=args.deffnm, ncpu=args.ncpu, out_time=out_time,
              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, hostfile=args.hostfile,
