@@ -41,6 +41,7 @@ pip install asyncssh
     - Protein - Cofactor (multiple);  
     - Protein - Ligand - Cofactor (multiple);  
     
+- supports of simulation of boron-containing compounds using Gaussian Software
 - supports distributed computing using dask library
 - supports of running of parallel simulations on multiple servers
 - supports to extend time of MD simulations 
@@ -50,10 +51,11 @@ pip install asyncssh
 
 ### **USAGE**
 ```
- python ../md-scripts/run_md.py -h
-usage: run_md.py [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--topol topol.top]
-                 [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]] [--md_time ns] [--npt_time ps] [--nvt_time ps]
-                 [--not_clean_log_files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files]
+run_md -h
+usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--topol topol.top]
+              [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]] [--md_time ns] [--npt_time ps] [--nvt_time ps]
+              [--not_clean_log_files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files]
+              [--activate_gaussian module load Gaussian/09-d01] [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09]
 
 Run or continue MD simulation. Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple)
 
@@ -84,10 +86,15 @@ optional arguments:
   --cpt FILENAME        cpt file from previous simulation
   --xtc FILENAME        xtc file from previous simulation
   --wdir_to_continue DIRNAME [DIRNAME ...]
-                        directories for the previous simulations. Use to extend or continue the simulation. ' Should consist of: tpr, cpt, xtc files
+                        single or multiple directories for the previous simulations. Use to extend or continue the simulation. ' Should consist of: tpr, cpt, xtc files
   --deffnm preffix for md files
                         preffix for the previous md files. Use to extend or continue the simulation. Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. Files
                         deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue
+  --activate_gaussian module load Gaussian/09-d01
+                        string that load gaussian module if necessary
+  --gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09
+                        path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.
+
 ```
 
 ### **Examples**
@@ -125,33 +132,50 @@ https://github.com/ci-lab-cz/easydock
 **Run simulation for different sytems:**
 - Protein in Water
 ```
-python run_md.py -p protein_H_HIS.pdb --md_time 0.1 --nvt_time 100 --npt_time 100 --c 128 
+run_md -p protein_H_HIS.pdb --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
 ```
 
 - Protein - Ligand
 ```
-python run_md.py -p protein_H_HIS.pdb -l ligand.mol --md_time 0.1 --nvt_time 100 --npt_time 100 --c 128 
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
 ```
 
-- Protein - Coenzyme
+- Protein - Cofactor
+All molecules should present in simulated system, so any problem with preparation of cofactors will interrupt the program. 
+```
+run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
 
 ```
-python run_md.py -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 0.1 --nvt_time 100 --npt_time 100 --c 128 
 
+**To run simulations with boron-containing compounds**  
+*Gaussian Software* should be available.  
+Gaussian optimization and charge calculation will be run only for molecules with boron atoms, other molecules will be processed by regular procedure by Antechamber.
+If Gaussian cannot be load boron-containing molecules will be skipped.  
+Any --ligand or --cofactor files can consist of boron-containing compounds
+```
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128
+
+```
+
+**To run simulations using multiple servers**
+```
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile $PBS_NODEFILE --ncpu 128
 ```
 
 **To extend the simulation**
 ```
-python run_md.py --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ md_preparation/md_files/protein_H_HIS_ligand_1/ --md_time 0.2 --deffnm md_out
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ md_preparation/md_files/protein_H_HIS_ligand_*/ --md_time 0.2 --deffnm md_out
 ```
 you can continue your simulation unlimited times just use previous extended deffnm OR tpr, cpt and xtc arguments 
 ```
-python run_md.py --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --deffnm md_out_0.2
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --deffnm md_out_0.2
 ```
 or 
 ```
-python run_md.py --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.tpr --cpt md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.cpt --xtc md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.xtc
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.tpr --cpt md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.cpt --xtc md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.xtc
 ```
+
+
   
 **Output**   
 *each run creates a unique log file which contains name of the protein, ligand file and time of run.*  
@@ -245,8 +269,8 @@ _All analysis results you can visualize with xmgrace:_
 ### GBSA energy calculation
 #### **USAGE**
 ```
-python run_gbsa.py -h
-usage: run_gbsa.py [-h] [--wdir_to_run DIRNAME [DIRNAME ...]] [--topol topol.top] [--tpr md_out.tpr] [--xtc md_fit.xtc] [--index index.ndx] -m mmpbsa.in [-d WDIR] [--out_files OUT_FILES [OUT_FILES ...]]
+run_gbsa -h
+usage: run_gbsa [-h] [--wdir_to_run DIRNAME [DIRNAME ...]] [--topol topol.top] [--tpr md_out.tpr] [--xtc md_fit.xtc] [--index index.ndx] -m mmpbsa.in [-d WDIR] [--out_files OUT_FILES [OUT_FILES ...]]
                    [--hostfile FILENAME] [-c INTEGER] [--deffnm preffix for md files] [--ligand_id UNL] [--clean_previous]
 
 Run GBSA/PBSA calculation using gmx_gbsa tool
@@ -277,7 +301,7 @@ optional arguments:
 
 ### **Examples**
 ```
-python run_gbsa.py  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -m mmpbsa.in
+run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -m mmpbsa.in
 ```
 
 ###Licence

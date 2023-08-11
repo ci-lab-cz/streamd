@@ -367,17 +367,17 @@ def main():
                         help='xtc file from previous simulation')
     parser.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),
-                        help='''directories for the previous simulations. Use to extend or continue the simulation. '
+                        help='''single or multiple directories for the previous simulations. Use to extend or continue the simulation. '
                              Should consist of: tpr, cpt, xtc files''')
     parser.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
                         help='''preffix for the previous md files. Use to extend or continue the simulation.
                         Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. 
                         Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue''')
     parser.add_argument('--activate_gaussian', metavar='module load Gaussian/09-d01', required=False, default=None,
-                        help='string that load gaussian module if ')
+                        help='string that load gaussian module if necessary')
     parser.add_argument('--gaussian_exe', metavar='g09 or /apps/all/Gaussian/09-d01/g09/g09', required=False,
                         default=None,
-                        help='path to gaussian executable or alias')
+                        help='path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.')
 
     args = parser.parse_args()
 
