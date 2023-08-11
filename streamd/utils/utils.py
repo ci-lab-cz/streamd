@@ -48,3 +48,11 @@ def get_mol_resid_pair(fname):
         if pair:
             molid, resid = pair
             yield molid, resid
+
+def run_check_subprocess(cmd, key):
+    try:
+        subprocess.check_output(cmd, shell=True)
+    except subprocess.CalledProcessError as e:
+        logging.exception(f'{key}\nError:{e}', stack_info=True)
+        return False
+    return True
