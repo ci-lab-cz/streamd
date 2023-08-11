@@ -174,12 +174,17 @@ or
 ```
 run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.tpr --cpt md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.cpt --xtc md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.xtc
 ```
-
-
   
 **Output**   
-*each run creates a unique log file which contains name of the protein, ligand file and time of run.*  
-In the working directory (or in the current directory if wdir argument was not set up) will be created the next folders:
+*each run creates in the working directory (or in the current directory if wdir argument was not set up):*
+ 1) a unique streaMD log file which name contains name of the protein, ligand file, cofactor file and time of run.  
+ log_*protein-fname*\_*ligand-fname*\_*cofactor-fname*\_*start-time*.log  
+ Contains important information/warnings/errors about the main program run.
+ 2) a unique bash log file.  
+ streamd_bash_*protein-fname*\_*ligand-fname*\_*cofactor-fname*\_*start-time*.log  
+ Contains stdout from Gromacs and Antechamber.  
+ 
+will be created the next folders:
 ```
 md_files/
 - md_files/md_preparation/
@@ -266,24 +271,24 @@ gyrate.xvg - radius of gyration
 _All analysis results you can visualize with xmgrace:_  
 `` for i in *.xvg; do gracebat $i;done `` 
 
-### GBSA energy calculation
+### MM-PBSA/MM-GBSA  energy calculation
 #### **USAGE**
 ```
 run_gbsa -h
 usage: run_gbsa [-h] [--wdir_to_run DIRNAME [DIRNAME ...]] [--topol topol.top] [--tpr md_out.tpr] [--xtc md_fit.xtc] [--index index.ndx] -m mmpbsa.in [-d WDIR] [--out_files OUT_FILES [OUT_FILES ...]]
                    [--hostfile FILENAME] [-c INTEGER] [--deffnm preffix for md files] [--ligand_id UNL] [--clean_previous]
 
-Run GBSA/PBSA calculation using gmx_gbsa tool
+Run MM-GBSA/MM-PBSA calculation using gmx_MMPBSA tool
 
 optional arguments:
   -h, --help            show this help message and exit
   --wdir_to_run DIRNAME [DIRNAME ...]
-                        directories for the previous simulations. Use to extend or continue the simulation. ' Should consist of: tpr, cpt, xtc files
+                        single or multiple directories with simulations. Should consist of: tpr, xtc, ndx files
   --topol topol.top     topol file from the the MD simulation
-  --tpr md_out.tpr      tpr file from the the MD simulation
+  --tpr md_out.tpr      tpr file from the MD simulation
   --xtc md_fit.xtc      xtc file of the simulation. Trajectory should have no PBC and be fitted on the Protein_Ligand group
-  --index index.ndx     index file from the simulation
-  -m mmpbsa.in, --mmpbsa mmpbsa.in
+  --index index.ndx     index file from the MD simulation
+  -m mmpbsa.in, --mmpbsa mmpbsa.in  MMPBSA input file. If not set up default template will be used.
   -d WDIR, --wdir WDIR  Working directory. If not set the current directory will be used.
   --out_files OUT_FILES [OUT_FILES ...]
                         gmxMMPBSA out files to parse. If set will be used over other variables.
@@ -291,9 +296,6 @@ optional arguments:
                         the address of the scheduler running on the standard port 8786. If omitted, calculations will run on a single machine as usual.
   -c INTEGER, --ncpu INTEGER
                         number of CPU per server. Use all cpus by default.
-  --deffnm preffix for md files
-                        preffix for the previous md files. Use to extend or continue the simulation. Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. Files
-                        deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue
   --ligand_id UNL
   --clean_previous      Clean previous temporary gmxMMPBSA files
 
@@ -303,6 +305,18 @@ optional arguments:
 ```
 run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -m mmpbsa.in
 ```
-
+**Output**   
+*each run creates in the working directory (or in the current directory if wdir argument was not set up):*
+ 1) a unique streaMD log file  
+ log_mmpbsa_*start-time*.log 
+ Contains important information/warnings/errors about the main run_gbsa program run.
+ 2) a unique bash log file. 
+ log_mmpbsa_bash_*start-time*.log   
+ Contains stdout from gmx_MMPBSA 
+ 3) GBSA_output_*start*.csv with summary csv if MMGBSA method was run
+ 4) PBSA_output_*start*.csv with summary csv if MMPBSA method was run
+ 
+ each wdir_to_run has FINAL_RESULTS_MMPBSA_*start-time*.csv with GBSA/PBSA output. 
+ 
 ###Licence
 BSD-3
