@@ -7,6 +7,14 @@ from glob import glob
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair
 
 
+def check_if_info_already_added_to_topol(topol, string):
+    with open(topol) as inp:
+        data = inp.read()
+    if string in data:
+        return True
+    else:
+        return False
+
 def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
     def get_n_line_of_protein_in_mol_section(topol_file):
         with open(topol_file) as input:
@@ -26,15 +34,20 @@ def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
                                    f'#include "{posres}"\n#endif\n')
         resid_include_list.append(f'{resid}             1')
 
-    edit_topology_file(topol, pattern="; Include forcefield parameters",
+    if not check_if_info_already_added_to_topol(topol, '\n'.join(itp_include_list)):
+        edit_topology_file(topol, pattern="; Include forcefield parameters",
                        add='\n'.join(itp_include_list), how='after', n=3)
+
+    if not check_if_info_already_added_to_topol(topol, '\n'.join(posres_include_list)):
     # reverse order since add before pattern
-    edit_topology_file(topol, pattern="; Include topology for ions",
-                       add='\n'.join(posres_include_list[::-1]), how='before')
-    # ligand molecule should be after protein (or all protein chains listed)
-    n_line_after_molecules_section = get_n_line_of_protein_in_mol_section(topol_file=topol)
-    edit_topology_file(topol, pattern='[ molecules ]', add='\n'.join(resid_include_list),
-                       how='after', n=n_line_after_molecules_section)
+        edit_topology_file(topol, pattern="; Include topology for ions",
+                           add='\n'.join(posres_include_list[::-1]), how='before')
+
+    if not check_if_info_already_added_to_topol(topol, '\n'.join(resid_include_list)):
+        # ligand molecule should be after protein (or all protein chains listed)
+        n_line_after_molecules_section = get_n_line_of_protein_in_mol_section(topol_file=topol)
+        edit_topology_file(topol, pattern='[ molecules ]', add='\n'.join(resid_include_list),
+                           how='after', n=n_line_after_molecules_section)
 
 
 def edit_mdp(md_file, pattern, replace):
@@ -96,7 +109,8 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
     # topol for protein for all chains
     copy_md_files_to_wdir(glob(os.path.join(wdir_protein, '*.itp')), wdir_copy_to=wdir_md_cur)
-    copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
+    if not os.path.isfile(os.path.join(wdir_md_cur, "topol.top")):
+        copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
 
     # prep ligands and cofactor
     # copy ligand.itp to md_wdir_cur. Will be edited

@@ -4,7 +4,8 @@ import shutil
 import subprocess
 
 from streamd.preparation.ligand_preparation import make_all_itp
-from streamd.preparation.md_files_preparation import prep_md_files, add_ligands_to_topol, edit_topology_file, prepare_mdp_files
+from streamd.preparation.md_files_preparation import prep_md_files, add_ligands_to_topol, \
+    edit_topology_file, prepare_mdp_files, check_if_info_already_added_to_topol
 
 
 def complex_preparation(protein_gro, ligand_gro_list, out_file):
@@ -44,13 +45,16 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         else:
             logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip ligand all itp preparation step\n')
 
-        # edit topology
+        # add ligands info to topology if there is no necessary row
         add_ligands_to_topol(md_files_dict['itp'], md_files_dict['posres'], md_files_dict['resid'],
                              topol=os.path.join(wdir_md_cur, "topol.top"))
-        # copy molid-resid pairs for variable ligand and all system ligands
-        edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"), pattern="; Include forcefield parameters",
-                           add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n',
-                           how='after', n=3)
+        if not check_if_info_already_added_to_topol(os.path.join(wdir_md_cur, "topol.top"),
+                                                    f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n'):
+            edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"),
+                               pattern="; Include forcefield parameters",
+                               add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n',
+                               how='after', n=3)
+
         # create file with molid resid for each ligand in the current system
         with open(os.path.join(wdir_md_cur, 'all_ligand_resid.txt'), 'w') as out:
             molid_resid_pairs = ['\t'.join(map(str, i)) for i in zip(md_files_dict['molid'], md_files_dict['resid'])]
