@@ -1,4 +1,4 @@
-# Python module to automate molecular dynamics
+# StreaMD: a tool to perform high-throughput automated molecular dynamics simulations
 
 ## Dependency
 * **Python**
@@ -41,7 +41,7 @@ pip install asyncssh
     - Protein - Cofactor (multiple);  
     - Protein - Ligand - Cofactor (multiple);  
     
-- supports of simulation of boron-containing compounds using Gaussian Software
+- supports of simulations of boron-containing molecules using Gaussian Software
 - supports distributed computing using dask library
 - supports of running of parallel simulations on multiple servers
 - supports to extend time of MD simulations 
