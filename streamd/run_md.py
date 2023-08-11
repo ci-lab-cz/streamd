@@ -10,10 +10,9 @@ from multiprocessing import cpu_count
 
 from streamd.md_analysis import run_md_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
-from streamd.preparation.ligand_preparation import prep_ligand, supply_mols_tuple
+from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import filepath_type
-
+from streamd.utils.utils import filepath_type, run_check_subprocess
 
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -93,12 +92,13 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
 
 
 def start(protein, wdir, lfile, system_lfile,
-         clean_previous, mdtime_ns, npt_time_ps, nvt_time_ps,
-         topol, topol_itp_list, posre_list_protein,
-         wdir_to_continue_list, deffnm_prev,
-         tpr_prev, cpt_prev, xtc_prev,
-         hostfile, ncpu, not_clean_log_files,
-         forcefield_num=6, bash_log=None):
+          clean_previous, mdtime_ns, npt_time_ps, nvt_time_ps,
+          topol, topol_itp_list, posre_list_protein,
+          wdir_to_continue_list, deffnm_prev,
+          tpr_prev, cpt_prev, xtc_prev,
+          activate_gaussian, gaussian_exe,
+          hostfile, ncpu, not_clean_log_files,
+          forcefield_num=6, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -187,41 +187,45 @@ def start(protein, wdir, lfile, system_lfile,
             logging.warning(f'{os.path.join(wdir_protein, pname)}.gro and topol.top files exist. '
                             f'Protein preparation step will be skipped.')
 
-        # Part 1. Preparation. Run on each cpu
-        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
-        try:
+        # Part 1. Ligand Preparation
+        if system_lfile is not None:
+            logging.info('Start cofactor preparation')
+            number_of_mols, problem_mols = check_mols(system_lfile)
+            if problem_mols:
+                logging.exception(f'Cofactor molecules: {problem_mols} from {system_lfile} cannot be processed. Script will be interrupted.')
+                return None
+
+            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, script_path=script_path,
+                                                     project_dir=project_dir, wdir_ligand=wdir_system_ligand,
+                                                     gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                     hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
+            if number_of_mols != len(system_lig_wdirs):
+                logging.exception(f'Error with cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
+                                  f' The calculation will be interrupted')
+                return None
+
+            logging.info(f'Successfully finished {len(system_lig_wdirs)} cofactor preparation\n')
+        else:
             system_lig_wdirs = []  # wdir_ligand_cur
-            if system_lfile is not None:
-                logging.info('Start cofactor preparation')
-                if not os.path.isfile(system_lfile):
-                    raise FileExistsError(f'{system_lfile} does not exist')
 
-                mols_tuple = supply_mols_tuple(system_lfile, preset_resid=None)
-                for res in calc_dask(prep_ligand, mols_tuple, dask_client,
-                                     script_path=script_path, project_dir=project_dir,
-                                     wdir_ligand=wdir_system_ligand, conda_env_path=os.environ["CONDA_PREFIX"], bash_log=bash_log):
-                    if not res:
-                        logging.exception('Error with cofactor preparation. The calculation will be interrupted',
-                                          stack_info=True)
-                        return None
-                    system_lig_wdirs.append(res)
-                logging.info(f'Successfully finished {len(system_lig_wdirs)} cofactor preparation\n')
+        if lfile is not None:
+            logging.info('Start ligand preparation')
+            number_of_mols, problem_mols = check_mols(lfile)
+            if problem_mols:
+                logging.warning(f'Ligand molecules: {problem_mols} from {lfile} cannot be processed.'
+                                f' Such molecules will be skipped.')
 
-            var_lig_wdirs = []
-            if lfile is not None:
-                logging.info('Start ligand preparation')
-                if not os.path.isfile(lfile):
-                    raise FileExistsError(f'{lfile} does not exist')
+            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid='UNL', script_path=script_path,
+                                                  project_dir=project_dir, wdir_ligand=wdir_ligand,
+                                                  gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                  hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
+            if number_of_mols != len(var_lig_wdirs):
+                logging.warning(f'Problem with ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
+                                f' Such molecules will be skipped.')
 
-                mols_tuple = supply_mols_tuple(lfile, preset_resid='UNL')
-                for res in calc_dask(prep_ligand, mols_tuple, dask_client,
-                                     script_path=script_path, project_dir=project_dir,
-                                     wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"], bash_log=bash_log):
-                    if res:
-                        var_lig_wdirs.append(res)
-                logging.info(f'Successfully finished {len(var_lig_wdirs)} ligand preparation\n')
-            else:
-                var_lig_wdirs = [[]]  # run protein in water only simulation
+            logging.info(f'Successfully finished {len(var_lig_wdirs)} ligand preparation\n')
+        else:
+            var_lig_wdirs = [[]]  # run protein in water only simulation
 
             # make all.itp and create complex
             logging.info('Start complex preparation')
@@ -370,6 +374,11 @@ def main():
                         help='''preffix for the previous md files. Use to extend or continue the simulation.
                         Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. 
                         Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue''')
+    parser.add_argument('--activate_gaussian', metavar='module load Gaussian/09-d01', required=False, default=None,
+                        help='string that load gaussian module if ')
+    parser.add_argument('--gaussian_exe', metavar='g09 or /apps/all/Gaussian/09-d01/g09/g09', required=False,
+                        default=None,
+                        help='path to gaussian executable or alias')
 
     args = parser.parse_args()
 
@@ -400,11 +409,13 @@ def main():
     logging.info(args)
     try:
         start(protein=args.protein, lfile=args.ligand,
-             clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
-             topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre, mdtime_ns=args.md_time,
-             npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
-             wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
-             tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
-             hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, not_clean_log_files=args.not_clean_log_files, bash_log=bash_log)
+              clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
+              topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre, mdtime_ns=args.md_time,
+              npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
+              wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
+              tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
+              activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
+              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, not_clean_log_files=args.not_clean_log_files,
+              bash_log=bash_log)
     finally:
         logging.shutdown()
