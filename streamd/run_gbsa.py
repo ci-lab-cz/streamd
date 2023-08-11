@@ -7,23 +7,24 @@ import subprocess
 from datetime import datetime
 from functools import partial
 from multiprocessing import cpu_count
+import shutil
 
 import pandas as pd
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import get_index, filepath_type
+from streamd.utils.utils import get_index, filepath_type, run_check_subprocess
 
 
-def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, deffnm, np, ligand_resid, out_time, clean_previous):
-    def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time):
-        try:
-            output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
-            subprocess.check_output(f'cd {wdir}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} '
-                                    f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui '
-                                    f'-o {output} '
-                                    f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}', shell=True)
-        except subprocess.CalledProcessError as e:
-            logging.error(f'{xtc}\t{e}\n')
+def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, deffnm, np, ligand_resid, out_time, bash_log, clean_previous):
+    def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, bash_log):
+
+        output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
+        cmd = f'cd {wdir}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
+                                    f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
+                                    f'-o {output} ' \
+                                    f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}' \
+                                    f' >> {bash_log} 2>&1'
+        if not run_check_subprocess(cmd, key=xtc):
             return None
         return output
 
@@ -31,7 +32,7 @@ def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, deffnm, np, ligand_
         clean_temporary_gmxMMBPSA_files(wdir)
 
     if tpr is None:
-        tpr = os.path.join(wdir, f'{deffnm}.tpr')
+        tpr = os.path.join(wdir, f'md_out.tpr')
     if xtc is None:
         xtc = os.path.join(wdir, 'md_fit.xtc')
     if topol is None:
@@ -50,7 +51,7 @@ def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, deffnm, np, ligand_
                        index=index, mmpbsa=mmpbsa,
                        np=np, protein_index=protein_index,
                        ligand_index=ligand_index,
-                       out_time=out_time)
+                       out_time=out_time, bash_log=bash_log)
 
     clean_temporary_gmxMMBPSA_files(wdir)
 
@@ -129,7 +130,7 @@ def run_get_frames(wdir, xtc):
 def get_mmpbsa_start_end_interval(mmpbsa):
     with open(mmpbsa) as inp:
         mmpbsa_data = inp.read()
-    logging.info(f'{mmpbsa}:{mmpbsa_data}')
+    logging.info(f'{mmpbsa}:\n{mmpbsa_data}')
 
     startframe, endframe, interval = None, None, None
     for line in mmpbsa_data.split('\n'):
@@ -150,10 +151,16 @@ def get_mmpbsa_start_end_interval(mmpbsa):
     return startframe, endframe, interval
 
 
-def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand_resid, hostfile, out_time,
+def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand_resid, hostfile, out_time, bash_log,
          gmxmmpbsa_out_files=None, clean_previous=False):
     if gmxmmpbsa_out_files is None and wdir_to_run is not None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
+        if not mmpbsa:
+            mmpbsa = os.path.join(wdir, f'mmpbsa_{out_time}.in')
+            project_dir = os.path.dirname(os.path.abspath(__file__))
+            shutil.copy(os.path.join(project_dir, 'scripts', 'gbsa', 'mmpbsa.in'), mmpbsa)
+            logging.warning(f'No mmpbsa.in file was set up. Template will be used. Created file: {mmpbsa}.')
+
         startframe, endframe, interval = get_mmpbsa_start_end_interval(mmpbsa)
         dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
         try:
@@ -177,11 +184,11 @@ def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligan
             for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
                                  tpr=tpr, xtc=xtc, topol=topol, index=index, deffnm=deffnm,
                                  mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid,
-                                 out_time=out_time, clean_previous=clean_previous):
+                                 out_time=out_time, bash_log=bash_log, clean_previous=clean_previous):
                 if res:
                     var_gbsa_out_files.append(res)
         finally:
-            dask_client.close()
+            dask_client.shutdown()
             if cluster:
                 cluster.close()
     else:
@@ -214,11 +221,11 @@ def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligan
 
 
 def main():
-    parser = argparse.ArgumentParser(description='''Run GBSA/PBSA calculation using gmx_gbsa tool''')
-    parser.add_argument('--wdir_to_run', metavar='DIRNAME', required=False, default=None, nargs='+',
+    parser = argparse.ArgumentParser(description='''Run MM-GBSA/MM-PBSA calculation using gmx_MMPBSA tool''')
+    parser.add_argument('-i', '--wdir_to_run', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),
-                        help='''directories for the previous simulations. Use to extend or continue the simulation. '
-                             Should consist of: tpr, cpt, xtc files''')
+                        help='''single or multiple directories for simulations.
+                             Should consist of: tpr, xtc, ndx files''')
     parser.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
                         help='topol file from the the MD simulation')
     parser.add_argument('--tpr', metavar='md_out.tpr', required=False, default=None, type=filepath_type,
@@ -227,8 +234,8 @@ def main():
                         help='xtc file of the simulation. Trajectory should have no PBC and be fitted on the Protein_Ligand group')
     parser.add_argument('--index', metavar='index.ndx', required=False, default=None, type=filepath_type,
                         help='index file from the simulation')
-    parser.add_argument('-m', '--mmpbsa', metavar='mmpbsa.in', required=True, type=filepath_type,
-                        help='')
+    parser.add_argument('-m', '--mmpbsa', metavar='mmpbsa.in', required=False, type=filepath_type,
+                        help='MMPBSA input file. If not set up default template will be used.')
     parser.add_argument('-d', '--wdir', metavar='WDIR', default=None,
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory. If not set the current directory will be used.')
@@ -241,10 +248,6 @@ def main():
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
                         help='number of CPU per server. Use all cpus by default.')
-    parser.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
-                        help='''preffix for the previous md files. Use to extend or continue the simulation.
-                        Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. 
-                        Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue''')
     parser.add_argument('--ligand_id', metavar='UNL', required=False, help='')
     parser.add_argument('--clean_previous', action='store_true', default=False,
                         help=' Clean previous temporary gmxMMPBSA files')
@@ -256,7 +259,8 @@ def main():
     else:
         wdir = args.wdir
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
-    log_file = os.path.join(wdir, f'log_gbsa_{out_time}.log')
+    log_file = os.path.join(wdir, f'log_mmpbsa_{out_time}.log')
+    bash_log = os.path.join(wdir, f'log_mmpbsa_bash_{out_time}.log')
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
@@ -264,9 +268,11 @@ def main():
                                   logging.StreamHandler()])
 
     logging.getLogger('distributed').setLevel('WARNING')
+    logging.getLogger('asyncssh').setLevel('WARNING')
     logging.getLogger('distributed.worker').setLevel('WARNING')
     logging.getLogger('distributed.core').setLevel('WARNING')
     logging.getLogger('distributed.comm').setLevel('WARNING')
+    logging.getLogger('distributed.nanny').setLevel('CRITICAL')
     logging.getLogger('bockeh').setLevel('WARNING')
 
     logging.info(args)
@@ -275,6 +281,6 @@ def main():
              index=args.index, wdir=wdir, wdir_to_run=args.wdir_to_run,
              mmpbsa=args.mmpbsa, deffnm=args.deffnm, ncpu=args.ncpu, out_time=out_time,
              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, hostfile=args.hostfile,
-             clean_previous=args.clean_previous)
+             bash_log=bash_log, clean_previous=args.clean_previous)
     finally:
         logging.shutdown()
