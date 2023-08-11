@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 import shutil
-import subprocess
 from datetime import datetime
 from functools import partial
 from glob import glob
@@ -24,13 +23,8 @@ def run_equilibration(wdir, project_dir, bash_log):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
-
-    try:
-        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}'
-                                f'>> {bash_log} 2>&1',
-                                shell=True)
-    except subprocess.CalledProcessError as e:
-        logging.exception(f'{wdir}\n{e}', stack_info=True)
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {bash_log} 2>&1',
+    if not run_check_subprocess(cmd, wdir):
         return None
     return wdir
 
@@ -42,26 +36,19 @@ def run_simulation(wdir, project_dir, bash_log):
                         f'MD simulation step will be skipped. '
                         f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
         return wdir
-    try:
-        subprocess.check_output(f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}'
-                                f'>> {bash_log} 2>&1', shell=True)
-    except subprocess.CalledProcessError as e:
-        logging.exception(f'{wdir}\n{e}', stack_info=True)
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {bash_log} 2>&1'
+    if not run_check_subprocess(cmd, wdir):
         return None
     return wdir
 
 
 def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir, bash_log):
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log):
-        try:
-            subprocess.check_output(f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} '
-                                    f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}'
-                                    f'>> {bash_log} 2>&1',
-                                    shell=True)
-        except subprocess.CalledProcessError as e:
-            logging.exception(f'{wdir}\n{e}', stack_info=True)
+        cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
+              f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
+              f'>> {bash_log} 2>&1'
+        if not run_check_subprocess(cmd, wdir):
             return None
-
         return wdir
 
     if tpr is None:
@@ -127,6 +114,8 @@ def start(protein, wdir, lfile, system_lfile,
     script_path = os.path.join(project_dir, 'scripts')
     script_mdp_path = os.path.join(script_path, 'mdp')
 
+    dask_client, cluster = None, None
+
     if wdir_to_continue_list is None:
         # create dirs
         wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein')
@@ -140,26 +129,18 @@ def start(protein, wdir, lfile, system_lfile,
         os.makedirs(wdir_ligand, exist_ok=True)
         os.makedirs(wdir_system_ligand, exist_ok=True)
 
-        if not os.path.isfile(protein):
-            raise FileExistsError(f'{protein} does not exist')
-
         pname, p_ext = os.path.splitext(os.path.basename(protein))
         # check if already exist in the working directory
         if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro') or not os.path.isfile(
                 os.path.join(wdir_protein, "topol.top")):
             if p_ext != '.gro' or topol is None or posre_list_protein is None:
-                try:
-                    logging.info('Start protein preparation')
-                    subprocess.check_output(
-                        f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh '
-                        f'-i {os.path.join(wdir_protein, "posre.itp")} '
-                        f'-p {os.path.join(wdir_protein, "topol.top")}'
-                        f'<<< {forcefield_num}'
-                        f'>> {bash_log} 2>&1', shell=True)
-                    logging.info(f'Successfully finished protein preparation\n')
-                except subprocess.CalledProcessError as e:
-                    logging.exception(e, stack_info=True)
+                logging.info('Start protein preparation')
+                cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
+                      f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
+                      f'-p {os.path.join(wdir_protein, "topol.top")} <<< {forcefield_num} >> {bash_log} 2>&1'
+                if not run_check_subprocess(cmd, protein):
                     return None
+                logging.info(f'Successfully finished protein preparation\n')
             else:
                 target_path = os.path.join(wdir_protein, os.path.basename(protein))
                 if not os.path.isfile(target_path):
@@ -174,14 +155,14 @@ def start(protein, wdir, lfile, system_lfile,
                         shutil.copy(posre_protein, target_path)
                 if topol_itp_list is not None:
                     if len(posre_list_protein) != len(topol_itp_list):
-                        logging.exception('The number of protein_chainX.itp files should be equal the number of posre_protein_chainX.itp files.\n'
-                                          'Check --topol_itp and --posre arguments')
+                        logging.exception(
+                            'The number of protein_chainX.itp files should be equal the number of posre_protein_chainX.itp files.'
+                            ' Check --topol_itp and --posre arguments')
                         return None
                     for topol_itp in topol_itp_list:
                         target_path = os.path.join(wdir_protein, os.path.basename(topol_itp))
                         if not os.path.isfile(target_path):
                             shutil.copy(topol_itp, target_path)
-
 
         else:
             logging.warning(f'{os.path.join(wdir_protein, pname)}.gro and topol.top files exist. '
@@ -227,6 +208,11 @@ def start(protein, wdir, lfile, system_lfile,
         else:
             var_lig_wdirs = [[]]  # run protein in water only simulation
 
+        if not var_lig_wdirs:
+            return None
+
+        try:
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)), ncpu=ncpu)
             # make all.itp and create complex
             logging.info('Start complex preparation')
             var_complex_prepared_dirs = []
@@ -240,18 +226,22 @@ def start(protein, wdir, lfile, system_lfile,
                 if res:
                     var_complex_prepared_dirs.append(res)
             logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
-
         finally:
-            dask_client.shutdown()
+            if dask_client:
+                dask_client.shutdown()
             if cluster:
                 cluster.close()
 
+        if not var_complex_prepared_dirs:
+            return None
+
         # Part 2. Equilibration and MD simulation. Run on all cpu
-        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
         try:
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
             logging.info('Start Equilibration steps')
             var_eq_dirs = []
-            for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir, bash_log=bash_log):
+            for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir,
+                                 bash_log=bash_log):
                 if res:
                     var_eq_dirs.append(res)
             logging.info(f'Successfully finished {len(var_eq_dirs)} Equilibration step\n')
@@ -263,8 +253,8 @@ def start(protein, wdir, lfile, system_lfile,
                     var_md_dirs.append(res)
 
         finally:
-            logging.warning('Oook. finishing. shutdown')
-            dask_client.shutdown()
+            if dask_client:
+                dask_client.shutdown()
             if cluster:
                 cluster.close()
 
@@ -272,8 +262,8 @@ def start(protein, wdir, lfile, system_lfile,
         logging.info(f'Simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
 
     else:  # continue prev md
-        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
         try:
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
             logging.info('Start Continue Simulation step')
             var_md_dirs = []
             deffnm = f'{deffnm_prev}_{mdtime_ns}'
@@ -286,27 +276,35 @@ def start(protein, wdir, lfile, system_lfile,
                     var_md_dirs.append(res)
 
         finally:
-            dask_client.shutdown()
+            if dask_client:
+                dask_client.shutdown()
             if cluster:
                 cluster.close()
-        logging.info(f'Continue of simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
+        logging.info(
+            f'Continue of simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
+
+    if not var_md_dirs:
+        return None
 
     # Part 3. MD Analysis. Run on each cpu
-    dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
     try:
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_md_dirs)), ncpu=ncpu)
         logging.info('Start Analysis of the simulations')
         var_md_analysis_dirs = []
         # os.path.dirname(var_lig)
         for res in calc_dask(run_md_analysis, var_md_dirs,
-                             dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log):
+                             dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir,
+                             bash_log=bash_log):
             if res:
                 var_md_analysis_dirs.append(res)
     finally:
-        dask_client.shutdown()
+        if dask_client:
+            dask_client.shutdown()
         if cluster:
             cluster.close()
 
-    logging.info(f'Analysis of md simulation of {len(var_md_analysis_dirs)} were successfully finished\nFinished: {var_md_analysis_dirs}')
+    logging.info(
+        f'Analysis of md simulation of {len(var_md_analysis_dirs)} were successfully finished\nFinished: {var_md_analysis_dirs}')
 
     if not not_clean_log_files:
         if wdir_to_continue_list is None:
@@ -316,6 +314,7 @@ def start(protein, wdir, lfile, system_lfile,
             for wdir_md in wdir_to_continue_list:
                 for f in glob(os.path.join(wdir_md, '#*#')):
                     os.remove(f)
+
 
 def main():
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
@@ -391,7 +390,7 @@ def main():
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
                             f'{out_time}.log')
-    bash_log = os.path.join(wdir,f'streamd_bash_{out_time}.log')
+    bash_log = os.path.join(wdir, f'streamd_bash_{out_time}.log')
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
