@@ -43,6 +43,9 @@ def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, o
     if ligand_resid is None:
         ligand_resid = 'UNL'
 
+    if not os.path.isfile(tpr) or not os.path.isfile(xtc) or not os.path.isfile(topol) or not os.path.isfile(index):
+        return None
+
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
     protein_index = index_list.index('Protein')
     ligand_index = index_list.index(ligand_resid)
