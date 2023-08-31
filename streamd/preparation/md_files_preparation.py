@@ -16,16 +16,6 @@ def check_if_info_already_added_to_topol(topol, string):
         return False
 
 def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
-    def get_n_line_of_protein_in_mol_section(topol_file):
-        with open(topol_file) as input:
-            data = input.read()
-        molecules_section = data[data.find('[ molecules ]'):]
-        last_protein_n_line = None
-        for n, line in enumerate(molecules_section.split('\n'), 1):
-            if line.startswith('Protein'):
-                last_protein_n_line = n
-        return last_protein_n_line
-
     itp_include_list, posres_include_list, resid_include_list = [], [], []
     for itp, posres, resid in zip(all_itp_list, all_posres_list, all_resids):
         itp_include_list.append(f'; Include {resid} topology\n'
@@ -45,9 +35,7 @@ def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
 
     if not check_if_info_already_added_to_topol(topol, '\n'.join(resid_include_list)):
         # ligand molecule should be after protein (or all protein chains listed)
-        n_line_after_molecules_section = get_n_line_of_protein_in_mol_section(topol_file=topol)
-        edit_topology_file(topol, pattern='[ molecules ]', add='\n'.join(resid_include_list),
-                           how='after', n=n_line_after_molecules_section)
+        edit_topology_file(topol, pattern=None, add='\n'.join(resid_include_list), n=-1)
 
 
 def edit_mdp(md_file, pattern, replace):
@@ -66,12 +54,17 @@ def edit_topology_file(topol_file, pattern, add, how='before', n=0):
     with open(topol_file) as input:
         data = input.read()
 
-    if n == 0:
-        data = data.replace(pattern, f'{add}\n{pattern}' if how == 'before' else f'{pattern}\n{add}')
+    if pattern:
+        if n == 0:
+            data = data.replace(pattern, f'{add}\n{pattern}' if how == 'before' else f'{pattern}\n{add}')
+        else:
+            data = data.split('\n')
+            ind = data.index(pattern)
+            data.insert(ind + n, add)
+            data = '\n'.join(data)
     else:
         data = data.split('\n')
-        ind = data.index(pattern)
-        data.insert(ind + n, add)
+        data.insert(n, add)
         data = '\n'.join(data)
 
     with open(topol_file, 'w') as output:
