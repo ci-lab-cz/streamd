@@ -15,7 +15,7 @@ from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import get_index, filepath_type, run_check_subprocess
 
 
-def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, deffnm, np, ligand_resid, out_time, bash_log, clean_previous):
+def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous):
     def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, bash_log):
 
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
@@ -151,7 +151,7 @@ def get_mmpbsa_start_end_interval(mmpbsa):
     return startframe, endframe, interval
 
 
-def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligand_resid, hostfile, out_time, bash_log,
+def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, ncpu, ligand_resid, hostfile, out_time, bash_log,
          gmxmmpbsa_out_files=None, clean_previous=False):
     if gmxmmpbsa_out_files is None and wdir_to_run is not None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
@@ -182,7 +182,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, wdir, mmpbsa, deffnm, ncpu, ligan
         try:
             var_gbsa_out_files = []
             for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
-                                 tpr=tpr, xtc=xtc, topol=topol, index=index, deffnm=deffnm,
+                                 tpr=tpr, xtc=xtc, topol=topol, index=index,
                                  mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid,
                                  out_time=out_time, bash_log=bash_log, clean_previous=clean_previous):
                 if res:
@@ -279,7 +279,7 @@ def main():
     try:
         start(tpr=args.tpr, xtc=args.xtc, topol=args.topol,
              index=args.index, wdir=wdir, wdir_to_run=args.wdir_to_run,
-             mmpbsa=args.mmpbsa, deffnm=args.deffnm, ncpu=args.ncpu, out_time=out_time,
+             mmpbsa=args.mmpbsa, ncpu=args.ncpu, out_time=out_time,
              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, hostfile=args.hostfile,
              bash_log=bash_log, clean_previous=args.clean_previous)
     finally:
