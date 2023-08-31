@@ -55,6 +55,8 @@ def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, o
                        np=np, protein_index=protein_index,
                        ligand_index=ligand_index,
                        out_time=out_time, bash_log=bash_log)
+    if os.path.isfile(os.path.join(wdir, 'gmx_MMPBSA.log')):
+        shutil.copy(os.path.join(wdir, 'gmx_MMPBSA.log'), os.path.join(wdir, f'gmx_MMPBSA_{out_time}.log'))
 
     clean_temporary_gmxMMBPSA_files(wdir)
 
