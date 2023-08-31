@@ -118,7 +118,9 @@ def start(protein, wdir, lfile, system_lfile,
 
     if wdir_to_continue_list is None:
         # create dirs
-        wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein')
+        pname, p_ext = os.path.splitext(os.path.basename(protein))
+
+        wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein', pname)
         wdir_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'var_lig')
         wdir_system_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'system_lig')
 
@@ -129,7 +131,6 @@ def start(protein, wdir, lfile, system_lfile,
         os.makedirs(wdir_ligand, exist_ok=True)
         os.makedirs(wdir_system_ligand, exist_ok=True)
 
-        pname, p_ext = os.path.splitext(os.path.basename(protein))
         # check if already exist in the working directory
         if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro') or not os.path.isfile(
                 os.path.join(wdir_protein, "topol.top")):
