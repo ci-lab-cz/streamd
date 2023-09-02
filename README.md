@@ -18,6 +18,7 @@ conda update conda
 conda create -n gmxMMPBSA python=3.9 -y -q
 conda activate gmxMMPBSA
 
+pip install prolif
 
 conda install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 -y -q
 
@@ -30,6 +31,7 @@ conda install -c conda-forge rdkit dask distributed -y -q
 
 pip install paramiko
 pip install asyncssh
+
 ```
 ## **Description**
 #### **Fully automatic pipeline for molecular dynamics**
