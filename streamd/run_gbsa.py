@@ -3,11 +3,11 @@ import logging
 import math
 import os
 import re
+import shutil
 import subprocess
 from datetime import datetime
 from functools import partial
 from multiprocessing import cpu_count
-import shutil
 
 import pandas as pd
 
@@ -19,10 +19,10 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
     def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, bash_log):
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
         cmd = f'cd {wdir}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
-                                    f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
-                                    f'-o {output} ' \
-                                    f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}' \
-                                    f' >> {bash_log} 2>&1'
+              f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
+              f'-o {output} ' \
+              f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}' \
+              f' >> {bash_log} 2>&1'
         if not run_check_subprocess(cmd, key=xtc):
             return None
         return output
@@ -51,12 +51,14 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
 
     return output
 
+
 def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
     index = os.path.join(wdir, index)
     return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous)
+
 
 def clean_temporary_gmxMMBPSA_files(wdir):
     # remove intermediate files
@@ -112,12 +114,14 @@ def parse_gmxMMPBSA_output(fname):
 
     return out_res
 
+
 def get_number_of_frames(xtc):
     res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True)
     frames = re.findall('Step[ ]*([0-9]*)[ ]*[0-9]*\n', res.stderr.decode("utf-8"))
     if frames:
         logging.info(f'{xtc} has {frames} frames')
         return int(frames[0])
+
 
 def run_get_frames_from_wdir(wdir, xtc):
     return get_number_of_frames(os.path.join(wdir, xtc))
@@ -181,7 +185,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
             # run energy calculation
             try:
-                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=n_tasks_per_node, ncpu=ncpu)
+                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=n_tasks_per_node,
+                                                         ncpu=ncpu)
                 var_gbsa_out_files = []
                 for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
                                      tpr=tpr, xtc=xtc, topol=topol, index=index,
@@ -212,7 +217,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
     if var_gbsa_out_files:
         GBSA_output_res, PBSA_output_res = [], []
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=len(var_gbsa_out_files), ncpu=ncpu)
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=len(var_gbsa_out_files),
+                                                     ncpu=ncpu)
             for res in calc_dask(parse_gmxMMPBSA_output, var_gbsa_out_files, dask_client=dask_client):
                 if res:
                     GBSA_output_res.append(res['GBSA'])
@@ -233,7 +239,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         if list(pd_pbsa.columns) != ['fname']:
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{out_time}.csv'), sep='\t', index=False)
 
-        logging.info(f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\nFinished: {var_gbsa_out_files}\n')
+        logging.info(
+            f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\nFinished: {var_gbsa_out_files}\n')
 
 
 def main():
