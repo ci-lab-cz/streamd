@@ -1,14 +1,5 @@
 # StreaMD: a tool to perform high-throughput automated molecular dynamics simulations
 
-## Dependency
-* **Python**
-* **AmberTools**
-* **RDKit**
-* **gmx_MMPBSA**
-* **mpi4py**
-* **ParmEd**
-* **Dask**
-
 ## installation
 *Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
 
@@ -45,7 +36,7 @@ pip install paramiko asyncssh prolif
 - supports to extend time of MD simulations 
 - supports to continue of interrupted MD simulation
 - interrupted MD preparation can be restarted by invoking the same command
-
+- implemented tools for end-state free energy calculations (gmx_MMPBSA) and Protein-Ligand Interaction analysis (ProLIF)
 
 ### **USAGE**
 ```
@@ -269,7 +260,7 @@ gyrate.xvg - radius of gyration
 _All analysis results you can visualize with xmgrace:_  
 `` for i in *.xvg; do gracebat $i;done `` 
 
-### MM-PBSA/MM-GBSA  energy calculation
+### MM-PBSA/MM-GBSA energy calculation
 #### **USAGE**
 ```
 run_gbsa -h
@@ -316,5 +307,42 @@ run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/p
  
  each wdir_to_run has FINAL_RESULTS_MMPBSA_*start-time*.csv with GBSA/PBSA output. 
  
+### ProLIF Protein-Ligand Interaction Fingerprints
+#### **USAGE**
+```
+$ run_prolif -h
+usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [-a STRING] [-d WDIR] [-v] [--hostfile FILENAME] [-c INTEGER]
+
+Get protein-ligand interactions from MD trajectories using ProLIF module.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i DIRNAME [DIRNAME ...], --wdir_to_run DIRNAME [DIRNAME ...]
+                        single or multiple directories with simulations.
+                                                     Should consist of: md_out.tpr and md_fit.xtc files (default: None)
+  --xtc FILENAME        input trajectory file (XTC). Will be ignored if --wdir_to_run is used (default: None)
+  --tpr FILENAME        input topology file (TPR). Will be ignored if --wdir_to_run is used (default: None)
+  -l STRING, --ligand STRING
+                        residue name of a ligand in the input trajectory. (default: UNL)
+  -s INTEGER, --step INTEGER
+                        step to take every n-th frame. ps (default: 1)
+  -a STRING, --append_protein_selection STRING
+                        the string which will be concatenated to the protein selection atoms. Example: "resname ZN or resname MG". (default: None)
+  -d WDIR, --wdir WDIR  Working directory for program output. If not set the current directory will be used. (default: None)
+  -v, --verbose         print progress. (default: False)
+  --hostfile FILENAME   text file with addresses of nodes of dask SSH cluster. The most typical, it can be passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file will be the address of the scheduler running on the standard port 8786. If omitted, calculations will run on a single machine as usual. (default: None)
+  -c INTEGER, --ncpu INTEGER
+                        number of CPU per server. Use all cpus by default. (default: 64)
+
+
+```
+
+### **Examples**
+```
+run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -v -s 5
+```
+**Output**  
+1) in each directory where xtc file is located  *plifs.csv* file for each simulation will be created
+2) *prolif_output.csv* - aggregated csv output file for all analyzed simulations
 ###Licence
 BSD-3
