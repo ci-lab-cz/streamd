@@ -18,8 +18,6 @@ conda update conda
 conda create -n gmxMMPBSA python=3.9 -y -q
 conda activate gmxMMPBSA
 
-pip install prolif
-
 conda install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 -y -q
 
 python -m pip install git+https://github.com/Valdes-Tresanco-MS/ParmEd.git@v3.4
@@ -29,9 +27,7 @@ python -m pip install gmx_MMPBSA
 
 conda install -c conda-forge rdkit dask distributed -y -q
 
-pip install paramiko
-pip install asyncssh
-
+pip install paramiko asyncssh prolif
 ```
 ## **Description**
 #### **Fully automatic pipeline for molecular dynamics**
