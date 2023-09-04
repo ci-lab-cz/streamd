@@ -27,6 +27,7 @@ setuptools.setup(
     },
     entry_points={'console_scripts':
                       ['run_md = streamd.run_md:main',
-                       'run_gbsa = streamd.run_gbsa:main']},
+                       'run_gbsa = streamd.run_gbsa:main',
+                       'run_prolif = streamd.prolif.run_prolif:main']},
     include_package_data=True
 )
