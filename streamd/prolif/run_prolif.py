@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import math
 import os
 import shutil
 from functools import partial
@@ -14,6 +13,7 @@ import prolif as plf
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import filepath_type
+
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -67,7 +67,7 @@ def collect_outputs(output_list, output):
     df_aggregated = df_aggregated.fillna(False).sort_values('Frame')
     amino_acids = df_aggregated.columns.drop(['fname', 'Frame']).to_list()
     # sort by number and type of interaction
-    amino_acids.sort(key=lambda x: (int(x.split('.')[0][3:]), x.split('.')[1] ))
+    amino_acids.sort(key=lambda x: (int(x.split('.')[0][3:]), x.split('.')[1]))
     sorted_columns = ['fname', 'Frame'] + amino_acids
     df_aggregated.loc[:, sorted_columns].to_csv(output, sep='\t', index=False)
 
@@ -108,7 +108,8 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
                     var_prolif_out_files.append(res)
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore', close_workers=True, remove=True)
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                                           close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
                 cluster.close()
