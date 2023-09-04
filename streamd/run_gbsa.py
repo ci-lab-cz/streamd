@@ -31,6 +31,7 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
         clean_temporary_gmxMMBPSA_files(wdir)
 
     if not os.path.isfile(tpr) or not os.path.isfile(xtc) or not os.path.isfile(topol) or not os.path.isfile(index):
+        logging.warning(f'{wdir} cannot run gbsa. Check if there are missing files: {tpr} {xtc} {topol} {index}')
         return None
 
     index_list = get_index(index)
