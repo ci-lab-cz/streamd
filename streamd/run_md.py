@@ -79,19 +79,17 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
 
 
 def start(protein, wdir, lfile, system_lfile,
-          clean_previous, mdtime_ns, npt_time_ps, nvt_time_ps,
+          forcefield_name, npt_time_ps, nvt_time_ps, mdtime_ns,
           topol, topol_itp_list, posre_list_protein,
-          wdir_to_continue_list, deffnm_prev,
-          tpr_prev, cpt_prev, xtc_prev,
+          wdir_to_continue_list, deffnm_prev, tpr_prev, cpt_prev, xtc_prev,
           activate_gaussian, gaussian_exe,
-          hostfile, ncpu, not_clean_log_files,
-          forcefield_num=6, bash_log=None):
+          hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
     :param lfile: None or file
     :param system_lfile: None or file. Mol or sdf format
-    :param forcefield_num: int
+    :param forcefield_name: str
     :param clean_previous: boolean. Remove all previous md files
     :param mdtime_ns: float. Time in ns
     :param npt_time_ps: int. Time in ps
@@ -138,7 +136,7 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.info('Start protein preparation')
                 cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
                       f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
-                      f'-p {os.path.join(wdir_protein, "topol.top")} <<< {forcefield_num} >> {bash_log} 2>&1'
+                      f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {bash_log} 2>&1'
                 if not run_check_subprocess(cmd, protein):
                     return None
                 logging.info(f'Successfully finished protein preparation\n')
@@ -359,6 +357,8 @@ def main():
     parser.add_argument('--posre', metavar='posre.itp', required=False, nargs='+', default=None, type=filepath_type,
                         help='posre file(s) (required if a gro-file is provided for the protein).'
                              'All output files obtained from gmx2pdb should preserve the original names')
+    parser.add_argument('--protein_forcefield', metavar='amber99sb-ildn', required=False, default='amber99sb-ildn', type=str,
+                        help='Force Field for protein preparation')
     parser.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='time of MD simulation in ns')
     parser.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
@@ -417,14 +417,15 @@ def main():
 
     logging.info(args)
     try:
-        start(protein=args.protein, lfile=args.ligand,
-              clean_previous=args.clean_previous_md, system_lfile=args.cofactor,
-              topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre, mdtime_ns=args.md_time,
-              npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time,
+        start(protein=args.protein,
+              lfile=args.ligand, system_lfile=args.cofactor,
+              topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
+              forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
               wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
               tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
-              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, not_clean_log_files=args.not_clean_log_files,
+              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir,
+              clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
               bash_log=bash_log)
     finally:
         logging.shutdown()
