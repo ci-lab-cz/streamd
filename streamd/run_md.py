@@ -121,8 +121,8 @@ def start(protein, wdir, lfile, system_lfile,
         pname, p_ext = os.path.splitext(os.path.basename(protein))
 
         wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein', pname)
-        wdir_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'var_lig')
-        wdir_system_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'system_lig')
+        wdir_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'ligands')
+        wdir_system_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'cofactors')
 
         wdir_md = os.path.join(wdir, 'md_files', 'md_run')
 
@@ -188,7 +188,7 @@ def start(protein, wdir, lfile, system_lfile,
 
             logging.info(f'Successfully finished {len(system_lig_wdirs)} cofactor preparation\n')
         else:
-            system_lig_wdirs = []  # wdir_ligand_cur
+            system_lig_wdirs = []
 
         if lfile is not None:
             logging.info('Start ligand preparation')

@@ -178,8 +178,8 @@ will be created the next folders:
 md_files/
 - md_files/md_preparation/
  -- md_files/md_preparation/protein/
- -- md_files/md_preparation/var_lig/
- -- md_files/md_preparation/system_lig/
+ -- md_files/md_preparation/ligands/
+ -- md_files/md_preparation/cofactors/
 - md_files/md_run/
 ```
 
@@ -198,7 +198,7 @@ topol_Protein_chain_B.itp
 ```
 
 ```
-md_files/md_preparation/var_lig/:
+md_files/md_preparation/ligands/:
 all_resid.txt
 
 ligand_1/
@@ -212,7 +212,7 @@ ligand_2/
 ```
 
 ```
-md_files/md_preparation/system_lig/:
+md_files/md_preparation/cofactors/:
 all_resid.txt
 
 cofactor_1/
