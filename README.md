@@ -3,23 +3,23 @@
 ## installation
 *Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
 
+We recommend to install the package using `conda` and `mamba`. To use exclusively `conda` one can simply replace `mamba` calls with `conda`.
 ```
-conda update conda
+conda install -n base -c conda-forge mamba
 
 conda create -n gmxMMPBSA python=3.9 -y -q
 conda activate gmxMMPBSA
 
-conda install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 -y -q
+mamba install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 gromacs==2022.4 rdkit dask distributed -y -q
 
 python -m pip install git+https://github.com/Valdes-Tresanco-MS/ParmEd.git@v3.4
-
-conda install -c conda-forge gromacs==2022.4 -y -q
 python -m pip install gmx_MMPBSA
 
-conda install -c conda-forge rdkit dask distributed -y -q
-
 pip install paramiko asyncssh prolif
+
+pip install git+https://github.com/ci-lab-cz/md-scripts.git
 ```
+
 ## **Description**
 #### **Fully automatic pipeline for molecular dynamics**
 
