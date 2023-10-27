@@ -31,8 +31,8 @@ def run_equilibration(wdir, project_dir, bash_log):
 
 def run_simulation(wdir, project_dir, bash_log):
     if os.path.isfile(os.path.join(wdir, 'md_out.tpr')) and os.path.isfile(os.path.join(wdir, 'md_out.cpt')) \
-            and os.path.isfile(os.path.join(wdir, 'md_out.xtc')) and os.path.isfile(os.path.join(wdir, 'md_out.log')):
-        logging.warning(f'{wdir}. md_out.xtc and md_out.tpr exist. '
+            and os.path.isfile(os.path.join(wdir, 'md_out.xtc')):
+        logging.warning(f'{wdir}. md_out.xtc and md_out.tpr and  md_out.cpt exist. '
                         f'MD simulation step will be skipped. '
                         f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
         return wdir
