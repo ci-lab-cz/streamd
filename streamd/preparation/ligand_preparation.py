@@ -122,8 +122,6 @@ def prepare_gaussian_files(file_template, file_out, ncpu):
 
 def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path, bash_log, gaussian_exe=None,
                 activate_gaussian=None, ncpu=1):
-    # molid = mol.GetProp('_Name')
-    # resid = mol.GetProp('resid')
 
     mol, molid, resid = mol_tuple
 
@@ -131,11 +129,14 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
     os.makedirs(wdir_ligand_cur, exist_ok=True)
 
     if os.path.isfile(os.path.join(wdir_ligand_cur, f'{molid}.itp')) and os.path.isfile(
-            os.path.join(wdir_ligand_cur, f'posre_{molid}.itp')) \
-            and os.path.isfile(os.path.join(wdir_ligand_cur, 'resid.txt')):
+            os.path.join(wdir_ligand_cur, f'posre_{molid}.itp')):
         logging.warning(
             f'{molid}.itp and posre_{molid}.itp files already exist.'
             f'Mol preparation step will be skipped for such molecule\n')
+        if not os.path.isfile(os.path.join(wdir_ligand_cur, 'resid.txt')):
+            with open(os.path.join(wdir_ligand_cur, 'resid.txt'), 'w') as out:
+                out.write(f'{molid}\t{resid}\n')
+
         return wdir_ligand_cur
 
     mol_file = os.path.join(wdir_ligand_cur, f'{molid}.mol')
