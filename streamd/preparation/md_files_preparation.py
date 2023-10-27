@@ -1,10 +1,8 @@
-import logging
 import os
 import shutil
-import subprocess
 from glob import glob
 
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
 
 
 def check_if_info_already_added_to_topol(topol, string):
@@ -131,16 +129,13 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
 def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_time_ps, mdtime_ns):
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
-        try:
-            subprocess.check_output(f'''
+        cmd = f'''
             cd {wdir_md_cur}
             gmx make_ndx -f solv_ions.gro << INPUT
             q
             INPUT
-            ''', shell=True)
-
-        except subprocess.CalledProcessError as e:
-            logging.exception(f'{wdir_md_cur}\n{e}', stack_info=True)
+            '''
+        if not run_check_subprocess(cmd, key=wdir_md_cur):
             return None
 
     index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))

@@ -26,17 +26,16 @@ def get_index(index_file):
 
 
 def make_group_ndx(query, wdir):
-    try:
-        subprocess.check_output(f'''
+    cmd = f'''
         cd {wdir}
         gmx make_ndx -f solv_ions.gro -n index.ndx << INPUT
         {query}
         q
         INPUT
-        ''', shell=True)
-    except subprocess.CalledProcessError as e:
-        logging.error(f'{wdir}\t{e}\n')
-        return False
+        '''
+    if not run_check_subprocess(cmd, key=wdir):
+       return False
+
     return True
 
 

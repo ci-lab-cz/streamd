@@ -4,6 +4,14 @@ from rdkit import Chem
 from rdkit.Chem import rdmolops
 
 
+def main(fname):
+    mol = Chem.MolFromMolFile(fname)
+    if mol:
+        charge = rdmolops.GetFormalCharge(mol)
+    else:
+        sys.stderr.write('Molecule from file {} cannot be parsed'.format(fname))
+        return None
+    return charge
 
 
 if __name__ == '__main__':
