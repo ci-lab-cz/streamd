@@ -81,7 +81,8 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
 def start(protein, wdir, lfile, system_lfile,
           forcefield_name, npt_time_ps, nvt_time_ps, mdtime_ns,
           topol, topol_itp_list, posre_list_protein,
-          wdir_to_continue_list, deffnm_prev, tpr_prev, cpt_prev, xtc_prev,
+          wdir_to_continue_list, deffnm_prev,
+          tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe,
           hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
@@ -101,6 +102,8 @@ def start(protein, wdir, lfile, system_lfile,
     :param tpr_prev: None or file
     :param cpt_prev: None or file
     :param xtc_prev: None or file
+    :param ligand_resid: UNL. Used for md analysis only if continue simulation
+    :param ligand_list_file_prev: None or file
     :param deffnm_prev: md_out
     :param hostfile: None or file
     :param ncpu:
@@ -114,8 +117,9 @@ def start(protein, wdir, lfile, system_lfile,
 
     dask_client, cluster = None, None
 
-    if wdir_to_continue_list is None:
+    if wdir_to_continue_list is None and (tpr_prev is None or cpt_prev is None or xtc_prev is None):
         # create dirs
+        ligand_resid = 'UNL'
         pname, p_ext = os.path.splitext(os.path.basename(protein))
 
         wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein', pname)
@@ -195,7 +199,7 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.warning(f'Ligand molecules: {problem_mols} from {lfile} cannot be processed.'
                                 f' Such molecules will be skipped.')
 
-            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid='UNL', script_path=script_path,
+            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, script_path=script_path,
                                                   project_dir=project_dir, wdir_ligand=wdir_ligand,
                                                   gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                   hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
@@ -209,7 +213,7 @@ def start(protein, wdir, lfile, system_lfile,
 
         if not var_lig_wdirs:
             return None
-
+        # Part 2 Complex preparation
         try:
             dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)), ncpu=ncpu)
             # make all.itp and create complex
@@ -236,7 +240,7 @@ def start(protein, wdir, lfile, system_lfile,
         if not var_complex_prepared_dirs:
             return None
 
-        # Part 2. Equilibration and MD simulation. Run on all cpu
+        # Part 3. Equilibration and MD simulation. Run on all cpu
         try:
             dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
             logging.info('Start Equilibration steps')
@@ -270,7 +274,10 @@ def start(protein, wdir, lfile, system_lfile,
             logging.info('Start Continue Simulation step')
             var_md_dirs = []
             deffnm = f'{deffnm_prev}_{mdtime_ns}'
-            # os.path.dirname(var_lig)
+            #  continue simulations not created by tool
+            if tpr_prev and cpt_prev and xtc_prev:
+                wdir_to_continue_list = [wdir]
+
             for res in calc_dask(continue_md_from_dir, wdir_to_continue_list, dask_client,
                                  tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
                                  deffnm_prev=deffnm_prev, deffnm_next=deffnm, mdtime_ns=mdtime_ns,
@@ -299,7 +306,7 @@ def start(protein, wdir, lfile, system_lfile,
         # os.path.dirname(var_lig)
         for res in calc_dask(run_md_analysis, var_md_dirs,
                              dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir,
-                             bash_log=bash_log):
+                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file=ligand_list_file_prev):
             if res:
                 var_md_analysis_dirs.append(res)
     finally:
@@ -368,20 +375,29 @@ def main():
     parser.add_argument('--not_clean_log_files', action='store_true', default=False,
                         help='Not to remove all backups of md files')
     # continue md
+    parser.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
+                        type=partial(filepath_type, exist_type='dir'),
+                        help='''single or multiple directories contain simulations created by the tool. Use to extend or continue the simulation.\n'
+                                 Should consist of: tpr, cpt, xtc and all_ligand_resid.txt files. 
+                                 File all_ligand_resid.txt is optional and used to run md analysis for the ligands.\n
+                                 If you want to continue your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments 
+                                 (--ligand_list_file is optional and required to run md analysis after simulation )''')
+    parser.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
+                        help='''preffix for the previous md files. Use to extend or continue the simulation.
+                            Required if --wdir_to_continue is used. Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from --wdir_to_continue directories''')
     parser.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='tpr file from the previous MD simulation')
     parser.add_argument('--cpt', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='cpt file from previous simulation')
     parser.add_argument('--xtc', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='xtc file from previous simulation')
-    parser.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
-                        type=partial(filepath_type, exist_type='dir'),
-                        help='''single or multiple directories for the previous simulations. Use to extend or continue the simulation. '
-                             Should consist of: tpr, cpt, xtc files''')
-    parser.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
-                        help='''preffix for the previous md files. Use to extend or continue the simulation.
-                        Only if wdir_to_continue is used. Use if each --tpr, --cpt, --xtc arguments are not set up. 
-                        Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from wdir_to_continue''')
+    parser.add_argument('--ligand_list_file', metavar='all_ligand_resid.txt', default=None, type=filepath_type,
+                        help='''If you want automatic md analysis for ligands was run after continue of simulation you should set ligand_list file. 
+                                 Format of the file (no headers): user_ligand_id\tgromacs_ligand_id. Example: my_ligand\tUNL.
+                                 Can be set up or placed into --wdir_to_continue directory(ies)''')
+    parser.add_argument('--ligand_id', metavar='UNL', default='UNL', type=str,
+                        help='''If you want automatic md analysis for ligand was run after continue of simulation you can set ligand_id if it is not UNL default value''')
+    # boron-containing molecules
     parser.add_argument('--activate_gaussian', metavar='module load Gaussian/09-d01', required=False, default=None,
                         help='string that load gaussian module if necessary')
     parser.add_argument('--gaussian_exe', metavar='g09 or /apps/all/Gaussian/09-d01/g09/g09', required=False,
@@ -423,6 +439,7 @@ def main():
               forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
               wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
               tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
+              ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
