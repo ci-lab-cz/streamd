@@ -6,7 +6,7 @@ cd $wdir
 if [ ! -f em.gro ]; then
 >&2 echo 'Script running:***************************** Energy minimization *********************************'
 gmx grompp -f minim.mdp -c solv_ions.gro -p topol.top -n index.ndx -o em.tpr -maxwarn 1
-gmx mdrun -nt 32 -v -deffnm em -s em.tpr  || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
+gmx mdrun -v -deffnm em -s em.tpr  || { >&2 echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 
 gmx energy -f em.edr -o potential.xvg <<< "Potential"
 fi
