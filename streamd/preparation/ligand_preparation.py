@@ -20,7 +20,7 @@ def supply_mols_tuple(fname, preset_resid=None):
 
     def add_ids(mol, n, input_fname, resid):
         mol.SetProp('resid', resid)
-        if not mol.HasProp('_Name'):
+        if not mol.HasProp('_Name') or not mol.GetProp('_Name'):
             mol.SetProp('_Name', f'{input_fname}_{n}')
         return mol
 
