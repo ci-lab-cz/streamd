@@ -17,8 +17,8 @@ echo 'Script running:***************************** 6. Coords and Bonds fix *****
 # return original coords and fix damaged bonds
 python $script_path/mol2_fix_coordsbonds.py --mol $lfile --mol2 _$molid\_tofix.mol2 -o _$molid\_fixed.mol2 || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
 # better to check $molid.mol2 by visual inspection
-# correct mol2 from fixed previous mol2
-antechamber -fi mol2 -fo mol2 -i _$molid\_fixed.mol2 -o $molid.mol2 -nc $charge -pf y -s 2 -dr no -rn $resid || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
+# correct mol2 from fixed previous mol2 and j 1 - use previous bonds from fixed mol2
+antechamber -fi mol2 -fo mol2 -i _$molid\_fixed.mol2 -o $molid.mol2 -nc $charge -pf y -s 2 -dr no -rn $resid -j 1 || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
 
 #if [ $mode == 'forcefield' ]
 #then
