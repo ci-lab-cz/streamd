@@ -65,12 +65,12 @@ def check_mols(fname):
     problem_mols = []
     number_of_mols = 0
     if fname.endswith('.sdf'):
-        n = 1
+        n = 0
         for n, mol in enumerate(Chem.SDMolSupplier(fname, removeHs=False, sanitize=False), 1):
             problem_molid = check_if_problem(mol, n)
             if problem_molid:
                 problem_mols.append(problem_molid)
-        number_of_mols = n - 1
+        number_of_mols = n
 
     if fname.endswith('.mol'):
         mol = Chem.MolFromMolFile(fname, removeHs=False, sanitize=False)
