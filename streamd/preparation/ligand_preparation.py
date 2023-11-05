@@ -2,6 +2,7 @@ import itertools
 import logging
 import os
 from glob import glob
+import re
 
 from rdkit import Chem
 from rdkit.Chem import rdmolops
@@ -111,17 +112,24 @@ def prepare_tleap(tleap_template, tleap, molid, conda_env_path):
         output.write(new_data)
 
 
-def prepare_gaussian_files(file_template, file_out, ncpu):
+def prepare_gaussian_files(file_template, file_out, ncpu, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB'):
     with open(file_template) as inp:
         data = inp.read()
-    # data_new = re.sub('%NProcShared=[0-9]*', '%NProcShared=128', data)
-    new_data = data.replace('%NProcShared=1', f'%NProcShared={ncpu}')
+
+    standard_basis = 'B3LYP/6-31G\*'
+    new_data = re.sub('%NProcShared=[0-9]*', f'%NProcShared={ncpu}', data)
+    new_data = re.sub('%Mem=[0-9a-zA-Z]*', f'%Mem={gaussian_memory}', new_data)
+    if 'SCF=' not in new_data:
+        new_data = re.sub(standard_basis, f'{gaussian_basis} SCF=XQC', new_data)
+    else:
+        new_data = re.sub(standard_basis, gaussian_basis, new_data)
+
     with open(file_out, 'w') as output:
         output.write(new_data)
 
 
 def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path, bash_log, gaussian_exe=None,
-                activate_gaussian=None, ncpu=1):
+                activate_gaussian=None, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB', ncpu=1):
 
     mol, molid, resid = mol_tuple
 
@@ -153,7 +161,8 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
             if gaussian_exe:
                 for file in glob(os.path.join(script_path, 'com', '*.com')):
                     prepare_gaussian_files(file_template=file,
-                                           file_out=os.path.join(wdir_ligand_cur, os.path.basename(file)), ncpu=ncpu)
+                                           file_out=os.path.join(wdir_ligand_cur, os.path.basename(file)), ncpu=ncpu,
+                                           gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory)
                 cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
                       f'resid={resid} molid={molid} charge={charge} gaussian_version={gaussian_exe} ' \
                       f'activate_gaussian="{activate_gaussian if activate_gaussian else ""}" ' \
@@ -184,8 +193,9 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
     return wdir_ligand_cur
 
 
-def prepare_input_ligands(ligand_fname, preset_resid, script_path, project_dir, wdir_ligand, gaussian_exe,
-                          activate_gaussian, hostfile, ncpu, bash_log):
+def prepare_input_ligands(ligand_fname, preset_resid, script_path, project_dir, wdir_ligand,
+                          gaussian_exe, activate_gaussian, gaussian_basis, gaussian_memory,
+                          hostfile, ncpu, bash_log):
     '''
 
     :param ligand_fname:
@@ -219,6 +229,7 @@ def prepare_input_ligands(ligand_fname, preset_resid, script_path, project_dir, 
                                      script_path=script_path, project_dir=project_dir,
                                      wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"],
                                      gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                     gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                      ncpu=ncpu, bash_log=bash_log):
                     if res:
                         lig_wdirs.append(res)
