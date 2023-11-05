@@ -1,0 +1,11 @@
+original_pdb complex.pdb
+group_name protein
+cut_off cut_off
+ion_ids variable_ion_ids
+ion_mol2files variable_ion_mol2_files
+naa_mol2files variable_ligand_mol2_files
+frcmod_files variable_ligand_frcmod_files
+software_version gaussian_version
+large_opt large_opt
+force_field force_field
+water_model TIP3P
