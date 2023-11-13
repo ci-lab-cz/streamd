@@ -306,7 +306,7 @@ def start(protein, wdir, lfile, system_lfile,
         # os.path.dirname(var_lig)
         for res in calc_dask(run_md_analysis, var_md_dirs,
                              dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir,
-                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file=ligand_list_file_prev):
+                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev):
             if res:
                 var_md_analysis_dirs.append(res)
     finally:
