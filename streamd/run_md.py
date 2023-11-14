@@ -11,7 +11,7 @@ from streamd.md_analysis import run_md_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import filepath_type, run_check_subprocess
+from streamd.utils.utils import filepath_type, run_check_subprocess, get_protein_resid_set
 
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -172,6 +172,7 @@ def start(protein, wdir, lfile, system_lfile,
                             f'Protein preparation step will be skipped.')
 
         # Part 1. Ligand Preparation
+        protein_resid_set = get_protein_resid_set(protein)
         if system_lfile is not None:
             logging.info('Start cofactor preparation')
             number_of_mols, problem_mols = check_mols(system_lfile)
@@ -179,7 +180,7 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.exception(f'Cofactor molecules: {problem_mols} from {system_lfile} cannot be processed. Script will be interrupted.')
                 return None
 
-            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, script_path=script_path,
+            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
                                                      project_dir=project_dir, wdir_ligand=wdir_system_ligand,
                                                      gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                      hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
@@ -199,7 +200,7 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.warning(f'Ligand molecules: {problem_mols} from {lfile} cannot be processed.'
                                 f' Such molecules will be skipped.')
 
-            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, script_path=script_path,
+            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, protein_resid_set=protein_resid_set, script_path=script_path,
                                                   project_dir=project_dir, wdir_ligand=wdir_ligand,
                                                   gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                   hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)

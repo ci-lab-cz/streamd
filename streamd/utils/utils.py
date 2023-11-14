@@ -3,6 +3,8 @@ import os
 import re
 import subprocess
 
+import MDAnalysis as mda
+
 
 def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=False):
     value = os.path.abspath(x) if x else x
@@ -55,3 +57,8 @@ def run_check_subprocess(cmd, key):
         logging.exception(f'{key}\nError:{e}', stack_info=True)
         return False
     return True
+
+def get_protein_resid_set(protein_fname):
+    protein = mda.Universe(protein_fname)
+    protein_resid_set = set(protein.residues.resnames.tolist())
+    return protein_resid_set

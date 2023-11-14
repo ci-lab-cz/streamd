@@ -10,12 +10,12 @@ from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import run_check_subprocess
 
 
-def supply_mols_tuple(fname, preset_resid=None):
-    def generate_resid():
-        ascii_uppercase_digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
+    def generate_resid(protein_resid_list):
+        ascii_uppercase_digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         for i in itertools.product(ascii_uppercase_digits, repeat=3):
             resid = ''.join(i)
-            if resid != 'UNL':
+            if resid != 'UNL' and resid not in protein_resid_list:
                 yield resid
 
     def add_ids(mol, n, input_fname, resid):
@@ -24,7 +24,7 @@ def supply_mols_tuple(fname, preset_resid=None):
             mol.SetProp('_Name', f'{input_fname}_{n}')
         return mol
 
-    resid_generator = generate_resid()
+    resid_generator = generate_resid(protein_resid_list=protein_resid_set)
 
     if fname.endswith('.sdf'):
         for n, mol in enumerate(Chem.SDMolSupplier(fname, removeHs=False), 1):
@@ -184,7 +184,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
     return wdir_ligand_cur
 
 
-def prepare_input_ligands(ligand_fname, preset_resid, script_path, project_dir, wdir_ligand, gaussian_exe,
+def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_path, project_dir, wdir_ligand, gaussian_exe,
                           activate_gaussian, hostfile, ncpu, bash_log):
     '''
 
@@ -201,7 +201,7 @@ def prepare_input_ligands(ligand_fname, preset_resid, script_path, project_dir, 
     :return:
     '''
     standard_mols, boron_containing_mols = [], []
-    for mol_tuple in supply_mols_tuple(ligand_fname, preset_resid=preset_resid):
+    for mol_tuple in supply_mols_tuple(ligand_fname, preset_resid=preset_resid, protein_resid_set=protein_resid_set):
         mol = mol_tuple[0]
         if mol.HasSubstructMatch(Chem.MolFromSmarts("[#5]")):
             boron_containing_mols.append(mol_tuple)
