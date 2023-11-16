@@ -1,8 +1,11 @@
 import itertools
 import logging
 import os
+import shutil
 import re
 from glob import glob
+
+import parmed as pmd
 
 from rdkit import Chem
 from rdkit.Chem import rdmolops
@@ -39,17 +42,18 @@ def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
                 yield (mol, mol.GetProp('_Name'), resid)
 
     if fname.endswith('.mol') or fname.endswith('.mol2'):
-        if fname.endswith('.mol'):
-            mol = Chem.MolFromMolFile(fname, removeHs=False)
+        if fname.endswith('.mol2'):
+            mol = pmd.load_file(fname).to_structure()
+            mol = mol.rdkit_mol
         else:
-            mol = Chem.MolFromMol2File(fname, removeHs=False)
+            mol = Chem.MolFromMolFile(fname, removeHs=False)
 
         if mol:
             if preset_resid is None:
                 resid = next(resid_generator)
             else:
                 resid = preset_resid
-            mol = add_ids(mol, n=1, input_fname=os.path.basename(fname).strip('.mol'), resid=resid)
+            mol = add_ids(mol, n=1, input_fname=os.path.basename(fname).strip('.mol2').strip('.mol'), resid=resid)
             yield (mol, mol.GetProp('_Name'), resid)
 
 
@@ -152,7 +156,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
 
         return wdir_ligand_cur
 
-    if not mol2_file:
+    if not mol2_file or not os.path.isfile(mol2_file):
         mol2_file = os.path.join(wdir_ligand_cur, f'{molid}.mol2')
         mol_file = os.path.join(wdir_ligand_cur, f'{molid}.mol')
         # if addH:
@@ -181,17 +185,20 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
                 else:
                     return None
             else:
-                cmd = f'script_path={script_path} mol2={mol_file} input_dirname={wdir_ligand_cur} ' \
+                cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
                       f'resid={resid} molid={molid} charge={charge} bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
                       f' >> {bash_log} 2>&1',
                 if not run_check_subprocess(cmd, molid):
                     return None
     else:
+        mol2 = pmd.load_file(mol2_file).to_structure()
+        mol2.residues[0].name = 'UNL'
+        mol2.save(os.path.join(wdir_ligand_cur, f'{molid}.mol2'))
         logging.warning(f'INFO: No mol2 file will be generated. {mol2_file} will be used instead')
 
     prepare_tleap(os.path.join(script_path, 'tleap.in'), tleap=os.path.join(wdir_ligand_cur, 'tleap.in'),
                   molid=molid, conda_env_path=conda_env_path)
-    cmd = f'script_path={script_path} mol2={mol2_file} input_dirname={wdir_ligand_cur} ' \
+    cmd = f'script_path={script_path} input_dirname={wdir_ligand_cur} ' \
           f'molid={molid} bash {os.path.join(project_dir, "scripts/script_sh/ligand_prep.sh")} ' \
           f' >> {bash_log} 2>&1'
     if not run_check_subprocess(cmd, molid):
@@ -223,7 +230,8 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
     lig_wdirs = []
 
     if ligand_fname.endswith('.mol2'):
-        res = prep_ligand(mol_tuple=supply_mols_tuple(ligand_fname, preset_resid=preset_resid, protein_resid_set=protein_resid_set),
+        mol_tuple = next(supply_mols_tuple(ligand_fname, preset_resid=preset_resid, protein_resid_set=protein_resid_set))
+        res = prep_ligand(mol_tuple=mol_tuple,
                           script_path=script_path, project_dir=project_dir,
                           wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"],
                           gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,

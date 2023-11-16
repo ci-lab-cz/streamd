@@ -1,7 +1,7 @@
 #!/bin/bash
 #  args: input_dirname lfile script_path resid charge molid
 cd $input_dirname
-parmchk2 -i $mol2 -f mol2 -o $molid.frcmod || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
+parmchk2 -i $molid.mol2 -f mol2 -o $molid.frcmod || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
 tleap -f tleap.in  || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
 python $script_path"/"pmed_amb2gmx.py -p $molid.prmtop -x $molid.inpcrd -o $molid || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
 
