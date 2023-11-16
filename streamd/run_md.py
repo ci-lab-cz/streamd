@@ -341,7 +341,7 @@ def main():
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory. If not set the current directory will be used.')
     parser.add_argument('-l', '--ligand', metavar='FILENAME', required=False,
-                        type=partial(filepath_type, ext=('mol', 'sdf')),
+                        type=partial(filepath_type, ext=('mol', 'sdf', 'mol2')),
                         help='input file with compound. Supported formats: *.mol or sdf')
     parser.add_argument('--cofactor', metavar='FILENAME', default=None,
                         type=partial(filepath_type, ext=('mol', 'sdf')),
