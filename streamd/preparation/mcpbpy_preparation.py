@@ -20,9 +20,11 @@ def convert_pdb2mol2(metal_pdb, charge_dict):
     atom = os.path.basename(metal_pdb).split('_')[0]
     charge = charge_dict.get(atom, None)
     if not charge:
-        logging.error(f'MCPBPY Preparation Error: Cannot find charge for {atom} Metal atom. Please set up charge for the Metal atom. '
+        logging.error(f'MCPBPY procedure: Preparation Error: Cannot find charge for {atom} metal atom. Please set up charge for the metal atom'
                       f'Calculation will be stopped')
         return None
+
+    logging.warning(f'INFO: MCPBPY procedure: Use {charge} as a charge for {atom} metal atom')
 
     metal_mol2 = metal_pdb.replace(".pdb",".mol2")
 
@@ -85,28 +87,35 @@ def merge_complex(protein_pdb, ligand_mol2_list, metal_mol2_list, wdir):
 
     return complex_file
 
+def remove_allHs_from_pdb(complex_file):
+    complex_mda = mda.Universe(complex_file)
+    complex_mda_noH = complex_mda.atoms.select_atoms('not (type H and protein)')
 
-def copy_rename_ligand_files(all_lig_wdirs, dir_to_copy):
+    shutil.copy(complex_file, complex_file.replace('.pdb', '_originalwithHs.pdb'))
+    complex_mda_noH.write(complex_file)
+
+
+def copy_rename_ligand_files(lig_wdir_list, wdir, ext_list=('mol2','frcmod')):
     '''
     mol2 and frcmod file names should correspond residue id
     :return: dict
     '''
-    def copy_molid_to_resid_file(lig_wdir_list, wdir, ext_list=('mol2','frcmod')):
-        new_file_ext_dict = {i: [] for i in ext_list}
-        for lig_wdir in lig_wdir_list:
-            molid, resid = list(get_mol_resid_pair(os.path.join(lig_wdir, 'resid.txt')))[0]
+    lig_new_file_ext_dict = {i: [] for i in ext_list}
+    molids_pairs_dict = {}
+    for lig_wdir in lig_wdir_list:
+        if lig_wdir:
+            molid, resid = next(get_mol_resid_pair(os.path.join(lig_wdir, 'resid.txt')))
+            molids_pairs_dict[molid] = resid
             cur_file_name = os.path.join(lig_wdir, molid)
             new_file_name = os.path.join(wdir, resid)
 
             for ext in ext_list:
-                shutil.copy(f'{cur_file_name}.{ext}', f'{new_file_name}.{ext}')
-                new_file_ext_dict[ext].append(f'{new_file_name}.{ext}')
+                if not os.path.isfile(f'{new_file_name}.{ext}'):
+                    shutil.copy(f'{cur_file_name}.{ext}', f'{new_file_name}.{ext}')
 
-        return new_file_ext_dict
+                lig_new_file_ext_dict[ext].append(f'{new_file_name}.{ext}')
 
-    lig_new_file_ext_dict = copy_molid_to_resid_file(all_lig_wdirs, dir_to_copy)
-
-    return lig_new_file_ext_dict
+    return lig_new_file_ext_dict, molids_pairs_dict
 
 
 def prepare_protein_in(file_in_template, file_out, complex_file,variable_ion_ids, variable_ion_mol2_files,
@@ -117,24 +126,34 @@ def prepare_protein_in(file_in_template, file_out, complex_file,variable_ion_ids
     new_data = data.replace('complex.pdb', complex_file)\
         .replace('variable_ion_ids', variable_ion_ids)\
         .replace('variable_ion_mol2_files', variable_ion_mol2_files)\
-        .replace('variable_ligand_mol2_files', variable_ligand_mol2_files)\
-        .replace('variable_ligand_frcmod_files', variable_ligand_frcmod_files)\
         .replace('gaussian_version', gaussian_version)\
         .replace('cut_off cut_off', f'cut_off {cut_off}')\
         .replace('large_opt large_opt', f'large_opt {large_opt}')\
         .replace('force_field force_field', f'force_field {force_field}')
 
+    if not variable_ligand_mol2_files and not variable_ligand_frcmod_files:
+        new_data = new_data.replace('naa_mol2files variable_ligand_mol2_files\n', '') \
+            .replace('frcmod_files variable_ligand_frcmod_files\n', '')
+    else:
+        new_data = new_data.replace('variable_ligand_mol2_files', variable_ligand_mol2_files)\
+            .replace('variable_ligand_frcmod_files', variable_ligand_frcmod_files)\
+
     with open(file_out, 'w') as output:
         output.write(new_data)
-
-    return file_out
 
 
 def set_up_gaussian_files(wdir, ncpu, gaussian_basis, gaussian_memory):
     gaussian_files = glob(os.path.join(wdir, 'protein*.com'))
     for gau_file in gaussian_files:
-        prepare_gaussian_files(file_template=gau_file, file_out=gau_file, ncpu=ncpu,
-                               gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory)
+        chk = gau_file.replace('.com','.chk')
+        if os.path.isfile(chk):
+            logging.warning(f'INFO: MCPBPY procedure: the gaussian checkpoint file exists: {chk}. Gaussian Calculation will'
+                         f'begin from the last completed point in the previous calculation')
+            prepare_gaussian_files(file_template=gau_file, file_out=gau_file, ncpu=ncpu,
+                               gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory, opt_restart=True)
+        else:
+            prepare_gaussian_files(file_template=gau_file, file_out=gau_file, ncpu=ncpu,
+                                   gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory, opt_restart=False)
 
 
 def run_MCPBPY(protein_in_file, wdir, s, bash_log):
@@ -144,8 +163,8 @@ def run_MCPBPY(protein_in_file, wdir, s, bash_log):
     return wdir
 
 
-def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log):
-    def run_task(gau_cmd, activate_gaussian, log, wdir, bash_log, check_only_if_exist=False):
+def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian):
+    def run_task(gau_cmd, activate_gaussian, log, wdir, check_only_if_exist=False):
         def check_gau_log_file(log):
             if os.path.isfile(log):
                 with open(log) as checkpoint:
@@ -153,15 +172,13 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log
                 if 'Normal termination of' in gau_log:
                     return True
             return False
-
         if (check_only_if_exist and not os.path.isfile(log)) or not check_gau_log_file(small_opt_log):
             cmd = (f'cd {wdir}; {activate_gaussian};'
-                   f'{gau_cmd}'
-                   f' >> {bash_log} 2>&1')
+                   f'{gau_cmd}')
             if not run_check_subprocess(cmd, wdir):
                 return None
         else:
-            logging.info(f'MCPB.py gaussian calculation was finished: {log}. Skip this step.')
+            logging.warning(f'INFO MCPBPY procedure: the gaussian calculation was finished: {wdir} {log}. Skip this step')
         return log
 
     small_opt_log = os.path.join(wdir, 'protein_small_opt.log')
@@ -169,17 +186,21 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log
     small_opt_fchk = os.path.join(wdir, 'protein_small_opt.fchk')
     large_mk_log = os.path.join(wdir, 'protein_large_mk.log')
 
+    logging.warning(f'INFO: MCPBPY procedure: start Gaussian geometry optimization for the small model{wdir}')
     if not run_task(gau_cmd=f'{gaussian_version} < protein_small_opt.com > protein_small_opt.log', log=small_opt_log,
-                    activate_gaussian=activate_gaussian, bash_log=bash_log, wdir=wdir):
+                    activate_gaussian=activate_gaussian, wdir=wdir):
         return None
+    logging.warning(f'INFO: MCPBPY procedure: start Gaussian force constant calculation for the small model {wdir}')
     if not run_task(gau_cmd=f'{gaussian_version} < protein_small_fc.com > protein_small_fc.log', log=small_fc_log,
-                    activate_gaussian=activate_gaussian, bash_log=bash_log, wdir=wdir):
+                    activate_gaussian=activate_gaussian, wdir=wdir):
         return None
+    logging.warning(f'INFO: MCPBPY procedure: generation fchk file for the small model {wdir}')
     if not run_task(gau_cmd=f'formchk protein_small_opt.chk protein_small_opt.fchk', log=small_opt_fchk,
-                    activate_gaussian=activate_gaussian, bash_log=bash_log, wdir=wdir, check_only_if_exist=True):
+                    activate_gaussian=activate_gaussian, wdir=wdir, check_only_if_exist=True):
         return None
+    logging.warning(f'INFO: MCPBPY procedure: start Gaussian geometry optimization for the large model {wdir}')
     if not run_task(gau_cmd=f'{gaussian_version} < protein_large_mk.com > protein_large_mk.log', log=large_mk_log,
-                    activate_gaussian=activate_gaussian, bash_log=bash_log, wdir=wdir):
+                    activate_gaussian=activate_gaussian, wdir=wdir):
         return None
 
     return wdir
@@ -192,9 +213,54 @@ def run_tleap(wdir, bash_log):
     return wdir
 
 
-def amber2gmx(wdir):
-    parm = pmd.load_file(os.path.join(wdir, 'protein_solv.prmtop'), os.path.join(wdir, 'protein_solv.inpcrd'))
-    parm.save(os.path.join(wdir, 'topol.top'), format='gromacs')
-    parm.save(os.path.join(wdir, 'solv_ions.gro'))
+def get_renamed_mcpbpy_residues(complex_original, complex_mcpbpy):
+    '''
 
-    return wdir
+    :param complex_original:
+    :param complex_mcpbpy:
+    :return: dict {mcpbpy_resname:orig_resname}
+    '''
+    pdb_orig = mda.Universe(complex_original)
+    pdb_mcpbpy = mda.Universe(complex_mcpbpy)
+
+    residues_orig_list = pdb_orig.residues.resnames
+    residues_mcpbpy_list = pdb_mcpbpy.residues.resnames
+
+    diff_dict = {}
+    for res_orig, res_mcpbpy in zip(residues_orig_list, residues_mcpbpy_list):
+        if res_orig != res_mcpbpy:
+            diff_dict[res_mcpbpy] = res_orig
+
+    return diff_dict
+
+def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
+    '''
+    MCPBPY renames refined amino acids. Here we rename them back and transform files from amber to gromacs format
+    :param complex_original:
+    :param complex_mcpbpy:
+    :param prmtop:
+    :param inpcrd:
+    :param wdir:
+    :return:
+    '''
+
+    topol_top, solv_ions_gro = os.path.join(wdir, 'topol.top'), os.path.join(wdir, 'solv_ions.gro')
+
+    diff_residues_dict = get_renamed_mcpbpy_residues(complex_original=complex_original,
+                                                     complex_mcpbpy=complex_mcpbpy)
+    parm = pmd.load_file(prmtop, inpcrd)
+
+    for res in parm.residues:
+        if res.name in diff_residues_dict:
+            res.name = diff_residues_dict[res.name]
+
+    parm.save(topol_top, format='gromacs')
+    parm.save(solv_ions_gro)
+
+
+
+
+
+
+
+
