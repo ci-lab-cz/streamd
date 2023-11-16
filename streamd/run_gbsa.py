@@ -206,6 +206,9 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             number_of_frames = get_number_of_frames(xtc)
             used_number_of_frames = math.ceil((min(number_of_frames, endframe) - (startframe - 1)) / interval)
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
+            if used_number_of_frames <= 0:
+                logging.error('Used number of frames are less or equal than 0. Run will be interrupted')
+                raise ValueError
             run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
                           np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, out_time=out_time,
                           bash_log=bash_log, clean_previous=clean_previous)

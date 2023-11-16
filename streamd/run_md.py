@@ -178,6 +178,7 @@ def start(protein, wdir, lfile, system_lfile,
                                 f'Protein preparation step will be skipped.')
 
         # Part 1. Ligand Preparation
+        protein_resid_set = get_protein_resid_set(protein)
         if system_lfile is not None:
             logging.info('Start cofactor preparation')
             number_of_mols, problem_mols = check_mols(system_lfile)
@@ -185,7 +186,7 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.exception(f'Cofactor molecules: {problem_mols} from {system_lfile} cannot be processed. Script will be interrupted.')
                 return None
 
-            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, script_path=script_path,
+            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
                                                      project_dir=project_dir, wdir_ligand=wdir_system_ligand,
                                                      gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                      gaussian_basis=gaussian_basis,gaussian_memory=gaussian_memory,
@@ -206,7 +207,7 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.warning(f'Ligand molecules: {problem_mols} from {lfile} cannot be processed.'
                                 f' Such molecules will be skipped.')
 
-            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, script_path=script_path,
+            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, protein_resid_set=protein_resid_set, script_path=script_path,
                                                   project_dir=project_dir, wdir_ligand=wdir_ligand,
                                                   gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                   gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
@@ -332,7 +333,7 @@ def start(protein, wdir, lfile, system_lfile,
         # os.path.dirname(var_lig)
         for res in calc_dask(run_md_analysis, var_md_dirs,
                              dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir,
-                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file=ligand_list_file_prev):
+                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev):
             if res:
                 var_md_analysis_dirs.append(res)
     finally:
@@ -366,7 +367,7 @@ def main():
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory. If not set the current directory will be used.')
     parser.add_argument('-l', '--ligand', metavar='FILENAME', required=False,
-                        type=partial(filepath_type, ext=('mol', 'sdf')),
+                        type=partial(filepath_type, ext=('mol', 'sdf', 'mol2')),
                         help='input file with compound. Supported formats: *.mol or sdf')
     parser.add_argument('--cofactor', metavar='FILENAME', default=None,
                         type=partial(filepath_type, ext=('mol', 'sdf')),
