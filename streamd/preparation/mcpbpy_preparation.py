@@ -172,7 +172,7 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian):
                 if 'Normal termination of' in gau_log:
                     return True
             return False
-        if (check_only_if_exist and not os.path.isfile(log)) or not check_gau_log_file(small_opt_log):
+        if (check_only_if_exist and not os.path.isfile(log)) or not check_gau_log_file(log):
             cmd = (f'cd {wdir}; {activate_gaussian};'
                    f'{gau_cmd}')
             if not run_check_subprocess(cmd, wdir):
@@ -187,19 +187,19 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian):
     large_mk_log = os.path.join(wdir, 'protein_large_mk.log')
 
     logging.warning(f'INFO: MCPBPY procedure: start Gaussian geometry optimization for the small model{wdir}')
-    if not run_task(gau_cmd=f'{gaussian_version} < protein_small_opt.com > protein_small_opt.log', log=small_opt_log,
+    if not run_task(gau_cmd=f'{gaussian_version} < protein_small_opt.com > {small_opt_log}', log=small_opt_log,
                     activate_gaussian=activate_gaussian, wdir=wdir):
         return None
     logging.warning(f'INFO: MCPBPY procedure: start Gaussian force constant calculation for the small model {wdir}')
-    if not run_task(gau_cmd=f'{gaussian_version} < protein_small_fc.com > protein_small_fc.log', log=small_fc_log,
+    if not run_task(gau_cmd=f'{gaussian_version} < protein_small_fc.com > {small_fc_log}', log=small_fc_log,
                     activate_gaussian=activate_gaussian, wdir=wdir):
         return None
     logging.warning(f'INFO: MCPBPY procedure: generation fchk file for the small model {wdir}')
-    if not run_task(gau_cmd=f'formchk protein_small_opt.chk protein_small_opt.fchk', log=small_opt_fchk,
+    if not run_task(gau_cmd=f'formchk protein_small_opt.chk {small_opt_fchk}', log=small_opt_fchk,
                     activate_gaussian=activate_gaussian, wdir=wdir, check_only_if_exist=True):
         return None
     logging.warning(f'INFO: MCPBPY procedure: start Gaussian geometry optimization for the large model {wdir}')
-    if not run_task(gau_cmd=f'{gaussian_version} < protein_large_mk.com > protein_large_mk.log', log=large_mk_log,
+    if not run_task(gau_cmd=f'{gaussian_version} < protein_large_mk.com > {large_mk_log}', log=large_mk_log,
                     activate_gaussian=activate_gaussian, wdir=wdir):
         return None
 
