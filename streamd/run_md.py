@@ -12,7 +12,7 @@ from streamd.md_analysis import run_md_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import filepath_type, run_check_subprocess
+from streamd.utils.utils import filepath_type, run_check_subprocess, get_protein_resid_set
 from streamd.mcpbpy_md import mcbpy_md
 
 
