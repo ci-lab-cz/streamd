@@ -82,8 +82,12 @@ def check_mols(fname):
                 problem_mols.append(problem_molid)
         number_of_mols = n
 
-    if fname.endswith('.mol'):
-        mol = Chem.MolFromMolFile(fname, removeHs=False, sanitize=False)
+    if fname.endswith('.mol') or fname.endswith('.mol2'):
+        if fname.endswith('.mol2'):
+            mol = pmd.load_file(fname).to_structure()
+            mol = mol.rdkit_mol
+        else:
+            mol = Chem.MolFromMolFile(fname, removeHs=False, sanitize=False)
         problem_molid = check_if_problem(mol, 1)
         if problem_molid:
             problem_mols.append(problem_molid)
