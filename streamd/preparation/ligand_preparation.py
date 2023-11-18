@@ -183,16 +183,16 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
                           f'resid={resid} molid={molid} charge={charge} gaussian_version={gaussian_exe} ' \
                           f'activate_gaussian="{activate_gaussian if activate_gaussian else ""}" ' \
                           f'bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep_by_gaussian.sh")} ' \
-                          f' >> {bash_log} 2>&1'
-                    if not run_check_subprocess(cmd, molid):
+                          f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
+                    if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log)):
                         return None
                 else:
                     return None
             else:
                 cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
                       f'resid={resid} molid={molid} charge={charge} bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
-                      f' >> {bash_log} 2>&1',
-                if not run_check_subprocess(cmd, molid):
+                      f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
+                if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log)):
                     return None
     else:
         mol2 = pmd.load_file(mol2_file).to_structure()
@@ -204,8 +204,8 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
                   molid=molid, conda_env_path=conda_env_path)
     cmd = f'script_path={script_path} input_dirname={wdir_ligand_cur} ' \
           f'molid={molid} bash {os.path.join(project_dir, "scripts/script_sh/ligand_prep.sh")} ' \
-          f' >> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, molid):
+          f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
+    if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log)):
         return None
 
     # create log for molid resid corresponding

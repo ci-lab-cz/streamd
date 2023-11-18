@@ -22,8 +22,8 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
               f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
               f'-o {output} ' \
               f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}' \
-              f' >> {bash_log} 2>&1'
-        if not run_check_subprocess(cmd, key=xtc):
+              f' >> {os.path.join(wdir, bash_log)} 2>&1'
+        if not run_check_subprocess(cmd, key=xtc, log=os.path.join(wdir, bash_log)):
             return None
         return output
 

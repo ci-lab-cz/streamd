@@ -23,8 +23,8 @@ def run_equilibration(wdir, project_dir, bash_log):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {bash_log} 2>&1',
-    if not run_check_subprocess(cmd, wdir):
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {os.path.join(wdir, bash_log)} 2>&1',
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
         return None
     return wdir
 
@@ -36,8 +36,8 @@ def run_simulation(wdir, project_dir, bash_log):
                         f'MD simulation step will be skipped. '
                         f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
         return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, wdir):
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
         return None
     return wdir
 
@@ -46,8 +46,8 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
               f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
-              f'>> {bash_log} 2>&1'
-        if not run_check_subprocess(cmd, wdir):
+              f'>> {os.path.join(wdir, bash_log)} 2>&1'
+        if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
             return None
         return wdir
 
@@ -83,7 +83,7 @@ def start(protein, wdir, lfile, system_lfile,
           topol, topol_itp_list, posre_list_protein,
           wdir_to_continue_list, deffnm_prev,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
-          activate_gaussian, gaussian_exe,
+          activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
@@ -140,8 +140,8 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.info('Start protein preparation')
                 cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
                       f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
-                      f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {bash_log} 2>&1'
-                if not run_check_subprocess(cmd, protein):
+                      f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
+                if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
                     return None
                 logging.info(f'Successfully finished protein preparation\n')
             else:
@@ -422,8 +422,7 @@ def main():
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
                             f'{out_time}.log')
-    bash_log = os.path.join(wdir, f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
-                            f'{out_time}.log')
+    bash_log = f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_{out_time}.log'
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
