@@ -35,7 +35,7 @@ def make_group_ndx(query, wdir):
         q
         INPUT
         '''
-    if not run_check_subprocess(cmd, key=wdir):
+    if not run_check_subprocess(cmd, key=wdir, log=None):
        return False
 
     return True
@@ -50,11 +50,11 @@ def get_mol_resid_pair(fname):
             molid, resid = pair
             yield molid, resid
 
-def run_check_subprocess(cmd, key):
+def run_check_subprocess(cmd, key, log):
     try:
         subprocess.check_output(cmd, shell=True)
     except subprocess.CalledProcessError as e:
-        logging.exception(f'{key}\nError:{e}', stack_info=True)
+        logging.exception(f'{key}. {f"Check log {log}" if log else ""}\nError:{e}', stack_info=True)
         return False
     return True
 

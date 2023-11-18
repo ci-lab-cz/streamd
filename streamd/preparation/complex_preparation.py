@@ -76,7 +76,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         try:
             subprocess.check_output(
                 f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "scripts/script_sh/solv_ions.sh")}'
-                f'>> {bash_log} 2>&1', shell=True)
+                f'>> {os.path.join(wdir_md_cur, bash_log)} 2>&1', shell=True)
         except subprocess.CalledProcessError as e:
             logging.exception(f'{wdir_md_cur}\n{e}', stack_info=True)
             return None

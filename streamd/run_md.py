@@ -25,8 +25,8 @@ def run_equilibration(wdir, project_dir, bash_log):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {bash_log} 2>&1',
-    if not run_check_subprocess(cmd, wdir):
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {os.path.join(wdir, bash_log)} 2>&1',
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
         return None
     return wdir
 
@@ -38,8 +38,8 @@ def run_simulation(wdir, project_dir, bash_log):
                         f'MD simulation step will be skipped. '
                         f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
         return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, wdir):
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
         return None
     return wdir
 
@@ -48,8 +48,8 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
               f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
-              f'>> {bash_log} 2>&1'
-        if not run_check_subprocess(cmd, wdir):
+              f'>> {os.path.join(wdir, bash_log)} 2>&1'
+        if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
             return None
         return wdir
 
@@ -146,8 +146,8 @@ def start(protein, wdir, lfile, system_lfile,
                     logging.info('Start protein preparation')
                     cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
                           f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
-                          f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {bash_log} 2>&1'
-                    if not run_check_subprocess(cmd, protein):
+                          f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
+                    if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
                         return None
                     logging.info(f'Successfully finished protein preparation\n')
                 else:
@@ -189,7 +189,7 @@ def start(protein, wdir, lfile, system_lfile,
             system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
                                                      project_dir=project_dir, wdir_ligand=wdir_system_ligand,
                                                      gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
-                                                     gaussian_basis=gaussian_basis,gaussian_memory=gaussian_memory,
+                                                     gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                                      hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
             if number_of_mols != len(system_lig_wdirs):
                 logging.exception(f'Error with cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
@@ -459,8 +459,7 @@ def main():
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
                             f'{out_time}.log')
-    bash_log = os.path.join(wdir, f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
-                            f'{out_time}.log')
+    bash_log = f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_{out_time}.log'
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
