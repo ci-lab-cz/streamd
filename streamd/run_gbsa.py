@@ -22,8 +22,8 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
               f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
               f'-o {output} ' \
               f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}' \
-              f' >> {bash_log} 2>&1'
-        if not run_check_subprocess(cmd, key=xtc):
+              f' >> {os.path.join(wdir, bash_log)} 2>&1'
+        if not run_check_subprocess(cmd, key=xtc, log=os.path.join(wdir, bash_log)):
             return None
         return output
 
@@ -206,6 +206,9 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             number_of_frames = get_number_of_frames(xtc)
             used_number_of_frames = math.ceil((min(number_of_frames, endframe) - (startframe - 1)) / interval)
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
+            if used_number_of_frames <= 0:
+                logging.error('Used number of frames are less or equal than 0. Run will be interrupted')
+                raise ValueError
             run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
                           np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, out_time=out_time,
                           bash_log=bash_log, clean_previous=clean_previous)

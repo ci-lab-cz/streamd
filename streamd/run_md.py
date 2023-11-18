@@ -11,7 +11,7 @@ from streamd.md_analysis import run_md_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import filepath_type, run_check_subprocess
+from streamd.utils.utils import filepath_type, run_check_subprocess, get_protein_resid_set
 
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -23,8 +23,8 @@ def run_equilibration(wdir, project_dir, bash_log):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {bash_log} 2>&1',
-    if not run_check_subprocess(cmd, wdir):
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {os.path.join(wdir, bash_log)} 2>&1',
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
         return None
     return wdir
 
@@ -36,8 +36,8 @@ def run_simulation(wdir, project_dir, bash_log):
                         f'MD simulation step will be skipped. '
                         f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
         return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, wdir):
+    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
         return None
     return wdir
 
@@ -46,8 +46,8 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
               f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
-              f'>> {bash_log} 2>&1'
-        if not run_check_subprocess(cmd, wdir):
+              f'>> {os.path.join(wdir, bash_log)} 2>&1'
+        if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
             return None
         return wdir
 
@@ -83,7 +83,7 @@ def start(protein, wdir, lfile, system_lfile,
           topol, topol_itp_list, posre_list_protein,
           wdir_to_continue_list, deffnm_prev,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
-          activate_gaussian, gaussian_exe,
+          activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
@@ -140,8 +140,8 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.info('Start protein preparation')
                 cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
                       f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
-                      f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {bash_log} 2>&1'
-                if not run_check_subprocess(cmd, protein):
+                      f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
+                if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
                     return None
                 logging.info(f'Successfully finished protein preparation\n')
             else:
@@ -172,6 +172,7 @@ def start(protein, wdir, lfile, system_lfile,
                             f'Protein preparation step will be skipped.')
 
         # Part 1. Ligand Preparation
+        protein_resid_set = get_protein_resid_set(protein)
         if system_lfile is not None:
             logging.info('Start cofactor preparation')
             number_of_mols, problem_mols = check_mols(system_lfile)
@@ -179,9 +180,10 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.exception(f'Cofactor molecules: {problem_mols} from {system_lfile} cannot be processed. Script will be interrupted.')
                 return None
 
-            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, script_path=script_path,
+            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
                                                      project_dir=project_dir, wdir_ligand=wdir_system_ligand,
                                                      gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                     gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                                      hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
             if number_of_mols != len(system_lig_wdirs):
                 logging.exception(f'Error with cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
@@ -199,9 +201,10 @@ def start(protein, wdir, lfile, system_lfile,
                 logging.warning(f'Ligand molecules: {problem_mols} from {lfile} cannot be processed.'
                                 f' Such molecules will be skipped.')
 
-            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, script_path=script_path,
+            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, protein_resid_set=protein_resid_set, script_path=script_path,
                                                   project_dir=project_dir, wdir_ligand=wdir_ligand,
                                                   gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                  gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                                   hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
             if number_of_mols != len(var_lig_wdirs):
                 logging.warning(f'Problem with ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
@@ -340,7 +343,7 @@ def main():
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory. If not set the current directory will be used.')
     parser.add_argument('-l', '--ligand', metavar='FILENAME', required=False,
-                        type=partial(filepath_type, ext=('mol', 'sdf')),
+                        type=partial(filepath_type, ext=('mol', 'sdf', 'mol2')),
                         help='input file with compound. Supported formats: *.mol or sdf')
     parser.add_argument('--cofactor', metavar='FILENAME', default=None,
                         type=partial(filepath_type, ext=('mol', 'sdf')),
@@ -403,6 +406,10 @@ def main():
     parser.add_argument('--gaussian_exe', metavar='g09 or /apps/all/Gaussian/09-d01/g09/g09', required=False,
                         default=None,
                         help='path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.')
+    parser.add_argument('--gaussian_basis', metavar='B3LYP/6-31G*', required=False,
+                        default='B3LYP/6-31G*', help='Gaussian Basis')
+    parser.add_argument('--gaussian_memory', metavar='200GB', required=False,
+                        default='200GB', help='Gaussian Memory Usage')
 
     args = parser.parse_args()
 
@@ -415,8 +422,7 @@ def main():
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
                             f'{out_time}.log')
-    bash_log = os.path.join(wdir, f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
-                            f'{out_time}.log')
+    bash_log = f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_{out_time}.log'
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
@@ -441,6 +447,7 @@ def main():
               tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
+              gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
               hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
               bash_log=bash_log)

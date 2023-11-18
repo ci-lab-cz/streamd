@@ -135,7 +135,7 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
             q
             INPUT
             '''
-        if not run_check_subprocess(cmd, key=wdir_md_cur):
+        if not run_check_subprocess(cmd, key=wdir_md_cur, log=None):
             return None
 
     index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
