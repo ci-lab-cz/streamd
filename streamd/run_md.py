@@ -183,6 +183,7 @@ def start(protein, wdir, lfile, system_lfile,
             system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
                                                      project_dir=project_dir, wdir_ligand=wdir_system_ligand,
                                                      gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                     gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                                      hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
             if number_of_mols != len(system_lig_wdirs):
                 logging.exception(f'Error with cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
@@ -203,6 +204,7 @@ def start(protein, wdir, lfile, system_lfile,
             var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, protein_resid_set=protein_resid_set, script_path=script_path,
                                                   project_dir=project_dir, wdir_ligand=wdir_ligand,
                                                   gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                  gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                                   hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
             if number_of_mols != len(var_lig_wdirs):
                 logging.warning(f'Problem with ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
@@ -404,6 +406,10 @@ def main():
     parser.add_argument('--gaussian_exe', metavar='g09 or /apps/all/Gaussian/09-d01/g09/g09', required=False,
                         default=None,
                         help='path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.')
+    parser.add_argument('--gaussian_basis', metavar='B3LYP/6-31G*', required=False,
+                        default='B3LYP/6-31G*', help='Gaussian Basis')
+    parser.add_argument('--gaussian_memory', metavar='200GB', required=False,
+                        default='200GB', help='Gaussian Memory Usage')
 
     args = parser.parse_args()
 
@@ -442,6 +448,7 @@ def main():
               tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
+              gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
               hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
               bash_log=bash_log)
