@@ -411,8 +411,8 @@ def main():
                         help='path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.')
     parser3.add_argument('--gaussian_basis', metavar='B3LYP/6-31G*', required=False,
                         default='B3LYP/6-31G*', help='Gaussian Basis')
-    parser3.add_argument('--gaussian_memory', metavar='200GB', required=False,
-                        default='200GB', help='Gaussian Memory Usage')
+    parser3.add_argument('--gaussian_memory', metavar='120GB', required=False,
+                        default='120GB', help='Gaussian Memory Usage')
 
     args = parser.parse_args()
 
