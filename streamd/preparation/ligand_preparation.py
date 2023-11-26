@@ -38,7 +38,7 @@ def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
                 else:
                     resid = preset_resid
 
-                mol = add_ids(mol, n, input_fname=os.path.basename(fname).strip('.sdf'), resid=resid)
+                mol = add_ids(mol, n, input_fname=os.path.basename(fname).rstrip('.sdf'), resid=resid)
                 yield (mol, mol.GetProp('_Name'), resid)
 
     if fname.endswith('.mol') or fname.endswith('.mol2'):
@@ -53,7 +53,7 @@ def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
                 resid = next(resid_generator)
             else:
                 resid = preset_resid
-            mol = add_ids(mol, n=1, input_fname=os.path.basename(fname).strip('.mol2').strip('.mol'), resid=resid)
+            mol = add_ids(mol, n=1, input_fname=os.path.basename(fname).rstrip('.mol2').rstrip('.mol'), resid=resid)
             yield (mol, mol.GetProp('_Name'), resid)
 
 
