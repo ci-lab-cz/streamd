@@ -29,7 +29,6 @@ def convertxvg2png(xvg_file):
 
     plot = None
     plt.figure(figsize=(15, 8))
-    plt.legend(loc='upper right', bbox_to_anchor=(0, 0), borderaxespad=-1)
 
     if coords and len(coords[0]) == 2:
         d = pd.DataFrame(coords, columns=[xaxis, yaxis])
@@ -37,7 +36,9 @@ def convertxvg2png(xvg_file):
 
     elif coords and len(coords[0]) > 2 and legend:
         d = pd.DataFrame(coords, columns=[xaxis]+legend).pivot_table(index=xaxis, values=legend)
+        plt.legend(loc='upper right', bbox_to_anchor=(0, 0), borderaxespad=-1)
         plot = seaborn.lineplot(d, marker="o").set_title(title)
+
 
     if plot:
         plot = plot.figure.suptitle(subtitle)
