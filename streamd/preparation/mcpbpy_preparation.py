@@ -60,6 +60,16 @@ def split_metal(protein_fname, metal_resnames, wdir):
 
     return protein_clean_pdb, metal_pdb_list
 
+def get_new_metal_ids(protein_fname, metal_resnames):
+    protein = mda.Universe(protein_fname)
+    me_selection = ' or '.join([f'resname {i}' for i in metal_resnames])
+    metal_atoms = list(protein.select_atoms(me_selection))
+    atom_ids = []
+    for atom in metal_atoms:
+        atom_ids.append(atom.id)
+
+    atom_ids = sorted(atom_ids)
+    return atom_ids
 
 def merge_complex(protein_pdb, ligand_mol2_list, metal_mol2_list, wdir):
     '''

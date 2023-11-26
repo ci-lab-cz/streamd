@@ -50,6 +50,7 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
         complex_file = mcpbpy_preparation.merge_complex(protein_clean_pdb,
                                                         ligand_mol2_list=all_lig_new_file_ext_dict['mol2'],
                                                         metal_mol2_list=metal_mol2_list, wdir=wdir_md_cur)
+        metal_atomid_list = [str(i) for i in mcpbpy_preparation.get_new_metal_ids(protein_fname=complex_file, metal_resnames=metal_resnames)]
         # prepapre protein.in
         protein_in_file = os.path.join(wdir_md_cur, 'protein.in')
         if not os.path.isfile(protein_in_file):
