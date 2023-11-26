@@ -19,6 +19,7 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
         wdir_md_cur = os.path.join(wdir_md, protein_name)
 
     os.makedirs(wdir_md_cur, exist_ok=True)
+    bash_log_curr = os.path.join(wdir_md_cur, bash_log)
 
     # copy molid.mol2, molid.frcmod as resid for MCPBPY usage and get molid_resid pairs
     if system_lig_wdirs or wdir_var_ligand:
@@ -44,7 +45,6 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
 
         # sort mol2 by atom id - order important for complex merge
         metal_mol2_list.sort(key=lambda x: int(os.path.basename(x).strip('.mol2').split('_')[1]))
-        metal_atomid_list = [os.path.basename(i).strip('.mol2').split('_')[1] for i in metal_mol2_list]
 
         # merge protein, metal atoms, cofactors, ligand
         complex_file = mcpbpy_preparation.merge_complex(protein_clean_pdb,
@@ -70,7 +70,7 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
         if not (os.path.isfile(os.path.join(wdir_md_cur, 'protein_small_opt.com')) and
                 os.path.isfile(os.path.join(wdir_md_cur, 'protein_small_fc.com')) and
                 os.path.isfile(os.path.join(wdir_md_cur, 'protein_large_mk.com'))):
-            if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=1, bash_log=bash_log):
+            if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=1, bash_log=bash_log_curr):
                 return None
         else:
             logging.warning(
@@ -83,22 +83,22 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
         mcpbpy_preparation.set_up_gaussian_files(wdir=wdir_md_cur, ncpu=ncpu, gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory)
 
         logging.warning(f'INFO: MCPBPY procedure: Start gaussian calculation: {wdir_md_cur}')
-        if not mcpbpy_preparation.run_gaussian_calculation(wdir=wdir_md_cur, gaussian_version=gaussian_version, activate_gaussian=activate_gaussian):
+        if not mcpbpy_preparation.run_gaussian_calculation(wdir=wdir_md_cur, gaussian_version=gaussian_version, activate_gaussian=activate_gaussian, bash_log=bash_log_curr):
             return None
         logging.warning(f'INFO: MCPBPY procedure: Finish gaussian calculation successfully: {wdir_md_cur}')
 
-        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=2, bash_log=bash_log):
+        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=2, bash_log=bash_log_curr):
             return None
-        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=3, bash_log=bash_log):
+        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=3, bash_log=bash_log_curr):
             return None
-        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=4, bash_log=bash_log):
+        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=4, bash_log=bash_log_curr):
             return None
 
-        if not mcpbpy_preparation.run_tleap(wdir=wdir_md_cur, bash_log=bash_log):
+        if not mcpbpy_preparation.run_tleap(wdir=wdir_md_cur, bash_log=bash_log_curr):
             logging.warning(f'MCPBPY procedure: tleap failed: {wdir_md_cur}. '
                             f'Try to remove protein connected hydrogens in {os.path.join(wdir_md_cur, "protein_mcpbpy.pdb")} and readd it by tleap')
             mcpbpy_preparation.remove_allHs_from_pdb(os.path.join(wdir_md_cur, 'protein_mcpbpy.pdb'))
-            if not mcpbpy_preparation.run_tleap(wdir=wdir_md_cur, bash_log=bash_log):
+            if not mcpbpy_preparation.run_tleap(wdir=wdir_md_cur, bash_log=bash_log_curr):
                 return None
     else:
         logging.warning(f'INFO: MCPBPY procedure: {wdir_md_cur}. {os.path.isfile(os.path.join(wdir_md_cur, "protein_solv.prmtop"))}'

@@ -29,7 +29,7 @@ def convert_pdb2mol2(metal_pdb, charge_dict):
     metal_mol2 = metal_pdb.replace(".pdb",".mol2")
 
     cmd = f'metalpdb2mol2.py -i {metal_pdb} -o {metal_mol2} -c {charge}'
-    if not run_check_subprocess(cmd, metal_pdb):
+    if not run_check_subprocess(cmd, metal_pdb, log=None):
         return None
     return metal_mol2
 
@@ -158,12 +158,12 @@ def set_up_gaussian_files(wdir, ncpu, gaussian_basis, gaussian_memory):
 
 def run_MCPBPY(protein_in_file, wdir, s, bash_log):
     cmd = f'cd {wdir}; MCPB.py -i {protein_in_file} -s {s} >> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, wdir):
+    if not run_check_subprocess(cmd, wdir, log=bash_log):
         return None
     return wdir
 
 
-def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian):
+def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log):
     def run_task(gau_cmd, activate_gaussian, log, wdir, check_only_if_exist=False):
         def check_gau_log_file(log):
             if os.path.isfile(log):
@@ -175,7 +175,7 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian):
         if (check_only_if_exist and not os.path.isfile(log)) or not check_gau_log_file(log):
             cmd = (f'cd {wdir}; {activate_gaussian};'
                    f'{gau_cmd}')
-            if not run_check_subprocess(cmd, wdir):
+            if not run_check_subprocess(cmd, wdir, log=bash_log):
                 return None
         else:
             logging.warning(f'INFO MCPBPY procedure: the gaussian calculation was finished: {wdir} {log}. Skip this step')
@@ -208,7 +208,7 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian):
 
 def run_tleap(wdir, bash_log):
     cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out >> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, wdir):
+    if not run_check_subprocess(cmd, wdir, log=bash_log):
         return None
     return wdir
 
