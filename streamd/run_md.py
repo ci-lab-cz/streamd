@@ -84,7 +84,7 @@ def start(protein, wdir, lfile, system_lfile,
           wdir_to_continue_list, deffnm_prev,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
-          hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
+          seed, hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -228,7 +228,7 @@ def start(protein, wdir, lfile, system_lfile,
                                  protein_name=pname, wdir_protein=wdir_protein,
                                  clean_previous=clean_previous, wdir_md=wdir_md,
                                  script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log):
+                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, seed=seed, bash_log=bash_log):
                 if res:
                     var_complex_prepared_dirs.append(res)
             logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
@@ -376,6 +376,8 @@ def main():
                         help='time of NPT equilibration in ps')
     parser1.add_argument('--nvt_time', metavar='ps', required=False, default=100, type=int,
                         help='time of NVT equilibration in ps')
+    parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
+                        help='seed')
     parser1.add_argument('--not_clean_log_files', action='store_true', default=False,
                         help='Not to remove all backups of md files')
     # continue md
@@ -451,7 +453,7 @@ def main():
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
-              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir,
+              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
               bash_log=bash_log)
     finally:
