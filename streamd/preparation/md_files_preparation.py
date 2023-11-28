@@ -127,7 +127,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     return wdir_md_cur, md_files_dict
 
 
-def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_time_ps, mdtime_ns):
+def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_time_ps, mdtime_ns, seed):
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
         cmd = f'''
             cd {wdir_md_cur}
@@ -156,6 +156,10 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
         steps = 0
         if md_fname == 'nvt.mdp':
             steps = int(nvt_time_ps * 1000 / 2)
+            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+                     pattern='gen_seed',
+                     replace=f'gen_seed                = {seed}        ;')
+
         if md_fname == 'npt.mdp':
             steps = int(npt_time_ps * 1000 / 2)
         if md_fname == 'md.mdp':

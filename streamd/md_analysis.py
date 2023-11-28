@@ -1,5 +1,7 @@
+from glob import glob
 import os
 
+from streamd.scripts.xvg2png import convertxvg2png
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
 
 
@@ -67,4 +69,6 @@ def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir, bash_log, ligand_resid
     for molid, resid in molid_resid_pairs:
         md_lig_rmsd_analysis(molid=molid, resid=resid, wdir=wdir, tu=tu, bash_log=bash_log)
 
+    for xvg_file in glob(os.path.join(wdir, '*.xvg')):
+        convertxvg2png(xvg_file)
     return wdir

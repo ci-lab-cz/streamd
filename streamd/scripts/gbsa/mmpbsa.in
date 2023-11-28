@@ -10,9 +10,9 @@ interaction_entropy=1, ie_segment=100, temperature=310
 &gb
 igb=5, saltcon=0.150,
 /
-&pb
-istrng=0.15, fillratio=4.0, radiopt=0, indi=1, exdi=80.0
-/
+#&pb
+#istrng=0.15, fillratio=4.0, radiopt=0, indi=1, exdi=80.0
+#/
 
 
 
