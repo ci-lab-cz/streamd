@@ -9,7 +9,7 @@ from streamd.utils.utils import get_mol_resid_pair
 
 def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_charges,
          system_lig_wdirs, wdir_metal, wdir_md, script_path, ncpu, activate_gaussian,
-         gaussian_version, gaussian_basis, gaussian_memory, bash_log,
+         gaussian_version, gaussian_basis, gaussian_memory, bash_log, seed,
          nvt_time_ps, npt_time_ps, mdtime_ns, cut_off=2.8):
 
     if wdir_var_ligand:
@@ -119,7 +119,7 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
 
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=list(molids_pairs_dict.values()),
                              script_path=os.path.join(script_path, 'mdp'), nvt_time_ps=nvt_time_ps,
-                             npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns):
+                             npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns, seed=seed):
         return None
 
     return wdir_md_cur

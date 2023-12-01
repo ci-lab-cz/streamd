@@ -251,7 +251,7 @@ def start(protein, wdir, lfile, system_lfile,
                                      protein_name=pname, wdir_protein=wdir_protein,
                                      clean_previous=clean_previous, wdir_md=wdir_md,
                                      script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                     npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log):
+                                     npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log, seed=seed):
                     if res:
                         var_complex_prepared_dirs.append(res)
 
@@ -426,8 +426,6 @@ def main():
                         help='''If you want automatic md analysis for ligands was run after continue of simulation you should set ligand_list file. 
                                  Format of the file (no headers): user_ligand_id\tgromacs_ligand_id. Example: my_ligand\tUNL.
                                  Can be set up or placed into --wdir_to_continue directory(ies)''')
-    parser.add_argument('--ligand_id', metavar='UNL', default='UNL', type=str,
-                        help='''If you want automatic md analysis for ligand was run after continue of simulation you can set ligand_id if it is not UNL default value''')
     parser2.add_argument('--ligand_id', metavar='UNL', default='UNL', type=str,
                         help='''If you want to run an automatic md analysis for the ligand after continue of simulation you can set ligand_id if it is not UNL default value''')
     # boron-containing molecules
@@ -440,9 +438,11 @@ def main():
                         help='path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.')
     parser3.add_argument('--gaussian_basis', metavar='B3LYP/6-31G*', required=False,
                         default='B3LYP/6-31G*', help='Gaussian Basis')
+    parser3.add_argument('--gaussian_memory', metavar='120GB', required=False,
+                        default='120GB', help='Gaussian Memory Usage')
     # mcpbpy
     parser4 = parser.add_argument_group(
-        'MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run arguments group)')
+        'MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run and Boron-containing molecules arguments group)')
     parser4.add_argument('--metal_resnames', metavar='MN', required=False, default=None, nargs='*',
                         help='Metal residue names to run MCPB.py procedure. '
                              'Start MCPBPY procedure only if gaussian_exe and activate_gaussian arguments are set up,'
@@ -454,8 +454,7 @@ def main():
                         help='Metal residue charges in dictionary format'
                              'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up,'
                              'Otherwise standard gmx2pdb procedure will be run.')
-    parser4.add_argument('--gaussian_memory', metavar='120GB', required=False,
-                        default='120GB', help='Gaussian Memory Usage')
+
 
     args = parser.parse_args()
 
