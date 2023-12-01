@@ -29,7 +29,7 @@ def complex_preparation(protein_gro, ligand_gro_list, out_file):
 
 def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
                             protein_name, wdir_protein, wdir_md, script_path, project_dir,
-                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, bash_log):
+                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, seed, bash_log):
 
     wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
                                                wdir_system_ligand_list=wdir_system_ligand_list,
@@ -85,7 +85,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
 
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=md_files_dict['resid'],
                              script_path=script_path, nvt_time_ps=nvt_time_ps,
-                             npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns):
+                             npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns, seed=seed):
         return None
 
     return wdir_md_cur
