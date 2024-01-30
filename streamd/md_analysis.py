@@ -5,18 +5,16 @@ from streamd.scripts.xvg2png import convertxvg2png
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
 
 
-def md_lig_rmsd_analysis(molid, resid, wdir, tu, bash_log):
+def md_lig_rmsd_analysis(molid, resid, tpr, xtc, wdir, tu, bash_log, project_dir):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
     if f'{resid}_&_!H*' not in index_list:
         if not make_group_ndx(query=f'{index_list.index(resid)} & ! a H*', wdir=wdir):
             return None
         index_list = get_index(os.path.join(wdir, 'index.ndx'))
     index_ligand_noH = index_list.index(f'{resid}_&_!H*')
+    cmd = f'wdir={wdir} tpr={tpr} xtc={xtc}  molid={molid} tu={tu} index_ligand_noH={index_ligand_noH} ' \
+          f'bash {os.path.join(project_dir, "scripts/script_sh/md_ligand_analysis.sh")} >> {os.path.join(wdir, bash_log)} 2>&1'
 
-    cmd = f'''
-        cd {wdir}
-        gmx rms -s md_out.tpr -f md_fit.xtc -o rmsd_{molid}.xvg -n index.ndx  -tu {tu} <<< "Backbone  {index_ligand_noH}"
-        >> {os.path.join(wdir, bash_log)} 2>&1'''
     run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir, bash_log))
 
 
@@ -67,7 +65,7 @@ def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir, bash_log, ligand_resid
     # molid resid pairs for all ligands in the MD system
     # calc rmsd
     for molid, resid in molid_resid_pairs:
-        md_lig_rmsd_analysis(molid=molid, resid=resid, wdir=wdir, tu=tu, bash_log=bash_log)
+        md_lig_rmsd_analysis(molid=molid, resid=resid, xtc=os.path.join(wdir, f'md_fit.xtc'), tpr=tpr, wdir=wdir, tu=tu, bash_log=bash_log, project_dir=project_dir)
 
     for xvg_file in glob(os.path.join(wdir, '*.xvg')):
         convertxvg2png(xvg_file)
