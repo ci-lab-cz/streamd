@@ -7,8 +7,8 @@ We recommend to install the package using `conda` and `mamba`. To use exclusivel
 ```
 conda install -n base -c conda-forge mamba
 
-conda create -n gmxMMPBSA python=3.9 -y -q
-conda activate gmxMMPBSA
+conda create -n md python=3.9 -y -q
+conda activate md
 
 mamba install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 gromacs==2022.4 rdkit dask distributed -y -q
 
