@@ -1,0 +1,5 @@
+conda activate md
+
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 0.01 --nvt_time 10 --npt_time 10 --ncpu 8 -d mdrun
+run_gbsa -i mdrun/md_files/md_run/protein_HIS_ligand_1/
+

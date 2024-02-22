@@ -2,7 +2,7 @@ import os
 import shutil
 from glob import glob
 
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, create_ndx
 
 
 def check_if_info_already_added_to_topol(topol, string):
@@ -100,6 +100,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
     # topol for protein for all chains
     copy_md_files_to_wdir(glob(os.path.join(wdir_protein, '*.itp')), wdir_copy_to=wdir_md_cur)
+    # don't rewrite existed topol.top
     if not os.path.isfile(os.path.join(wdir_md_cur, "topol.top")):
         copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
 
@@ -129,14 +130,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
 def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_time_ps, mdtime_ns, seed):
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
-        cmd = f'''
-            cd {wdir_md_cur}
-            gmx make_ndx -f solv_ions.gro << INPUT
-            q
-            INPUT
-            '''
-        if not run_check_subprocess(cmd, key=wdir_md_cur, log=None):
-            return None
+        create_ndx(os.path.join(wdir_md_cur, 'index.ndx'))
 
     index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
     # make couple_index_group
