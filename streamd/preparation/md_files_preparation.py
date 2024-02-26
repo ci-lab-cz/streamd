@@ -108,20 +108,24 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     # copy ligand.itp to md_wdir_cur. Will be edited
     md_files_dict = {'itp_orig': [], 'itp': [], 'gro': [], 'posres': [], 'molid': [], 'resid': []}
     if wdir_var_ligand:
+        #copy posres
+        copy_md_files_to_wdir([os.path.join(wdir_var_ligand, f'posre_{var_lig_molid}.itp')], wdir_copy_to=wdir_md_cur)
         md_files_dict['itp_orig'].append(os.path.join(wdir_var_ligand, f'{var_lig_molid}.itp'))
-        md_files_dict['itp'].append(os.path.join(wdir_md_cur, f'{var_lig_molid}.itp'))
+        md_files_dict['itp'].append(f'{var_lig_molid}.itp')
+        md_files_dict['posres'].append(f'posre_{var_lig_molid}.itp')
         md_files_dict['gro'].append(os.path.join(wdir_var_ligand, f'{var_lig_molid}.gro'))
-        md_files_dict['posres'].append(os.path.join(wdir_var_ligand, f'posre_{var_lig_molid}.itp'))
         md_files_dict['molid'].append(var_lig_molid)
         md_files_dict['resid'].append(var_lig_resid)
 
     if wdir_system_ligand_list:
         for wdir_system_ligand in wdir_system_ligand_list:
             system_lig_molid, system_lig_resid = next(get_mol_resid_pair(os.path.join(wdir_system_ligand, 'resid.txt')))
+            copy_md_files_to_wdir([os.path.join(wdir_system_ligand, f'posre_{system_lig_molid}.itp')],
+                                  wdir_copy_to=wdir_md_cur)
             md_files_dict['itp_orig'].append(os.path.join(wdir_system_ligand, f'{system_lig_molid}.itp'))
-            md_files_dict['itp'].append(os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
+            md_files_dict['itp'].append(f'{system_lig_molid}.itp')
+            md_files_dict['posres'].append(f'posre_{system_lig_molid}.itp')
             md_files_dict['gro'].append(os.path.join(wdir_system_ligand, f'{system_lig_molid}.gro'))
-            md_files_dict['posres'].append(os.path.join(wdir_system_ligand, f'posre_{system_lig_molid}.itp'))
             md_files_dict['molid'].append(system_lig_molid)
             md_files_dict['resid'].append(system_lig_resid)
 
