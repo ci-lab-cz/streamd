@@ -6,9 +6,9 @@ import shutil
 import MDAnalysis as mda
 import parmed as pmd
 
-from streamd.utils.utils import run_check_subprocess
-from streamd.utils.utils import get_mol_resid_pair
+from streamd.utils.utils import run_check_subprocess, get_mol_resid_pair, get_index, make_group_ndx
 from streamd.preparation.ligand_preparation import prepare_gaussian_files
+from streamd.preparation.md_files_preparation import check_if_info_already_added_to_topol, edit_topology_file
 
 def convert_pdb2mol2(metal_pdb, charge_dict):
     '''
@@ -266,10 +266,29 @@ def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
     parm.save(topol_top, format='gromacs')
     parm.save(solv_ions_gro)
 
+def create_posre(all_resids, wdir, bash_log):
+    index_list = get_index(os.path.join(wdir, 'index.ndx'))
+    couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein-H'] + all_resids])
+    couple_group = '_'.join(['Protein-H'] + all_resids)
 
+    if couple_group not in index_list:
+        if not make_group_ndx(couple_group_ind, wdir):
+            return None
+        index_list = get_index(os.path.join(wdir, 'index.ndx'))
 
+    cmd = (f'cd {wdir}; gmx genrestr -f solv_ions.gro -o posre.itp -fc 1000 1000 1000 -n index.ndx <<< {index_list.index(couple_group)}')
 
+    if not run_check_subprocess(cmd, wdir, log=bash_log):
+        return None
+    return wdir
 
+def add_restraints_to_topol(topol):
+    string = '''; system1 position restraints
+#ifdef POSRES
+#include "posre.itp"
+#endif'''
+    if not check_if_info_already_added_to_topol(topol, string):
+        edit_topology_file(topol_file=topol, pattern='\n[ moleculetype ]', add=string, count_pattern=2)
 
 
 

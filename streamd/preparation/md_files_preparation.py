@@ -2,7 +2,7 @@ import os
 import shutil
 from glob import glob
 
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, create_ndx
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, create_ndx
 
 
 def check_if_info_already_added_to_topol(topol, string):
@@ -47,20 +47,30 @@ def edit_mdp(md_file, pattern, replace):
     with open(md_file, 'w') as out:
         out.write(''.join(new_mdp))
 
-
-def edit_topology_file(topol_file, pattern, add, how='before', n=0):
+def edit_topology_file(topol_file, pattern, add, how='before', n=0, count_pattern=1):
     with open(topol_file) as input:
         data = input.read()
 
-    if pattern:
-        if n == 0:
-            data = data.replace(pattern, f'{add}\n{pattern}' if how == 'before' else f'{pattern}\n{add}')
-        else:
+    if pattern is not None:
+        if n!=0:
             data = data.split('\n')
             ind = data.index(pattern)
-            data.insert(ind + n, add)
+            if how == 'after':
+                data.insert(ind + n, add)
+            else:
+                data.insert(ind - n, add)
             data = '\n'.join(data)
-    else:
+
+        elif count_pattern:
+            arr = data.split(pattern)
+            part1 = pattern.join(arr[:count_pattern])
+            part2 = pattern.join(arr[count_pattern:])
+            if how == 'before':
+                data = part1 + add + '\n' + pattern + part2
+            else:
+                data = part1 + pattern + '\n' + add + part2
+
+    if pattern is None:
         data = data.split('\n')
         data.insert(n, add)
         data = '\n'.join(data)
