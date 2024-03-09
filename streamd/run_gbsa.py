@@ -75,14 +75,14 @@ def parse_gmxMMPBSA_output(fname):
         IE_columns = [i.strip() for i in IE_parsed_out[0][0].split('  ') if i]
         IE_values = [i.strip() for i in IE_parsed_out[0][1].split('  ') if i]
         for n, i in enumerate(IE_columns):
-            IE_res[f'IE_{i}'] = IE_values[n]
+            IE_res[f'IE{i}'] = IE_values[n]
         return IE_res
 
     def get_Gbinding_values(Gbind_parsed_out):
         Gbinding_res = {}
         G_values = [i.strip() for i in Gbind_parsed_out[0].split(' ') if i and i != '+/-']
-        Gbinding_res['ΔG_binding'] = G_values[0]
-        Gbinding_res['ΔG_binding_+/-'] = G_values[1]
+        Gbinding_res['ΔGbinding'] = G_values[0]
+        Gbinding_res['ΔGbinding+/-'] = G_values[1]
         return Gbinding_res
 
     with open(fname) as inp:
@@ -102,7 +102,7 @@ def parse_gmxMMPBSA_output(fname):
         'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9+\-\./ ]+)\n',
         data)
 
-    out_res = {'GBSA': {'fname': fname}, 'PBSA': {'fname': fname}}
+    out_res = {'GBSA': {'Name': fname}, 'PBSA': {'Name': fname}}
     if IE_GB:
         out_res['GBSA'].update(get_IE_values(IE_GB))
     if IE_PB:
@@ -151,7 +151,8 @@ def get_mmpbsa_start_end_interval(mmpbsa):
     return startframe, endframe, interval
 
 
-def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid, hostfile, out_time, bash_log,
+def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid, append_protein_selection,
+          hostfile, out_time, bash_log,
           gmxmmpbsa_out_files=None, clean_previous=False):
     dask_client, cluster = None, None
     var_gbsa_out_files = []
@@ -234,12 +235,12 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             if cluster:
                 cluster.close()
 
-        pd_gbsa = pd.DataFrame(GBSA_output_res).sort_values('fname')
-        pd_pbsa = pd.DataFrame(PBSA_output_res).sort_values('fname')
+        pd_gbsa = pd.DataFrame(GBSA_output_res).sort_values('Name')
+        pd_pbsa = pd.DataFrame(PBSA_output_res).sort_values('Name')
 
-        if list(pd_gbsa.columns) != ['fname']:
+        if list(pd_gbsa.columns) != ['Name']:
             pd_gbsa.to_csv(os.path.join(out_wdir, f'GBSA_output_{out_time}.csv'), sep='\t', index=False)
-        if list(pd_pbsa.columns) != ['fname']:
+        if list(pd_pbsa.columns) != ['Name']:
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{out_time}.csv'), sep='\t', index=False)
 
         logging.info(
@@ -267,7 +268,7 @@ def main():
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory for program output. If not set the current directory will be used.')
     parser.add_argument('--out_files', nargs='+', default=None, type=filepath_type,
-                        help='gmxMMPBSA out files to parse. If set will be used over other variables.')
+                        help='gmxMMPBSA out files (FINAL*.dat) to parse. If set will be used over other variables.')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
