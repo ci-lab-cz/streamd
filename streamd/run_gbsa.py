@@ -12,10 +12,10 @@ from multiprocessing import cpu_count
 import pandas as pd
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import get_index, filepath_type, run_check_subprocess
+from streamd.utils.utils import get_index, make_group_ndx, filepath_type, run_check_subprocess
 
 
-def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous):
+def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous):
     def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, bash_log):
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
         cmd = f'cd {wdir}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
@@ -35,7 +35,30 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
         return None
 
     index_list = get_index(index)
-    protein_index = index_list.index('Protein')
+    if append_protein_selection is None:
+        protein_index = index_list.index('Protein')
+    else:
+        add_group_ids = {}
+        for i in append_protein_selection:
+            if i in index_list:
+                add_group_ids[str(index_list.index(i))] = i
+            else:
+                logging.warning(f'{wdir} Could not find resname {i}. It will not be used in gbsa calculation. Check your query carefully.')
+        if add_group_ids:
+            query = f"{index_list.index('Protein')}|{'|'.join(add_group_ids.keys())}"
+            name_query = f"Protein_{'_'.join(add_group_ids.values())}"
+            if name_query not in index_list:
+                if not make_group_ndx(query, wdir):
+                    return None
+                index_list = get_index(index)
+
+            protein_index = index_list.index(name_query)
+            logging.warning(f'INFO: {name_query} selection will be used as a protein system')
+        else:
+            protein_index = index_list.index('Protein')
+
+    logging.warning(f'INFO: {protein_index} number of index selection will be used as a protein system')
+
     ligand_index = index_list.index(ligand_resid)
 
     output = calc_gbsa(wdir=wdir, tpr=tpr, xtc=xtc, topol=topol,
@@ -52,12 +75,12 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
     return output
 
 
-def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous):
+def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
     index = os.path.join(wdir, index)
-    return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous)
+    return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous)
 
 
 def clean_temporary_gmxMMBPSA_files(wdir):
@@ -182,6 +205,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
 
             used_number_of_frames = math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
             n_tasks_per_node = ncpu // min(ncpu, used_number_of_frames)
+            #todo 64 2 mol 32 booked -> 34 use
 
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
             # run energy calculation
@@ -192,6 +216,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
                                      tpr=tpr, xtc=xtc, topol=topol, index=index,
                                      mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid,
+                                     append_protein_selection=append_protein_selection,
                                      out_time=out_time, bash_log=bash_log, clean_previous=clean_previous):
                     if res:
                         var_gbsa_out_files.append(res)
@@ -211,8 +236,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 logging.error('Used number of frames are less or equal than 0. Run will be interrupted')
                 raise ValueError
             run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
-                          np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, out_time=out_time,
-                          bash_log=bash_log, clean_previous=clean_previous)
+                          np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
+                          out_time=out_time, bash_log=bash_log, clean_previous=clean_previous)
 
     else:
         var_gbsa_out_files = gmxmmpbsa_out_files
@@ -277,6 +302,9 @@ def main():
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
                         help='number of CPU per server. Use all cpus by default.')
     parser.add_argument('--ligand_id', metavar='UNL', default='UNL', help='Ligand residue ID')
+    parser.add_argument('-a', '--append_protein_selection', metavar='STRING', required=False, default=None,
+                        nargs = '*', help='residue IDs whuch will be included in the protein system (cofactors).'
+                             'Example: ZN MG')
     parser.add_argument('--clean_previous', action='store_true', default=False,
                         help=' Clean previous temporary gmxMMPBSA files')
 
@@ -320,7 +348,7 @@ def main():
         start(tpr=tpr, xtc=xtc, topol=topol,
               index=index, out_wdir=wdir, wdir_to_run=args.wdir_to_run,
               mmpbsa=args.mmpbsa, ncpu=args.ncpu, out_time=out_time,
-              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, hostfile=args.hostfile,
-              bash_log=bash_log, clean_previous=args.clean_previous)
+              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, append_protein_selection=args.append_protein_selection,
+              hostfile=args.hostfile, bash_log=bash_log, clean_previous=args.clean_previous)
     finally:
         logging.shutdown()
