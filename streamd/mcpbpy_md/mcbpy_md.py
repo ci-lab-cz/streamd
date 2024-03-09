@@ -51,10 +51,18 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
         metal_mol2_list.sort(key=lambda x: int(os.path.basename(x).strip('.mol2').split('_')[1]))
 
         # merge protein, metal atoms, cofactors, ligand
-        complex_file = mcpbpy_preparation.merge_complex(protein_clean_pdb,
-                                                        ligand_mol2_list=all_lig_new_file_ext_dict['mol2'],
-                                                        metal_mol2_list=metal_mol2_list, wdir=wdir_md_cur)
-        metal_atomid_list = [str(i) for i in mcpbpy_preparation.get_new_metal_ids(protein_fname=complex_file, metal_resnames=metal_resnames)]
+        if not os.path.isfile(complex_file):
+            complex_file = mcpbpy_preparation.merge_complex(protein_clean_pdb,
+                                                            ligand_mol2_list=all_lig_new_file_ext_dict['mol2'],
+                                                  metal_mol2_list=metal_mol2_list, wdir=wdir_md_cur)
+        metal_atomid_dict = mcpbpy_preparation.get_new_metal_ids(protein_fname=complex_file, metal_resnames=metal_resnames)
+        #atom_ids = sorted(atom_ids)
+        metal_atomid_list = [str(i) for i in sorted(metal_atomid_dict.keys())]
+
+        with open(os.path.join(wdir_md_cur, 'all_metal_resid_resnum.txt'), 'w') as out:
+            molid_resid_pairs = ['\t'.join(map(str, i)) for i in metal_atomid_dict.items()]
+            out.write('\n'.join(molid_resid_pairs))
+
         # prepapre protein.in
         protein_in_file = os.path.join(wdir_md_cur, 'protein.in')
         if not os.path.isfile(protein_in_file):
@@ -106,6 +114,8 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
             if not mcpbpy_preparation.run_tleap(wdir=wdir_md_cur, bash_log=bash_log_curr):
                 return None
     else:
+        metal_atomid_dict = mcpbpy_preparation.get_new_metal_ids(protein_fname=complex_file,
+                                                                 metal_resnames=metal_resnames)
         logging.warning(f'INFO: MCPBPY procedure: {wdir_md_cur}. {os.path.isfile(os.path.join(wdir_md_cur, "protein_solv.prmtop"))}'
                         f'{os.path.isfile(os.path.join(wdir_md_cur, "protein_solv.inpcrd"))} already exist. '
                         f'Skip MCPBPY calculation steps.')
@@ -121,7 +131,8 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
         mdp_file = os.path.join(script_path, 'mdp', mdp_fname)
         shutil.copy(mdp_file, wdir_md_cur)
 
-    if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=list(molids_pairs_dict.values()),
+    if not prepare_mdp_files(wdir_md_cur=wdir_md_cur,
+                             all_resids=list(molids_pairs_dict.values())+list(set(metal_atomid_dict.values())),
                              script_path=os.path.join(script_path, 'mdp'), nvt_time_ps=nvt_time_ps,
                              npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns, seed=seed):
         return None
