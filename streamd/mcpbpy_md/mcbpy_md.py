@@ -2,9 +2,8 @@ import logging
 import os
 import shutil
 
-from streamd.preparation.md_files_preparation import prepare_mdp_files
+from streamd.preparation.md_files_preparation import prepare_mdp_files, prep_md_files
 from streamd.preparation import mcpbpy_preparation
-from streamd.utils.utils import get_mol_resid_pair
 
 
 def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_charges,
@@ -12,14 +11,19 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
          gaussian_version, gaussian_basis, gaussian_memory, bash_log, seed,
          nvt_time_ps, npt_time_ps, mdtime_ns, cut_off=2.8):
 
-    if wdir_var_ligand:
-        var_lig_molid, var_lig_resid = next(get_mol_resid_pair(os.path.join(wdir_var_ligand, 'resid.txt')))
-        wdir_md_cur = os.path.join(wdir_md, f'{protein_name}_{var_lig_molid}')
-    else:
-        wdir_md_cur = os.path.join(wdir_md, protein_name)
+    wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
+                                               wdir_system_ligand_list=system_lig_wdirs,
+                                               wdir_protein=None,
+                                               wdir_md=wdir_md, clean_previous=False)
+
+    with open(os.path.join(wdir_md_cur, 'all_ligand_resid.txt'), 'w') as out:
+        molid_resid_pairs = ['\t'.join(map(str, i)) for i in zip(md_files_dict['molid'], md_files_dict['resid'])]
+        out.write('\n'.join(molid_resid_pairs))
 
     os.makedirs(wdir_md_cur, exist_ok=True)
     bash_log_curr = os.path.join(wdir_md_cur, bash_log)
+
+    complex_file = os.path.join(wdir_md_cur, 'complex.pdb')
 
     # copy molid.mol2, molid.frcmod as resid for MCPBPY usage and get molid_resid pairs
     if system_lig_wdirs or wdir_var_ligand:

@@ -75,7 +75,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     :param wdir_var_ligand:
     :param protein_name:
     :param wdir_system_ligand_list:
-    :param wdir_protein:
+    :param wdir_protein: None (if mcpbpy procedure is applied) or path where topol and gro files are stored
     :param wdir_md:
     :param clean_previous:
     :return: wdir to run md, dict with the list of md files which will be add to topol.top or to complex.gro
@@ -99,10 +99,11 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     os.makedirs(wdir_md_cur, exist_ok=True)
 
     # topol for protein for all chains
-    copy_md_files_to_wdir(glob(os.path.join(wdir_protein, '*.itp')), wdir_copy_to=wdir_md_cur)
-    # don't rewrite existed topol.top
-    if not os.path.isfile(os.path.join(wdir_md_cur, "topol.top")):
-        copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
+    if wdir_protein is not None:
+        copy_md_files_to_wdir(glob(os.path.join(wdir_protein, '*.itp')), wdir_copy_to=wdir_md_cur)
+        # don't rewrite existed topol.top
+        if not os.path.isfile(os.path.join(wdir_md_cur, "topol.top")):
+            copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
 
     # prep ligands and cofactor
     # copy ligand.itp to md_wdir_cur. Will be edited
