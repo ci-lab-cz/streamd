@@ -92,20 +92,20 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
                 f'{os.path.join(wdir_md_cur, "protein_large_mk.com")}'
                 f' already exist. Use already prepared Gaussian files')
 
-
         mcpbpy_preparation.set_up_gaussian_files(wdir=wdir_md_cur, ncpu=ncpu, gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory)
-
         logging.warning(f'INFO: MCPBPY procedure: Start gaussian calculation: {wdir_md_cur}')
         if not mcpbpy_preparation.run_gaussian_calculation(wdir=wdir_md_cur, gaussian_version=gaussian_version, activate_gaussian=activate_gaussian, bash_log=bash_log_curr):
             return None
         logging.warning(f'INFO: MCPBPY procedure: Finish gaussian calculation successfully: {wdir_md_cur}')
 
-        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=2, bash_log=bash_log_curr):
-            return None
-        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=3, bash_log=bash_log_curr):
-            return None
-        if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=4, bash_log=bash_log_curr):
-            return None
+        if not os.path.isfile(os.path.join(wdir_md_cur, 'protein_tleap.in')) or \
+            not os.path.isfile(os.path.join(wdir_md_cur, 'protein_mcpbpy.pdb')):
+            if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=2, bash_log=bash_log_curr):
+                    return None
+            if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=3, bash_log=bash_log_curr):
+                return None
+            if not mcpbpy_preparation.run_MCPBPY(protein_in_file=protein_in_file, wdir=wdir_md_cur, s=4, bash_log=bash_log_curr):
+                return None
 
         if not mcpbpy_preparation.run_tleap(wdir=wdir_md_cur, bash_log=bash_log_curr):
             logging.warning(f'MCPBPY procedure: tleap failed: {wdir_md_cur}. '
