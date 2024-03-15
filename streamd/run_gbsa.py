@@ -12,10 +12,10 @@ from multiprocessing import cpu_count
 import pandas as pd
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import get_index, filepath_type, run_check_subprocess
+from streamd.utils.utils import get_index, make_group_ndx, filepath_type, run_check_subprocess
 
 
-def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous):
+def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous):
     def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, bash_log):
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
         cmd = f'cd {wdir}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
@@ -35,7 +35,30 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
         return None
 
     index_list = get_index(index)
-    protein_index = index_list.index('Protein')
+    if append_protein_selection is None:
+        protein_index = index_list.index('Protein')
+    else:
+        add_group_ids = {}
+        for i in append_protein_selection:
+            if i in index_list:
+                add_group_ids[str(index_list.index(i))] = i
+            else:
+                logging.warning(f'{wdir} Could not find resname {i}. It will not be used in gbsa calculation. Check your query carefully.')
+        if add_group_ids:
+            query = f"{index_list.index('Protein')}|{'|'.join(add_group_ids.keys())}"
+            name_query = f"Protein_{'_'.join(add_group_ids.values())}"
+            if name_query not in index_list:
+                if not make_group_ndx(query, wdir):
+                    return None
+                index_list = get_index(index)
+
+            protein_index = index_list.index(name_query)
+            logging.warning(f'INFO: {name_query} selection will be used as a protein system')
+        else:
+            protein_index = index_list.index('Protein')
+
+    logging.warning(f'INFO: {protein_index} number of index selection will be used as a protein system')
+
     ligand_index = index_list.index(ligand_resid)
 
     output = calc_gbsa(wdir=wdir, tpr=tpr, xtc=xtc, topol=topol,
@@ -52,12 +75,12 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_ti
     return output
 
 
-def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous):
+def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
     index = os.path.join(wdir, index)
-    return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, out_time, bash_log, clean_previous)
+    return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous)
 
 
 def clean_temporary_gmxMMBPSA_files(wdir):
@@ -75,14 +98,14 @@ def parse_gmxMMPBSA_output(fname):
         IE_columns = [i.strip() for i in IE_parsed_out[0][0].split('  ') if i]
         IE_values = [i.strip() for i in IE_parsed_out[0][1].split('  ') if i]
         for n, i in enumerate(IE_columns):
-            IE_res[f'IE_{i}'] = IE_values[n]
+            IE_res[f'IE{i}'] = IE_values[n]
         return IE_res
 
     def get_Gbinding_values(Gbind_parsed_out):
         Gbinding_res = {}
         G_values = [i.strip() for i in Gbind_parsed_out[0].split(' ') if i and i != '+/-']
-        Gbinding_res['ΔG_binding'] = G_values[0]
-        Gbinding_res['ΔG_binding_+/-'] = G_values[1]
+        Gbinding_res['ΔGbinding'] = G_values[0]
+        Gbinding_res['ΔGbinding+/-'] = G_values[1]
         return Gbinding_res
 
     with open(fname) as inp:
@@ -102,7 +125,7 @@ def parse_gmxMMPBSA_output(fname):
         'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9+\-\./ ]+)\n',
         data)
 
-    out_res = {'GBSA': {'fname': fname}, 'PBSA': {'fname': fname}}
+    out_res = {'GBSA': {'Name': fname}, 'PBSA': {'Name': fname}}
     if IE_GB:
         out_res['GBSA'].update(get_IE_values(IE_GB))
     if IE_PB:
@@ -151,7 +174,8 @@ def get_mmpbsa_start_end_interval(mmpbsa):
     return startframe, endframe, interval
 
 
-def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid, hostfile, out_time, bash_log,
+def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid, append_protein_selection,
+          hostfile, out_time, bash_log,
           gmxmmpbsa_out_files=None, clean_previous=False):
     dask_client, cluster = None, None
     var_gbsa_out_files = []
@@ -181,6 +205,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
 
             used_number_of_frames = math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
             n_tasks_per_node = ncpu // min(ncpu, used_number_of_frames)
+            #todo 64 2 mol 32 booked -> 34 use
 
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
             # run energy calculation
@@ -191,6 +216,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
                                      tpr=tpr, xtc=xtc, topol=topol, index=index,
                                      mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid,
+                                     append_protein_selection=append_protein_selection,
                                      out_time=out_time, bash_log=bash_log, clean_previous=clean_previous):
                     if res:
                         var_gbsa_out_files.append(res)
@@ -210,8 +236,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 logging.error('Used number of frames are less or equal than 0. Run will be interrupted')
                 raise ValueError
             run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
-                          np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, out_time=out_time,
-                          bash_log=bash_log, clean_previous=clean_previous)
+                          np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
+                          out_time=out_time, bash_log=bash_log, clean_previous=clean_previous)
 
     else:
         var_gbsa_out_files = gmxmmpbsa_out_files
@@ -234,12 +260,12 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             if cluster:
                 cluster.close()
 
-        pd_gbsa = pd.DataFrame(GBSA_output_res).sort_values('fname')
-        pd_pbsa = pd.DataFrame(PBSA_output_res).sort_values('fname')
+        pd_gbsa = pd.DataFrame(GBSA_output_res).sort_values('Name')
+        pd_pbsa = pd.DataFrame(PBSA_output_res).sort_values('Name')
 
-        if list(pd_gbsa.columns) != ['fname']:
+        if list(pd_gbsa.columns) != ['Name']:
             pd_gbsa.to_csv(os.path.join(out_wdir, f'GBSA_output_{out_time}.csv'), sep='\t', index=False)
-        if list(pd_pbsa.columns) != ['fname']:
+        if list(pd_pbsa.columns) != ['Name']:
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{out_time}.csv'), sep='\t', index=False)
 
         logging.info(
@@ -267,7 +293,7 @@ def main():
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory for program output. If not set the current directory will be used.')
     parser.add_argument('--out_files', nargs='+', default=None, type=filepath_type,
-                        help='gmxMMPBSA out files to parse. If set will be used over other variables.')
+                        help='gmxMMPBSA out files (FINAL*.dat) to parse. If set will be used over other variables.')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
@@ -276,6 +302,9 @@ def main():
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
                         help='number of CPU per server. Use all cpus by default.')
     parser.add_argument('--ligand_id', metavar='UNL', default='UNL', help='Ligand residue ID')
+    parser.add_argument('-a', '--append_protein_selection', metavar='STRING', required=False, default=None,
+                        nargs = '*', help='residue IDs whuch will be included in the protein system (cofactors).'
+                             'Example: ZN MG')
     parser.add_argument('--clean_previous', action='store_true', default=False,
                         help=' Clean previous temporary gmxMMPBSA files')
 
@@ -319,7 +348,7 @@ def main():
         start(tpr=tpr, xtc=xtc, topol=topol,
               index=index, out_wdir=wdir, wdir_to_run=args.wdir_to_run,
               mmpbsa=args.mmpbsa, ncpu=args.ncpu, out_time=out_time,
-              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, hostfile=args.hostfile,
-              bash_log=bash_log, clean_previous=args.clean_previous)
+              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, append_protein_selection=args.append_protein_selection,
+              hostfile=args.hostfile, bash_log=bash_log, clean_previous=args.clean_previous)
     finally:
         logging.shutdown()
