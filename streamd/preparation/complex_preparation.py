@@ -40,8 +40,8 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
     # ligands and cofactors
     if md_files_dict['itp']:
         # make all itp and edit itps
-        if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) or not all([os.path.isfile(i) for i in md_files_dict['itp']]):
-            make_all_itp(fileitp_input_list=md_files_dict['itp_orig'], fileitp_output_list=md_files_dict['itp'], out_file=os.path.join(wdir_md_cur, 'all.itp'))
+        if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) or not all([os.path.isfile(os.path.join(wdir_md_cur, i)) for i in md_files_dict['itp']]):
+            make_all_itp(fileitp_input_list=md_files_dict['itp_orig'], fileitp_output_list=[os.path.join(wdir_md_cur, j) for j in md_files_dict['itp']], out_file=os.path.join(wdir_md_cur, 'all.itp'))
         else:
             logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip ligand all itp preparation step\n')
 

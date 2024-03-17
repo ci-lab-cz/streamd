@@ -258,7 +258,7 @@ def start(protein, wdir, lfile, system_lfile,
             logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
@@ -286,7 +286,7 @@ def start(protein, wdir, lfile, system_lfile,
 
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
@@ -314,7 +314,7 @@ def start(protein, wdir, lfile, system_lfile,
 
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
@@ -338,7 +338,7 @@ def start(protein, wdir, lfile, system_lfile,
                 var_md_analysis_dirs.append(res)
     finally:
         if dask_client:
-            dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+            dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                        close_workers=True, remove=True)
             dask_client.shutdown()
         if cluster:

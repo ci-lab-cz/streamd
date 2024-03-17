@@ -197,7 +197,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                         var_number_of_frames.append(res)
             finally:
                 if dask_client:
-                    dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                    dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                                close_workers=True, remove=True)
                     dask_client.shutdown()
                 if cluster:
@@ -222,7 +222,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                         var_gbsa_out_files.append(res)
             finally:
                 if dask_client:
-                    dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                    dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                                close_workers=True, remove=True)
                     dask_client.shutdown()
                 if cluster:
@@ -254,7 +254,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                     PBSA_output_res.append(res['PBSA'])
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
