@@ -1,19 +1,10 @@
 import logging
 import math
-import os
 
 from dask.distributed import Client, SSHCluster
 from rdkit import Chem
 
-def set_env(main_os_env):
-    os.environ["PATH"] = f'{main_os_env["PATH"]}:{os.environ["PATH"]}'
-    os.environ["CONDA_DEFAULT_ENV"] = main_os_env["CONDA_DEFAULT_ENV"]
-    os.environ["CONDA_PREFIX"] = main_os_env["CONDA_PREFIX"]
-    os.environ["CONDA_PROMPT_MODIFIER"] = main_os_env["CONDA_PROMPT_MODIFIER"]
-    os.environ["CONDA_SHLVL"] = main_os_env["CONDA_SHLVL"]
-
-
-def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
+def init_dask_cluster(n_tasks_per_node, ncpu, use_multi_servers=True, hostfile=None):
     '''
 
     :param n_tasks_per_node: number of task on a single server
@@ -21,7 +12,7 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
     :param hostfile:
     :return:
     '''
-    if hostfile:
+    if hostfile and use_multi_servers:
         with open(hostfile) as f:
             hosts = [line.strip() for line in f if line.strip()]
             n_servers = len(hosts)
@@ -32,7 +23,7 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
     # n_workers = n_servers * n_tasks_per_node
     n_workers = n_tasks_per_node
     n_threads = math.ceil(ncpu / n_tasks_per_node)
-    if hostfile is not None:
+    if hosts:
         logging.warning(f'Dask init,{n_tasks_per_node}, {ncpu}, {n_threads}, {n_workers}, {hosts},{n_servers}')
         cluster = SSHCluster(
             [hosts[0]] + hosts,
@@ -47,7 +38,6 @@ def init_dask_cluster(n_tasks_per_node, ncpu, hostfile=None):
         dask_client = Client(n_workers=n_workers, threads_per_worker=n_threads)  # to run dask on a single server
 
     dask_client.forward_logging(level=logging.INFO)
-    dask_client.run(set_env, main_os_env=os.environ.copy())
     return dask_client, cluster
 
 
