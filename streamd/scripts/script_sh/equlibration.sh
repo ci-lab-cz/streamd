@@ -1,6 +1,5 @@
 #!/bin/bash
 #  args: wdirz
-OMP_NUM_THREADS=2
 cd $wdir
 #Energy minimization
 if [ ! -f em.gro ]; then
