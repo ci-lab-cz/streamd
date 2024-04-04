@@ -66,12 +66,6 @@ def get_mol_resid_pair(fname):
             yield molid, resid
 
 def run_check_subprocess(cmd, key, log, env=None):
-    if env:
-        env_local = os.environ.copy()
-        for i in env.keys():
-            if ('SLURM' in i.upper() or 'SSH' in i.upper()) and i in env_local:
-                env[i] = env_local[i]
-    logging.warning(f'Subprocess {cmd}: \n{env}')
     try:
         subprocess.check_output(cmd, shell=True, env=env)
     except subprocess.CalledProcessError as e:
