@@ -101,6 +101,16 @@ def parse_gmxMMPBSA_output(fname):
             IE_res[f'IE{i}'] = IE_values[n]
         return IE_res
 
+    def get_delta_total_values(delta_total_columns_re, delta_total_values_re):
+        delta_total_res = {}
+        delta_total_columns = [i.strip() for i in delta_total_columns_re[0].split('  ') if i]
+        delta_total_values = [i.strip() for i in delta_total_values_re[0].split('  ') if i]
+    #['Energy Component' - skip, 'Average', 'SD(Prop.)', 'SD', 'SEM(Prop.)', 'SEM']
+
+        for n, i in enumerate(delta_total_columns[1:]):
+            delta_total_res[f'ΔTOTAL_{i}'] = delta_total_values[n]
+        return delta_total_res
+
     def get_Gbinding_values(Gbind_parsed_out):
         Gbinding_res = {}
         G_values = [i.strip() for i in Gbind_parsed_out[0].split(' ') if i and i != '+/-']
@@ -116,6 +126,17 @@ def parse_gmxMMPBSA_output(fname):
     IE_PB = re.findall(
         'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nPB[ ]*?IE[ ]*?([0-9\. ]*)\n',
         data)
+
+    delta_total_columns_GB = re.findall(
+    'GENERALIZED BORN:[A-Z0-9\w\W\n]+?Delta \(Complex - Receptor - Ligand\):\n([A-Za-z \(\).]+)\n',
+    data)
+    delta_total_columns_PB = re.findall(
+    'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Delta \(Complex - Receptor - Ligand\):\n([A-Za-z \(\).]+)\n',
+    data)
+
+    # delta_total_GB = re.findall('GENERALIZED BORN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9]+)[ ]+([-.0-9]+)[ ]+([-.0-9]+)[ ]+([-.0-9]+)[ ]+', data)
+    delta_total_GB = re.findall('GENERALIZED BORN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9 ]+)\n', data)
+    delta_total_PB = re.findall('POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9 ]+)\n', data)
 
     # G_binding_GB = re.findall('GENERALIZED BORN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9-.]+)[ +/\-]+?([0-9-.]+)\n', data)
     G_binding_GB = re.findall(
@@ -134,6 +155,15 @@ def parse_gmxMMPBSA_output(fname):
         out_res['GBSA'].update(get_Gbinding_values(G_binding_GB))
     if G_binding_PB:
         out_res['PBSA'].update(get_Gbinding_values(G_binding_PB))
+
+    if delta_total_columns_GB and delta_total_GB:
+        out_res['GBSA'].update(get_delta_total_values(
+            delta_total_columns_re=delta_total_columns_GB,
+            delta_total_values_re=delta_total_GB))
+    if delta_total_columns_PB and delta_total_PB:
+        out_res['PBSA'].update(get_delta_total_values(
+            delta_total_columns_re=delta_total_columns_PB,
+            delta_total_values_re=delta_total_PB))
 
     return out_res
 
