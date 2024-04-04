@@ -15,15 +15,16 @@ from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import get_index, make_group_ndx, filepath_type, run_check_subprocess
 
 
-def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous):
-    def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, bash_log):
+def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time,
+                  env, bash_log, clean_previous):
+    def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, env, bash_log):
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
         cmd = f'cd {wdir}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
               f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
               f'-o {output} ' \
               f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}' \
               f' >> {os.path.join(wdir, bash_log)} 2>&1'
-        if not run_check_subprocess(cmd, key=xtc, log=os.path.join(wdir, bash_log)):
+        if not run_check_subprocess(cmd, key=xtc, log=os.path.join(wdir, bash_log), env=env):
             return None
         return output
 
@@ -65,7 +66,9 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
                        index=index, mmpbsa=mmpbsa,
                        np=np, protein_index=protein_index,
                        ligand_index=ligand_index,
-                       out_time=out_time, bash_log=bash_log)
+                       out_time=out_time,
+                       env=env,
+                       bash_log=bash_log)
 
     if os.path.isfile(os.path.join(wdir, 'gmx_MMPBSA.log')):
         shutil.copy(os.path.join(wdir, 'gmx_MMPBSA.log'), os.path.join(wdir, f'gmx_MMPBSA_{out_time}.log'))
@@ -75,12 +78,14 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
     return output
 
 
-def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous):
+def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time,
+                       env, bash_log, clean_previous):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
     index = os.path.join(wdir, index)
-    return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time, bash_log, clean_previous)
+    return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time,
+                         env, bash_log, clean_previous)
 
 
 def clean_temporary_gmxMMBPSA_files(wdir):
@@ -168,16 +173,16 @@ def parse_gmxMMPBSA_output(fname):
     return out_res
 
 
-def get_number_of_frames(xtc):
-    res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True)
+def get_number_of_frames(xtc, env):
+    res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
     frames = re.findall('Step[ ]*([0-9]*)[ ]*[0-9]*\n', res.stderr.decode("utf-8"))
     if frames:
         logging.info(f'{xtc} has {frames} frames')
         return int(frames[0])
 
 
-def run_get_frames_from_wdir(wdir, xtc):
-    return get_number_of_frames(os.path.join(wdir, xtc))
+def run_get_frames_from_wdir(wdir, xtc, env):
+    return get_number_of_frames(os.path.join(wdir, xtc), env=env)
 
 
 def get_mmpbsa_start_end_interval(mmpbsa):
@@ -222,7 +227,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             try:
                 dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
                 var_number_of_frames = []
-                for res in calc_dask(run_get_frames_from_wdir, wdir_to_run, dask_client=dask_client, xtc=xtc):
+                for res in calc_dask(run_get_frames_from_wdir, wdir_to_run, dask_client=dask_client,
+                                     xtc=xtc, env=os.environ.copy()):
                     if res:
                         var_number_of_frames.append(res)
             finally:
@@ -247,7 +253,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                                      tpr=tpr, xtc=xtc, topol=topol, index=index,
                                      mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid,
                                      append_protein_selection=append_protein_selection,
-                                     out_time=out_time, bash_log=bash_log, clean_previous=clean_previous):
+                                     out_time=out_time, env=os.environ.copy(),
+                                     bash_log=bash_log, clean_previous=clean_previous):
                     if res:
                         var_gbsa_out_files.append(res)
             finally:
@@ -259,7 +266,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                     cluster.close()
 
         elif tpr is not None and xtc is not None and topol is not None and index is not None:
-            number_of_frames = get_number_of_frames(xtc)
+            number_of_frames = get_number_of_frames(xtc, env=None)
             used_number_of_frames = math.ceil((min(number_of_frames, endframe) - (startframe - 1)) / interval)
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
             if used_number_of_frames <= 0:
@@ -267,7 +274,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 raise ValueError
             run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
                           np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
-                          out_time=out_time, bash_log=bash_log, clean_previous=clean_previous)
+                          out_time=out_time, env=os.environ.copy(),
+                          bash_log=bash_log, clean_previous=clean_previous)
 
     else:
         var_gbsa_out_files = gmxmmpbsa_out_files
