@@ -344,9 +344,13 @@ def start(protein, wdir, lfile, system_lfile,
         if wdir_to_continue_list is None:
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
                 os.remove(f)
+            for f in glob(os.path.join(wdir_md, '*', '*.trr')):
+                os.remove(f)
         else:
             for wdir_md in wdir_to_continue_list:
                 for f in glob(os.path.join(wdir_md, '#*#')):
+                    os.remove(f)
+                for f in glob(os.path.join(wdir_md, '*', '*.trr')):
                     os.remove(f)
 
 
