@@ -84,7 +84,7 @@ def start(protein, wdir, lfile, system_lfile,
           wdir_to_continue_list, deffnm_prev,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
-          seed, hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
+          seed, step, hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -344,9 +344,13 @@ def start(protein, wdir, lfile, system_lfile,
         if wdir_to_continue_list is None:
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
                 os.remove(f)
+            for f in glob(os.path.join(wdir_md, '*', '*.trr')):
+                os.remove(f)
         else:
             for wdir_md in wdir_to_continue_list:
                 for f in glob(os.path.join(wdir_md, '#*#')):
+                    os.remove(f)
+                for f in glob(os.path.join(wdir_md, '*', '*.trr')):
                     os.remove(f)
 
 
@@ -397,6 +401,14 @@ def main():
                         help='seed')
     parser1.add_argument('--not_clean_log_files', action='store_true', default=False,
                         help='Not to remove all backups of md files')
+    parser1.add_argument('--step', default=False, nargs='*', type=int,
+                        help='Run a particular step(s) of the StreaMD run. '
+                             'Options:'
+                             '1 - run preparation step (protein, ligand, cofactor preporation)'
+                             '2 - run MD equlibration step (minimization, NVT, NPT)'
+                             '3 - run MD simulation'
+                             '4 - run MD analysis.'
+                             'Ex: 3 4')
     # continue md
     parser2 = parser.add_argument_group('Continue or Extend Molecular Dynamics Simulation')
     parser2.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
@@ -440,6 +452,9 @@ def main():
     else:
         wdir = args.wdir
 
+    if args.step is not None and args.step not in [1, 2, 3, 4]:
+            raise ValueError(f'--step {args.step} argument is not valid. Please choose from: 1, 2, 3, 4')
+
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
@@ -470,7 +485,7 @@ def main():
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
-              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed,
+              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed, step=args.step,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
               bash_log=bash_log)
     finally:
