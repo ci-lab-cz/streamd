@@ -139,7 +139,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
                     var_prolif_out_files.append(res)
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
