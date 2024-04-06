@@ -6,6 +6,7 @@ import subprocess
 from streamd.preparation.ligand_preparation import make_all_itp
 from streamd.preparation.md_files_preparation import prep_md_files, add_ligands_to_topol, \
     edit_topology_file, prepare_mdp_files, check_if_info_already_added_to_topol
+from streamd.utils.utils import run_check_subprocess
 
 
 def complex_preparation(protein_gro, ligand_gro_list, out_file):
@@ -29,7 +30,7 @@ def complex_preparation(protein_gro, ligand_gro_list, out_file):
 
 def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
                             protein_name, wdir_protein, wdir_md, script_path, project_dir,
-                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, seed, bash_log):
+                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, seed, bash_log, env=None):
 
     wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
                                                wdir_system_ligand_list=wdir_system_ligand_list,
@@ -40,8 +41,8 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
     # ligands and cofactors
     if md_files_dict['itp']:
         # make all itp and edit itps
-        if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) or not all([os.path.isfile(i) for i in md_files_dict['itp']]):
-            make_all_itp(fileitp_input_list=md_files_dict['itp_orig'], fileitp_output_list=md_files_dict['itp'], out_file=os.path.join(wdir_md_cur, 'all.itp'))
+        if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) or not all([os.path.isfile(os.path.join(wdir_md_cur, i)) for i in md_files_dict['itp']]):
+            make_all_itp(fileitp_input_list=md_files_dict['itp_orig'], fileitp_output_list=[os.path.join(wdir_md_cur, j) for j in md_files_dict['itp']], out_file=os.path.join(wdir_md_cur, 'all.itp'))
         else:
             logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip ligand all itp preparation step\n')
 
@@ -73,12 +74,9 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         shutil.copy(mdp_file, wdir_md_cur)
 
     if not os.path.isfile(os.path.join(wdir_md_cur, 'solv_ions.gro')):
-        try:
-            subprocess.check_output(
-                f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "scripts/script_sh/solv_ions.sh")}'
-                f'>> {os.path.join(wdir_md_cur, bash_log)} 2>&1', shell=True)
-        except subprocess.CalledProcessError as e:
-            logging.exception(f'{wdir_md_cur}\n{e}', stack_info=True)
+        cmd = (f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "scripts/script_sh/solv_ions.sh")} '
+               f'>> {os.path.join(wdir_md_cur, bash_log)} 2>&1')
+        if not run_check_subprocess(cmd=cmd, key=wdir_md_cur, log=os.path.join(wdir_md_cur, bash_log), env=env):
             return None
     else:
         logging.warning(f'{wdir_md_cur}. Prepared solv_ions.gro file exists. Skip solvation and ion preparation step\n')

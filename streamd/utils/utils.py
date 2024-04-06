@@ -23,6 +23,12 @@ def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=F
 def get_index(index_file):
     with open(index_file) as input:
         data = input.read()
+
+    if not data:
+        create_ndx(index_file)
+        with open(index_file) as input:
+            data = input.read()
+
     groups = [i.strip() for i in re.findall('\[(.*)\]', data)]
     return groups
 
@@ -40,6 +46,15 @@ def make_group_ndx(query, wdir):
 
     return True
 
+def create_ndx(index_file):
+    wdir = os.path.dirname(index_file)
+    cmd = f'''
+        cd {wdir}
+        gmx make_ndx -f {os.path.join(wdir,"solv_ions.gro")} -o {index_file} << INPUT
+        q
+        INPUT
+        '''
+    run_check_subprocess(cmd, key=wdir, log=None)
 
 def get_mol_resid_pair(fname):
     with open(fname) as inp:
@@ -50,9 +65,9 @@ def get_mol_resid_pair(fname):
             molid, resid = pair
             yield molid, resid
 
-def run_check_subprocess(cmd, key, log):
+def run_check_subprocess(cmd, key, log, env=None):
     try:
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_output(cmd, shell=True, env=env)
     except subprocess.CalledProcessError as e:
         logging.exception(f'{key}. {f"Check log {log}" if log else ""}\nError:{e}', stack_info=True)
         return False

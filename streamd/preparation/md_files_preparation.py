@@ -2,7 +2,7 @@ import os
 import shutil
 from glob import glob
 
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, create_ndx
 
 
 def check_if_info_already_added_to_topol(topol, string):
@@ -100,6 +100,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
     # topol for protein for all chains
     copy_md_files_to_wdir(glob(os.path.join(wdir_protein, '*.itp')), wdir_copy_to=wdir_md_cur)
+    # don't rewrite existed topol.top
     if not os.path.isfile(os.path.join(wdir_md_cur, "topol.top")):
         copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
 
@@ -107,20 +108,24 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     # copy ligand.itp to md_wdir_cur. Will be edited
     md_files_dict = {'itp_orig': [], 'itp': [], 'gro': [], 'posres': [], 'molid': [], 'resid': []}
     if wdir_var_ligand:
+        #copy posres
+        copy_md_files_to_wdir([os.path.join(wdir_var_ligand, f'posre_{var_lig_molid}.itp')], wdir_copy_to=wdir_md_cur)
         md_files_dict['itp_orig'].append(os.path.join(wdir_var_ligand, f'{var_lig_molid}.itp'))
-        md_files_dict['itp'].append(os.path.join(wdir_md_cur, f'{var_lig_molid}.itp'))
+        md_files_dict['itp'].append(f'{var_lig_molid}.itp')
+        md_files_dict['posres'].append(f'posre_{var_lig_molid}.itp')
         md_files_dict['gro'].append(os.path.join(wdir_var_ligand, f'{var_lig_molid}.gro'))
-        md_files_dict['posres'].append(os.path.join(wdir_var_ligand, f'posre_{var_lig_molid}.itp'))
         md_files_dict['molid'].append(var_lig_molid)
         md_files_dict['resid'].append(var_lig_resid)
 
     if wdir_system_ligand_list:
         for wdir_system_ligand in wdir_system_ligand_list:
             system_lig_molid, system_lig_resid = next(get_mol_resid_pair(os.path.join(wdir_system_ligand, 'resid.txt')))
+            copy_md_files_to_wdir([os.path.join(wdir_system_ligand, f'posre_{system_lig_molid}.itp')],
+                                  wdir_copy_to=wdir_md_cur)
             md_files_dict['itp_orig'].append(os.path.join(wdir_system_ligand, f'{system_lig_molid}.itp'))
-            md_files_dict['itp'].append(os.path.join(wdir_md_cur, f'{system_lig_molid}.itp'))
+            md_files_dict['itp'].append(f'{system_lig_molid}.itp')
+            md_files_dict['posres'].append(f'posre_{system_lig_molid}.itp')
             md_files_dict['gro'].append(os.path.join(wdir_system_ligand, f'{system_lig_molid}.gro'))
-            md_files_dict['posres'].append(os.path.join(wdir_system_ligand, f'posre_{system_lig_molid}.itp'))
             md_files_dict['molid'].append(system_lig_molid)
             md_files_dict['resid'].append(system_lig_resid)
 
@@ -129,14 +134,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
 def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_time_ps, mdtime_ns, seed):
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
-        cmd = f'''
-            cd {wdir_md_cur}
-            gmx make_ndx -f solv_ions.gro << INPUT
-            q
-            INPUT
-            '''
-        if not run_check_subprocess(cmd, key=wdir_md_cur, log=None):
-            return None
+        create_ndx(os.path.join(wdir_md_cur, 'index.ndx'))
 
     index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
     # make couple_index_group

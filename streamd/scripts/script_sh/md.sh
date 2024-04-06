@@ -1,6 +1,5 @@
 #!/bin/bash
 #  args: wdir
-OMP_NUM_THREADS=2
 cd $wdir
 # MD
 echo 'Script running:***************************** MD simulation *********************************'

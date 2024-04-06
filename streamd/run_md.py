@@ -18,18 +18,18 @@ class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argpar
     pass
 
 
-def run_equilibration(wdir, project_dir, bash_log):
+def run_equilibration(wdir, project_dir, bash_log, env=None):
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
     cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {os.path.join(wdir, bash_log)} 2>&1',
-    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
         return None
     return wdir
 
 
-def run_simulation(wdir, project_dir, bash_log):
+def run_simulation(wdir, project_dir, bash_log, env=None):
     if os.path.isfile(os.path.join(wdir, 'md_out.tpr')) and os.path.isfile(os.path.join(wdir, 'md_out.cpt')) \
             and os.path.isfile(os.path.join(wdir, 'md_out.xtc')):
         logging.warning(f'{wdir}. md_out.xtc and md_out.tpr and  md_out.cpt exist. '
@@ -37,17 +37,17 @@ def run_simulation(wdir, project_dir, bash_log):
                         f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
         return wdir
     cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
-    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
+    if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
         return None
     return wdir
 
 
-def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir, bash_log):
+def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir, bash_log, env=None):
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
               f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
               f'>> {os.path.join(wdir, bash_log)} 2>&1'
-        if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log)):
+        if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
             return None
         return wdir
 
@@ -218,7 +218,10 @@ def start(protein, wdir, lfile, system_lfile,
             return None
         # Part 2 Complex preparation
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)), ncpu=ncpu)
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                     n_tasks_per_node=min(ncpu, len(var_lig_wdirs)),
+                                                     use_multi_servers = True if len(var_lig_wdirs) > ncpu else False,
+                                                     ncpu=ncpu)
             # make all.itp and create complex
             logging.info('Start complex preparation')
             var_complex_prepared_dirs = []
@@ -228,13 +231,14 @@ def start(protein, wdir, lfile, system_lfile,
                                  protein_name=pname, wdir_protein=wdir_protein,
                                  clean_previous=clean_previous, wdir_md=wdir_md,
                                  script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, seed=seed, bash_log=bash_log):
+                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, seed=seed, bash_log=bash_log,
+                                 env=os.environ.copy()):
                 if res:
                     var_complex_prepared_dirs.append(res)
             logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
@@ -245,24 +249,28 @@ def start(protein, wdir, lfile, system_lfile,
 
         # Part 3. Equilibration and MD simulation. Run on all cpu
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                     n_tasks_per_node=1,
+                                                     use_multi_servers=True if len(var_complex_prepared_dirs) > 1 else False,
+                                                     ncpu=ncpu)
             logging.info('Start Equilibration steps')
             var_eq_dirs = []
             for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir,
-                                 bash_log=bash_log):
+                                 bash_log=bash_log, env=os.environ.copy()):
                 if res:
                     var_eq_dirs.append(res)
             logging.info(f'Successfully finished {len(var_eq_dirs)} Equilibration step\n')
 
             var_md_dirs = []
             logging.info('Start Simulation step')
-            for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir, bash_log=bash_log):
+            for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir, bash_log=bash_log,
+                                 env=os.environ.copy()):
                 if res:
                     var_md_dirs.append(res)
 
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
@@ -272,25 +280,30 @@ def start(protein, wdir, lfile, system_lfile,
         logging.info(f'Simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
 
     else:  # continue prev md
+        if tpr_prev and cpt_prev and xtc_prev:
+            wdir_to_continue_list = [wdir]
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                     n_tasks_per_node=1,
+                                                     use_multi_servers=True if len(wdir_to_continue_list) > 1 else False,
+                                                     ncpu=ncpu)
             logging.info('Start Continue Simulation step')
             var_md_dirs = []
             deffnm = f'{deffnm_prev}_{mdtime_ns}'
             #  continue simulations not created by tool
-            if tpr_prev and cpt_prev and xtc_prev:
-                wdir_to_continue_list = [wdir]
+
 
             for res in calc_dask(continue_md_from_dir, wdir_to_continue_list, dask_client,
                                  tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
                                  deffnm_prev=deffnm_prev, deffnm_next=deffnm, mdtime_ns=mdtime_ns,
-                                 project_dir=project_dir, bash_log=bash_log):
+                                 project_dir=project_dir, bash_log=bash_log,
+                                 env=os.environ.copy()):
                 if res:
                     var_md_dirs.append(res)
 
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
@@ -303,18 +316,22 @@ def start(protein, wdir, lfile, system_lfile,
 
     # Part 3. MD Analysis. Run on each cpu
     try:
-        dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_md_dirs)), ncpu=ncpu)
+        dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                 n_tasks_per_node=min(ncpu, len(var_md_dirs)),
+                                                 use_multi_servers=True if len(var_md_dirs) > ncpu else False,
+                                                 ncpu=ncpu)
         logging.info('Start Analysis of the simulations')
         var_md_analysis_dirs = []
         # os.path.dirname(var_lig)
         for res in calc_dask(run_md_analysis, var_md_dirs,
                              dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir,
-                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev):
+                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev,
+                             env=os.environ.copy()):
             if res:
                 var_md_analysis_dirs.append(res)
     finally:
         if dask_client:
-            dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+            dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                        close_workers=True, remove=True)
             dask_client.shutdown()
         if cluster:

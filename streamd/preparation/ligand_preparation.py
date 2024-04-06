@@ -143,7 +143,8 @@ def prepare_gaussian_files(file_template, file_out, ncpu, opt_restart=False, gau
 
 
 def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path, bash_log, gaussian_exe=None,
-                activate_gaussian=None, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB', ncpu=1, mol2_file=None):
+                activate_gaussian=None, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB', ncpu=1,
+                mol2_file=None, env=None):
     mol, molid, resid = mol_tuple
 
     wdir_ligand_cur = os.path.join(wdir_ligand, molid)
@@ -184,7 +185,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
                           f'activate_gaussian="{activate_gaussian if activate_gaussian else ""}" ' \
                           f'bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep_by_gaussian.sh")} ' \
                           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
-                    if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log)):
+                    if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
                         return None
                 else:
                     return None
@@ -192,7 +193,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
                 cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
                       f'resid={resid} molid={molid} charge={charge} bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
                       f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
-                if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log)):
+                if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
                     return None
     else:
         mol2 = pmd.load_file(mol2_file).to_structure()
@@ -205,7 +206,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
     cmd = f'script_path={script_path} input_dirname={wdir_ligand_cur} ' \
           f'molid={molid} bash {os.path.join(project_dir, "scripts/script_sh/ligand_prep.sh")} ' \
           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
-    if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log)):
+    if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
         return None
 
     # create log for molid resid corresponding
@@ -258,13 +259,17 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
         if boron_containing_mols:
             if gaussian_exe:
                 try:
-                    dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=1, ncpu=ncpu)
+                    dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                             n_tasks_per_node=1,
+                                                             use_multi_servers=True if len(boron_containing_mols) > 1 else False,
+                                                             ncpu=ncpu)
                     for res in calc_dask(prep_ligand, boron_containing_mols, dask_client,
                                          script_path=script_path, project_dir=project_dir,
                                          wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"],
                                          gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                          gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                                         ncpu=ncpu, bash_log=bash_log):
+                                         ncpu=ncpu, bash_log=bash_log,
+                                         env=os.environ.copy()):
                         if res:
                             lig_wdirs.append(res)
                 finally:
@@ -279,11 +284,15 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
 
         if standard_mols:
             try:
-                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(standard_mols)), ncpu=ncpu)
+                dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                         n_tasks_per_node=min(ncpu, len(standard_mols)),
+                                                         use_multi_servers= True if len(standard_mols) > ncpu else False,
+                                                         ncpu=ncpu)
                 for res in calc_dask(prep_ligand, standard_mols, dask_client,
                                      script_path=script_path, project_dir=project_dir,
                                      wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"],
-                                     ncpu=ncpu, bash_log=bash_log):
+                                     ncpu=ncpu, bash_log=bash_log,
+                                     env=os.environ.copy()):
                     if res:
                         lig_wdirs.append(res)
             finally:
