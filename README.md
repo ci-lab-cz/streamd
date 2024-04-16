@@ -15,7 +15,7 @@ mamba install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 groma
 python -m pip install git+https://github.com/Valdes-Tresanco-MS/ParmEd.git@v3.4
 python -m pip install gmx_MMPBSA
 
-pip install paramiko asyncssh prolif
+pip install paramiko asyncssh prolif plotnine
 
 pip install git+https://github.com/ci-lab-cz/md-scripts.git
 ```

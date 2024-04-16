@@ -1,56 +1,83 @@
 import argparse
 import os
 import pandas as pd
+import re
 import matplotlib.pyplot as plt
 import seaborn as sns
+from plotnine import ggplot, geom_point, aes, theme, element_text, element_blank, theme_bw, scale_color_manual, element_rect, scale_x_discrete
 plt.ioff()
 
-sns.set_theme(style="whitegrid", palette="pastel", font_scale=2)
-# SMALL_SIZE = 15
-# MEDIUM_SIZE = 25
-# BIGGER_SIZE = 36
+# def calculate_figure_size(num_data_points_x, num_data_points_y):
+#     # aspect_ratio = (num_data_points_x/num_data_points_y)/10
+#     # # aspect_ratio = 16/12
+#     # pixels_per_point_x = num_data_points_x*10
+#     # pixels_per_point_y = num_data_points_y*10
+#     # width = (pixels_per_point_x * aspect_ratio) ** 0.5
+#     # height = (pixels_per_point_y / aspect_ratio) ** 0.5
+#     pixels_per_point_x = 53
+#     pixels_per_point_y = 40
+#
+#     width = num_data_points_x * pixels_per_point_x / 300
+#     height = num_data_points_y * pixels_per_point_y / 300
+#     return (width, height)
 
-# plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-# plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-# plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-# plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-# plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-# plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-# plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+# def align_by_spaces(var):
+#     split_row = var.split('.')
+#     chain = f'.{split_row[1]}' if len(split_row) > 2 else ''
+#     # resid_chain = f' {split_row[0]}{chain}'.ljust(10, '*')
+#     #
+#     # contact = split_row[-1].rjust(7,'_')
+#     # return f'{resid_chain} {contact}'
+#     return f'{split_row[0]}{chain} {split_row[-1]}'
 
-def convertplif2png(plif_out_file, occupancy=0.1, plot_width=15, plot_height=5):
+def convertplif2png(plif_out_file, occupancy=0.6,  plot_width=None, plot_height=None):
 
-    plt.figure(figsize=(plot_width, plot_height))
-    plt.xticks(rotation=90)
-    new_names = {"hbacceptor": "A", "anionic": "N", "hydrophobic": "H",
-                 "pistacking": "pi-s", "hbdonor": "D", "pication": "pi+", "cationic": "P"}
+    new_names = {"HBACCEPTOR": "A", "ANIONIC": "N", "HYDROPHOBIC": "H", 'METALACCEPTOR':'MeA',
+                 "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONIC": "P"}
 
-    label_colors = {"A": "red", "D": "forestgreen", "N": "blue", "P": "magenta",
-                    "H": "orange", "pi+": "black", "pi-s": 'black'}
+    # label_colors = {"A": "red", "D": "forestgreen", "N": "blue", "P": "magenta",
+    #                 "H": "orange", "pi+": "black", "pi-s": 'black','MeA': 'pink'}
+    label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
+                    "hydrophobic": "orange", "pication": "black", "pistacking": 'black','metalacceptor': 'pink'}
 
     df = pd.read_csv(plif_out_file, sep='\t')
-    df_occup = df.drop('Frame', axis=1).groupby('fname').apply(lambda x: round(x.sum() / len(x), 1))
+    df_occup = df.drop('Frame', axis=1).groupby('Name').apply(lambda x: round(x.sum() / len(x), 1))
 
-    subdf = pd.melt(df_occup.reset_index(), id_vars=['fname'])
-    subdf = subdf[subdf['value']>=occupancy]
+    subdf = pd.melt(df_occup.reset_index(), id_vars=['Name'])
+    subdf = subdf[subdf['value'] >= occupancy]
 
-    subdf['variable'] = subdf['variable'].replace(new_names, regex=True)
+    subdf['resi'] = subdf['variable'].apply(lambda x: int(re.findall('[0-9]+', x)[0]))
+    subdf['chain'] = subdf['variable'].apply(lambda x: x.split('.')[1])
+    subdf = subdf.sort_values(by=['chain','resi'])
 
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
+    subdf['interaction'] = subdf['variable'].apply(lambda x: x.split('.')[-1])
 
-    c = [label_colors.get(i.split('.')[-1], 'grey') for i in subdf['variable']]
-    plot = plt.scatter(subdf['variable'], subdf['fname'], c=c, s=85)
-    # plt.xticks(subdf['variable'], labels=subdf['variable'], rotation=90)
-    # plot = plt.plot(subdf['variable'], subdf['fname'], color='black', marker='o', linewidth=2, markersize=5)
+    subdf['variable'] = subdf['variable'].str.upper().replace(new_names, regex=True)
+    # subdf['variable_fill'] = subdf['variable'].apply(align_by_spaces)
+    # reorder for plotnine
+    subdf = subdf.sort_values(by=['chain','resi', 'interaction']).reset_index(drop=True)
+    subdf['variable'] = pd.Categorical(subdf.variable, categories=pd.unique(subdf.variable))
 
-    # for ticklabel, color in zip(plt.gca().get_xticklabels(), c):
-    #     ticklabel.set_color(color)
-    #     ticklabel.set_rotation(90)
+    plot = (ggplot(subdf)+ geom_point(aes( x="variable", y="Name", color = "interaction"))
+        + theme_bw(base_size=8)  + scale_color_manual(values = label_colors)+
+            theme(axis_text_x=element_text(rotation=90, hjust=0.5),
+                axis_text_y=element_text(vjust=0.5),
+                  axis_title_y=element_blank(),
+                axis_title_x=element_blank(),
+                legend_position = "bottom",
+                panel_border = element_blank(),
+                panel_background = element_blank(),
+                legend_key=element_rect(color = "white"),
+                  legend_box_spacing=0,
+    )
+            )
 
     output_name = os.path.join(os.path.dirname(plif_out_file), f"{os.path.basename(plif_out_file).strip('.csv')}_occupancy{occupancy}.png")
-    plot.figure.savefig(output_name, bbox_inches="tight")
 
+    if plot_width and plot_height:
+        plot.save(output_name, width=plot_width, height=plot_height, dpi=300, verbose=False)
+    else:
+        plot.save(output_name, dpi=300, verbose=False)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Returns the formal charge for the molecule using RDKiT''')
