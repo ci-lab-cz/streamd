@@ -10,7 +10,7 @@ from streamd.utils.utils import run_check_subprocess, get_mol_resid_pair, get_in
 from streamd.preparation.ligand_preparation import prepare_gaussian_files
 from streamd.preparation.md_files_preparation import check_if_info_already_added_to_topol, edit_topology_file
 
-def convert_pdb2mol2(metal_pdb, charge_dict):
+def convert_pdb2mol2(metal_pdb, charge_dict, env):
     '''
 
     :param metal_pdb: metal pdb file path
@@ -29,7 +29,7 @@ def convert_pdb2mol2(metal_pdb, charge_dict):
     metal_mol2 = metal_pdb.replace(".pdb",".mol2")
 
     cmd = f'metalpdb2mol2.py -i {metal_pdb} -o {metal_mol2} -c {charge}'
-    if not run_check_subprocess(cmd, metal_pdb, log=None):
+    if not run_check_subprocess(cmd, metal_pdb, log=None, env=env):
         return None
     return metal_mol2
 
@@ -165,15 +165,15 @@ def set_up_gaussian_files(wdir, ncpu, gaussian_basis, gaussian_memory):
                                    gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory, opt_restart=False)
 
 
-def run_MCPBPY(protein_in_file, wdir, s, bash_log):
+def run_MCPBPY(protein_in_file, wdir, s, bash_log, env):
     cmd = f'cd {wdir}; MCPB.py -i {protein_in_file} -s {s} >> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, wdir, log=bash_log):
+    if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
     return wdir
 
 
-def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log):
-    def run_task(gau_cmd, activate_gaussian, log, wdir, check_only_if_exist=False):
+def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log, env):
+    def run_task(gau_cmd, activate_gaussian, log, wdir, env, check_only_if_exist=False):
         def check_gau_log_file(log):
             if os.path.isfile(log):
                 with open(log) as checkpoint:
@@ -184,7 +184,7 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log
         if (check_only_if_exist and not os.path.isfile(log)) or not check_gau_log_file(log):
             cmd = (f'cd {wdir}; {activate_gaussian};'
                    f'{gau_cmd}')
-            if not run_check_subprocess(cmd, wdir, log=bash_log):
+            if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
                 return None
         else:
             logging.warning(f'INFO MCPBPY procedure: the gaussian calculation was finished: {wdir} {log}. Skip this step')
@@ -197,27 +197,27 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log
 
     logging.warning(f'INFO: MCPBPY procedure: start Gaussian geometry optimization for the small model{wdir}')
     if not run_task(gau_cmd=f'{gaussian_version} < protein_small_opt.com > {small_opt_log}', log=small_opt_log,
-                    activate_gaussian=activate_gaussian, wdir=wdir):
+                    activate_gaussian=activate_gaussian, wdir=wdir, env=env):
         return None
     logging.warning(f'INFO: MCPBPY procedure: start Gaussian force constant calculation for the small model {wdir}')
     if not run_task(gau_cmd=f'{gaussian_version} < protein_small_fc.com > {small_fc_log}', log=small_fc_log,
-                    activate_gaussian=activate_gaussian, wdir=wdir):
+                    activate_gaussian=activate_gaussian, wdir=wdir, env=env):
         return None
     logging.warning(f'INFO: MCPBPY procedure: generation fchk file for the small model {wdir}')
     if not run_task(gau_cmd=f'formchk protein_small_opt.chk {small_opt_fchk}', log=small_opt_fchk,
-                    activate_gaussian=activate_gaussian, wdir=wdir, check_only_if_exist=True):
+                    activate_gaussian=activate_gaussian, wdir=wdir, check_only_if_exist=True, env=env):
         return None
     logging.warning(f'INFO: MCPBPY procedure: start Gaussian geometry optimization for the large model {wdir}')
     if not run_task(gau_cmd=f'{gaussian_version} < protein_large_mk.com > {large_mk_log}', log=large_mk_log,
-                    activate_gaussian=activate_gaussian, wdir=wdir):
+                    activate_gaussian=activate_gaussian, wdir=wdir, env=env):
         return None
 
     return wdir
 
 
-def run_tleap(wdir, bash_log):
+def run_tleap(wdir, bash_log, env):
     cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out >> {bash_log} 2>&1'
-    if not run_check_subprocess(cmd, wdir, log=bash_log):
+    if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
     return wdir
 
@@ -266,7 +266,7 @@ def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
     parm.save(topol_top, format='gromacs')
     parm.save(solv_ions_gro)
 
-def create_posre(all_resids, wdir, bash_log):
+def create_posre(all_resids, wdir, bash_log, env):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
     couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein-H'] + all_resids])
     couple_group = '_'.join(['Protein-H'] + all_resids)
@@ -278,7 +278,7 @@ def create_posre(all_resids, wdir, bash_log):
 
     cmd = (f'cd {wdir}; gmx genrestr -f solv_ions.gro -o posre.itp -fc 1000 1000 1000 -n index.ndx <<< {index_list.index(couple_group)}')
 
-    if not run_check_subprocess(cmd, wdir, log=bash_log):
+    if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
     return wdir
 
