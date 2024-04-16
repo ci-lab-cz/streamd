@@ -4,6 +4,7 @@ import os
 import shutil
 import re
 from glob import glob
+import re
 
 import parmed as pmd
 

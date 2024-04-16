@@ -5,6 +5,7 @@ import shutil
 from datetime import datetime
 from functools import partial
 from glob import glob
+import json
 from multiprocessing import cpu_count
 
 from streamd.md_analysis import run_md_analysis
@@ -12,6 +13,7 @@ from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import filepath_type, run_check_subprocess, get_protein_resid_set
+from streamd.mcpbpy_md import mcbpy_md
 
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -84,6 +86,7 @@ def start(protein, wdir, lfile, system_lfile,
           wdir_to_continue_list, deffnm_prev,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
+          metal_resnames, metal_charges, mcpbpy_cut_off,
           seed, step, hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
@@ -125,6 +128,7 @@ def start(protein, wdir, lfile, system_lfile,
         wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein', pname)
         wdir_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'ligands')
         wdir_system_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'cofactors')
+        wdir_metal = os.path.join(wdir, 'md_files', 'md_preparation', 'metals', pname)
 
         wdir_md = os.path.join(wdir, 'md_files', 'md_run')
 
@@ -132,44 +136,46 @@ def start(protein, wdir, lfile, system_lfile,
         os.makedirs(wdir_protein, exist_ok=True)
         os.makedirs(wdir_ligand, exist_ok=True)
         os.makedirs(wdir_system_ligand, exist_ok=True)
+        os.makedirs(wdir_metal, exist_ok=True)
 
         # check if already exist in the working directory
-        if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro') or not os.path.isfile(
-                os.path.join(wdir_protein, "topol.top")):
-            if p_ext != '.gro' or topol is None or posre_list_protein is None:
-                logging.info('Start protein preparation')
-                cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
-                      f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
-                      f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
-                if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
-                    return None
-                logging.info(f'Successfully finished protein preparation\n')
-            else:
-                target_path = os.path.join(wdir_protein, os.path.basename(protein))
-                if not os.path.isfile(target_path):
-                    shutil.copy(protein, target_path)
-                target_path = os.path.join(wdir_protein, 'topol.top')
-                if not os.path.isfile(target_path):
-                    shutil.copy(topol, target_path)
-                # multiple chains
-                for posre_protein in posre_list_protein:
-                    target_path = os.path.join(wdir_protein, os.path.basename(posre_protein))
-                    if not os.path.isfile(target_path):
-                        shutil.copy(posre_protein, target_path)
-                if topol_itp_list is not None:
-                    if len(posre_list_protein) != len(topol_itp_list):
-                        logging.exception(
-                            'The number of protein_chainX.itp files should be equal the number of posre_protein_chainX.itp files.'
-                            ' Check --topol_itp and --posre arguments')
+        if not metal_resnames or (not gaussian_exe or not activate_gaussian):
+            if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro') or not os.path.isfile(
+                    os.path.join(wdir_protein, "topol.top")):
+                if p_ext != '.gro' or topol is None or posre_list_protein is None:
+                    logging.info('Start protein preparation')
+                    cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
+                          f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
+                          f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
+                    if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
                         return None
-                    for topol_itp in topol_itp_list:
-                        target_path = os.path.join(wdir_protein, os.path.basename(topol_itp))
+                    logging.info(f'Successfully finished protein preparation\n')
+                else:
+                    target_path = os.path.join(wdir_protein, os.path.basename(protein))
+                    if not os.path.isfile(target_path):
+                        shutil.copy(protein, target_path)
+                    target_path = os.path.join(wdir_protein, 'topol.top')
+                    if not os.path.isfile(target_path):
+                        shutil.copy(topol, target_path)
+                    # multiple chains
+                    for posre_protein in posre_list_protein:
+                        target_path = os.path.join(wdir_protein, os.path.basename(posre_protein))
                         if not os.path.isfile(target_path):
-                            shutil.copy(topol_itp, target_path)
+                            shutil.copy(posre_protein, target_path)
+                    if topol_itp_list is not None:
+                        if len(posre_list_protein) != len(topol_itp_list):
+                            logging.exception(
+                                'The number of protein_chainX.itp files should be equal the number of posre_protein_chainX.itp files.'
+                                ' Check --topol_itp and --posre arguments')
+                            return None
+                        for topol_itp in topol_itp_list:
+                            target_path = os.path.join(wdir_protein, os.path.basename(topol_itp))
+                            if not os.path.isfile(target_path):
+                                shutil.copy(topol_itp, target_path)
 
-        else:
-            logging.warning(f'{os.path.join(wdir_protein, pname)}.gro and topol.top files exist. '
-                            f'Protein preparation step will be skipped.')
+            else:
+                logging.warning(f'{os.path.join(wdir_protein, pname)}.gro and topol.top files exist. '
+                                f'Protein preparation step will be skipped.')
 
         # Part 1. Ligand Preparation
         protein_resid_set = get_protein_resid_set(protein)
@@ -218,23 +224,37 @@ def start(protein, wdir, lfile, system_lfile,
             return None
         # Part 2 Complex preparation
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
-                                                     n_tasks_per_node=min(ncpu, len(var_lig_wdirs)),
-                                                     use_multi_servers = True if len(var_lig_wdirs) > ncpu else False,
-                                                     ncpu=ncpu)
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)), ncpu=ncpu)
             # make all.itp and create complex
             logging.info('Start complex preparation')
             var_complex_prepared_dirs = []
+# check conflict
+            # Part 2.1 MCPBPY Metal-Complex preparation
+            if metal_resnames and gaussian_exe and activate_gaussian:
+                logging.info('Start MCPBPY procedure')
+                for res in calc_dask(mcbpy_md.main, var_lig_wdirs, dask_client,
+                              protein_name=pname, protein_file=protein,
+                              metal_resnames=metal_resnames, metal_charges=metal_charges,
+                              wdir_metal=wdir_metal, system_lig_wdirs=system_lig_wdirs,
+                              wdir_md=wdir_md, script_path=script_path, ncpu=ncpu,
+                              activate_gaussian=activate_gaussian, gaussian_version=gaussian_exe,
+                              gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
+                              bash_log=bash_log, seed=seed, nvt_time_ps=nvt_time_ps, npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
+                              cut_off=mcpbpy_cut_off, env=os.environ.copy()):
+                    if res:
+                        var_complex_prepared_dirs.append(res)
 
-            for res in calc_dask(run_complex_preparation, var_lig_wdirs, dask_client,
-                                 wdir_system_ligand_list=system_lig_wdirs,
-                                 protein_name=pname, wdir_protein=wdir_protein,
-                                 clean_previous=clean_previous, wdir_md=wdir_md,
-                                 script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                 npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, seed=seed, bash_log=bash_log,
-                                 env=os.environ.copy()):
-                if res:
-                    var_complex_prepared_dirs.append(res)
+                logging.info('MCPBPY procedure: Finish MCPBPY preparation')
+            else:
+                for res in calc_dask(run_complex_preparation, var_lig_wdirs, dask_client,
+                                     wdir_system_ligand_list=system_lig_wdirs,
+                                     protein_name=pname, wdir_protein=wdir_protein,
+                                     clean_previous=clean_previous, wdir_md=wdir_md,
+                                     script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
+                                     npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log, seed=seed, env=os.environ.copy()):
+                    if res:
+                        var_complex_prepared_dirs.append(res)
+
             logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
         finally:
             if dask_client:
@@ -435,6 +455,7 @@ def main():
                         help='''If you want to run an automatic md analysis for the ligand after continue of simulation you can set ligand_id if it is not UNL default value''')
     # boron-containing molecules
     parser3 = parser.add_argument_group('Boron-containing molecules or MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run arguments group)')
+    # boron-containing molecules and mcpbpy
     parser3.add_argument('--activate_gaussian', metavar='module load Gaussian/09-d01', required=False, default=None,
                         help='string that load gaussian module if necessary')
     parser3.add_argument('--gaussian_exe', metavar='g09 or /apps/all/Gaussian/09-d01/g09/g09', required=False,
@@ -444,6 +465,21 @@ def main():
                         default='B3LYP/6-31G*', help='Gaussian Basis')
     parser3.add_argument('--gaussian_memory', metavar='120GB', required=False,
                         default='120GB', help='Gaussian Memory Usage')
+    # mcpbpy
+    parser4 = parser.add_argument_group(
+        'MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run and Boron-containing molecules arguments group)')
+    parser4.add_argument('--metal_resnames', metavar='MN', required=False, default=None, nargs='*',
+                        help='Metal residue names to run MCPB.py procedure. '
+                             'Start MCPBPY procedure only if gaussian_exe and activate_gaussian arguments are set up,'
+                             'Otherwise standard gmx2pdb procedure will be run.')
+    parser4.add_argument('--metal_cutoff', metavar='2.8', required=False, default=2.8,
+                        help='Metal residue cutoff to run MCPB.py procedure')
+    parser4.add_argument('--metal_charges', metavar='{MN:2, ZN:2, CA:2}', type=json.loads, required=False,
+                        default={'MN':2, 'ZN':2, 'CA':2},
+                        help='Metal residue charges in dictionary format'
+                             'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up,'
+                             'Otherwise standard gmx2pdb procedure will be run.')
+
 
     args = parser.parse_args()
 
@@ -487,6 +523,7 @@ def main():
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
               hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed, step=args.step,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
+              metal_resnames=args.metal_resnames, metal_charges=args.metal_charges, mcpbpy_cut_off=args.metal_cutoff,
               bash_log=bash_log)
     finally:
         logging.shutdown()
