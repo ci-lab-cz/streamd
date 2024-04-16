@@ -2,7 +2,7 @@ import os
 import shutil
 from glob import glob
 
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, create_ndx
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, create_ndx
 
 
 def check_if_info_already_added_to_topol(topol, string):
@@ -47,20 +47,30 @@ def edit_mdp(md_file, pattern, replace):
     with open(md_file, 'w') as out:
         out.write(''.join(new_mdp))
 
-
-def edit_topology_file(topol_file, pattern, add, how='before', n=0):
+def edit_topology_file(topol_file, pattern, add, how='before', n=0, count_pattern=1):
     with open(topol_file) as input:
         data = input.read()
 
-    if pattern:
-        if n == 0:
-            data = data.replace(pattern, f'{add}\n{pattern}' if how == 'before' else f'{pattern}\n{add}')
-        else:
+    if pattern is not None:
+        if n!=0:
             data = data.split('\n')
             ind = data.index(pattern)
-            data.insert(ind + n, add)
+            if how == 'after':
+                data.insert(ind + n, add)
+            else:
+                data.insert(ind - n, add)
             data = '\n'.join(data)
-    else:
+
+        elif count_pattern:
+            arr = data.split(pattern)
+            part1 = pattern.join(arr[:count_pattern])
+            part2 = pattern.join(arr[count_pattern:])
+            if how == 'before':
+                data = part1 + add + '\n' + pattern + part2
+            else:
+                data = part1 + pattern + '\n' + add + part2
+
+    if pattern is None:
         data = data.split('\n')
         data.insert(n, add)
         data = '\n'.join(data)
@@ -75,7 +85,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     :param wdir_var_ligand:
     :param protein_name:
     :param wdir_system_ligand_list:
-    :param wdir_protein:
+    :param wdir_protein: None (if mcpbpy procedure is applied) or path where topol and gro files are stored
     :param wdir_md:
     :param clean_previous:
     :return: wdir to run md, dict with the list of md files which will be add to topol.top or to complex.gro
@@ -99,10 +109,11 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     os.makedirs(wdir_md_cur, exist_ok=True)
 
     # topol for protein for all chains
-    copy_md_files_to_wdir(glob(os.path.join(wdir_protein, '*.itp')), wdir_copy_to=wdir_md_cur)
-    # don't rewrite existed topol.top
-    if not os.path.isfile(os.path.join(wdir_md_cur, "topol.top")):
-        copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
+    if wdir_protein is not None:
+        copy_md_files_to_wdir(glob(os.path.join(wdir_protein, '*.itp')), wdir_copy_to=wdir_md_cur)
+        # don't rewrite existed topol.top
+        if not os.path.isfile(os.path.join(wdir_md_cur, "topol.top")):
+            copy_md_files_to_wdir([os.path.join(wdir_protein, "topol.top")], wdir_copy_to=wdir_md_cur)
 
     # prep ligands and cofactor
     # copy ligand.itp to md_wdir_cur. Will be edited
