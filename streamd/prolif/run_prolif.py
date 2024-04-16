@@ -6,14 +6,19 @@ import shutil
 from functools import partial
 from glob import glob
 from multiprocessing import cpu_count
+import pathlib
 
 import MDAnalysis as mda
 import pandas as pd
 import prolif as plf
+from prolif.plotting.barcode import Barcode
+from prolif.plotting.network import LigNetwork
+import matplotlib.pyplot as plt
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import filepath_type
-
+from streamd.prolif.prolif2png import convertplif2png
+plt.ioff()
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -26,7 +31,24 @@ def backup_output(output):
         shutil.move(output, os.path.join(os.path.dirname(output), f'#{os.path.basename(output)}.{n}#'))
 
 
-def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs):
+def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
+                    save_visual=True, dpi=300, plot_width=15, plot_height=8):
+    '''
+
+    :param tpr:
+    :param xtc:
+    :param protein_selection:
+    :param ligand_selection:
+    :param step:
+    :param verbose:
+    :param output:
+    :param n_jobs:
+    :param save_visual: save barcode in png and network in html
+    :param dpi:
+    :param plot_width:  in inches
+    :param plot_height: in inches
+    :return: pandas dataframe
+    '''
     u = mda.Universe(tpr, xtc)
 
     protein = u.atoms.select_atoms(protein_selection)
@@ -35,10 +57,18 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     fp = plf.Fingerprint(['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
                           'PiStacking', 'MetalAcceptor'])
     fp.run(u.trajectory[::step], ligand, protein, progress=verbose, n_jobs=n_jobs)
+
     df = fp.to_dataframe()
     df.columns = ['.'.join(item.strip().lower() for item in items[1:]) for items in df.columns]
     df = df.reindex(sorted(df.columns), axis=1)
     df.to_csv(output, sep='\t')
+
+    if save_visual:
+        # barcode
+        Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
+        # Net
+        LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit')).save(f'{output.rstrip(".csv")}.html')
+
     return df
 
 
@@ -60,15 +90,16 @@ def collect_outputs(output_list, output):
     df_list = []
     for i in output_list:
         df = pd.read_csv(i, sep='\t')
-        df['fname'] = i
+        # save dirname - protein_ligand pair
+        df['Name'] = pathlib.PurePath(i).parent.name
         df_list.append(df)
 
     df_aggregated = pd.concat(df_list)
     df_aggregated = df_aggregated.fillna(False).sort_values('Frame')
-    amino_acids = df_aggregated.columns.drop(['fname', 'Frame']).to_list()
+    amino_acids = df_aggregated.columns.drop(['Name', 'Frame']).to_list()
     # sort by number and type of interaction
     amino_acids.sort(key=lambda x: (int(x.split('.')[0][3:]), x.split('.')[1]))
-    sorted_columns = ['fname', 'Frame'] + amino_acids
+    sorted_columns = ['Name', 'Frame'] + amino_acids
     df_aggregated.loc[:, sorted_columns].to_csv(output, sep='\t', index=False)
 
 
@@ -108,7 +139,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
                     var_prolif_out_files.append(res)
         finally:
             if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'], on_error='ignore',
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
                                            close_workers=True, remove=True)
                 dask_client.shutdown()
             if cluster:
@@ -120,6 +151,8 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
 
     backup_output(output_aggregated)
     collect_outputs(var_prolif_out_files, output=output_aggregated)
+
+    convertplif2png(output_aggregated)
 
 
 def main():
