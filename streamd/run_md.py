@@ -31,17 +31,26 @@ def run_equilibration(wdir, project_dir, bash_log, env=None):
     return wdir
 
 
-def run_simulation(wdir, project_dir, bash_log, env=None):
-    if os.path.isfile(os.path.join(wdir, 'md_out.tpr')) and os.path.isfile(os.path.join(wdir, 'md_out.cpt')) \
-            and os.path.isfile(os.path.join(wdir, 'md_out.xtc')):
+def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
+                   tpr, cpt, xtc, deffnm_prev, deffnm_next,
+                   env=None):
+    # continue/extend simulation if checkpoint files exist
+    if (tpr is not None and os.path.isfile(tpr) and cpt is not None and os.path.isfile(cpt) and xtc is not None and os.path.isfile(str(xtc))) or \
+        (os.path.isfile(os.path.join(wdir, f'{deffnm_prev}.tpr')) and os.path.isfile(os.path.join(wdir, f'{deffnm_prev}.cpt'))
+            and os.path.isfile(os.path.join(wdir, f'{deffnm_prev}.xtc')) ) :
         logging.warning(f'{wdir}. md_out.xtc and md_out.tpr and  md_out.cpt exist. '
-                        f'MD simulation step will be skipped. '
-                        f'You can rerun the script and use --wdir_to_continue {wdir} --md_time time_in_ns to extend current trajectory.')
-        return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
+                        f'MD simulation will be continued until the setup simulation steps are reached.')
+        if continue_md_from_dir(wdir_to_continue=wdir, tpr=tpr, cpt=cpt, xtc=xtc,
+                             deffnm_prev=deffnm_prev, deffnm_next=deffnm_next,
+                             mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log, env=env) is None:
+            return None
+
+        return (wdir,deffnm_next)
+
+    cmd = f'wdir={wdir} deffnm={deffnm_prev} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
         return None
-    return wdir
+    return (wdir, deffnm_prev)
 
 
 def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir, bash_log, env=None):
@@ -87,7 +96,7 @@ def start(protein, wdir, lfile, system_lfile,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
-          seed, step, hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
+          seed, steps, hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -120,256 +129,243 @@ def start(protein, wdir, lfile, system_lfile,
 
     dask_client, cluster = None, None
 
-    if wdir_to_continue_list is None and (tpr_prev is None or cpt_prev is None or xtc_prev is None):
-        # create dirs
-        ligand_resid = 'UNL'
-        pname, p_ext = os.path.splitext(os.path.basename(protein))
+    if tpr_prev is None or cpt_prev is None or xtc_prev is None:
+        if steps is None or 1 in steps:
+            # create dirs
+            ligand_resid = 'UNL'
+            pname, p_ext = os.path.splitext(os.path.basename(protein))
 
-        wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein', pname)
-        wdir_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'ligands')
-        wdir_system_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'cofactors')
-        wdir_metal = os.path.join(wdir, 'md_files', 'md_preparation', 'metals', pname)
+            wdir_protein = os.path.join(wdir, 'md_files', 'md_preparation', 'protein', pname)
+            wdir_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'ligands')
+            wdir_system_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'cofactors')
+            wdir_metal = os.path.join(wdir, 'md_files', 'md_preparation', 'metals', pname)
 
-        wdir_md = os.path.join(wdir, 'md_files', 'md_run')
+            wdir_md = os.path.join(wdir, 'md_files', 'md_run')
 
-        os.makedirs(wdir_md, exist_ok=True)
-        os.makedirs(wdir_protein, exist_ok=True)
-        os.makedirs(wdir_ligand, exist_ok=True)
-        os.makedirs(wdir_system_ligand, exist_ok=True)
-        os.makedirs(wdir_metal, exist_ok=True)
+            os.makedirs(wdir_md, exist_ok=True)
+            os.makedirs(wdir_protein, exist_ok=True)
+            os.makedirs(wdir_ligand, exist_ok=True)
+            os.makedirs(wdir_system_ligand, exist_ok=True)
+            os.makedirs(wdir_metal, exist_ok=True)
 
-        # check if already exist in the working directory
-        if not metal_resnames or (not gaussian_exe or not activate_gaussian):
-            if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro') or not os.path.isfile(
-                    os.path.join(wdir_protein, "topol.top")):
-                if p_ext != '.gro' or topol is None or posre_list_protein is None:
-                    logging.info('Start protein preparation')
-                    cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
-                          f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
-                          f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
-                    if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
-                        return None
-                    logging.info(f'Successfully finished protein preparation\n')
-                else:
-                    target_path = os.path.join(wdir_protein, os.path.basename(protein))
-                    if not os.path.isfile(target_path):
-                        shutil.copy(protein, target_path)
-                    target_path = os.path.join(wdir_protein, 'topol.top')
-                    if not os.path.isfile(target_path):
-                        shutil.copy(topol, target_path)
-                    # multiple chains
-                    for posre_protein in posre_list_protein:
-                        target_path = os.path.join(wdir_protein, os.path.basename(posre_protein))
-                        if not os.path.isfile(target_path):
-                            shutil.copy(posre_protein, target_path)
-                    if topol_itp_list is not None:
-                        if len(posre_list_protein) != len(topol_itp_list):
-                            logging.exception(
-                                'The number of protein_chainX.itp files should be equal the number of posre_protein_chainX.itp files.'
-                                ' Check --topol_itp and --posre arguments')
+            # check if already exist in the working directory
+            if not metal_resnames or (not gaussian_exe or not activate_gaussian):
+                if not os.path.isfile(f'{os.path.join(wdir_protein, pname)}.gro') or not os.path.isfile(
+                        os.path.join(wdir_protein, "topol.top")):
+                    if p_ext != '.gro' or topol is None or posre_list_protein is None:
+                        logging.info('Start protein preparation')
+                        cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
+                              f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
+                              f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
+                        if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
                             return None
-                        for topol_itp in topol_itp_list:
-                            target_path = os.path.join(wdir_protein, os.path.basename(topol_itp))
+                        logging.info(f'Successfully finished protein preparation\n')
+                    else:
+                        target_path = os.path.join(wdir_protein, os.path.basename(protein))
+                        if not os.path.isfile(target_path):
+                            shutil.copy(protein, target_path)
+                        target_path = os.path.join(wdir_protein, 'topol.top')
+                        if not os.path.isfile(target_path):
+                            shutil.copy(topol, target_path)
+                        # multiple chains
+                        for posre_protein in posre_list_protein:
+                            target_path = os.path.join(wdir_protein, os.path.basename(posre_protein))
                             if not os.path.isfile(target_path):
-                                shutil.copy(topol_itp, target_path)
+                                shutil.copy(posre_protein, target_path)
+                        if topol_itp_list is not None:
+                            if len(posre_list_protein) != len(topol_itp_list):
+                                logging.exception(
+                                    'The number of protein_chainX.itp files should be equal the number of posre_protein_chainX.itp files.'
+                                    ' Check --topol_itp and --posre arguments')
+                                return None
+                            for topol_itp in topol_itp_list:
+                                target_path = os.path.join(wdir_protein, os.path.basename(topol_itp))
+                                if not os.path.isfile(target_path):
+                                    shutil.copy(topol_itp, target_path)
 
+                else:
+                    logging.warning(f'{os.path.join(wdir_protein, pname)}.gro and topol.top files exist. '
+                                    f'Protein preparation step will be skipped.')
+
+            # Part 1. Ligand Preparation
+            protein_resid_set = get_protein_resid_set(protein)
+            if system_lfile is not None:
+                logging.info('Start cofactor preparation')
+                number_of_mols, problem_mols = check_mols(system_lfile)
+                if problem_mols:
+                    logging.exception(f'Cofactor molecules: {problem_mols} from {system_lfile} cannot be processed. Script will be interrupted.')
+                    return None
+
+                system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
+                                                         project_dir=project_dir, wdir_ligand=wdir_system_ligand,
+                                                         gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                         gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
+                                                         hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
+                if number_of_mols != len(system_lig_wdirs):
+                    logging.exception(f'Error with cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
+                                      f' The calculation will be interrupted')
+                    return None
+
+                logging.info(f'Successfully finished {len(system_lig_wdirs)} cofactor preparation\n')
             else:
-                logging.warning(f'{os.path.join(wdir_protein, pname)}.gro and topol.top files exist. '
-                                f'Protein preparation step will be skipped.')
+                system_lig_wdirs = []
 
-        # Part 1. Ligand Preparation
-        protein_resid_set = get_protein_resid_set(protein)
-        if system_lfile is not None:
-            logging.info('Start cofactor preparation')
-            number_of_mols, problem_mols = check_mols(system_lfile)
-            if problem_mols:
-                logging.exception(f'Cofactor molecules: {problem_mols} from {system_lfile} cannot be processed. Script will be interrupted.')
+            if lfile is not None:
+                logging.info('Start ligand preparation')
+                number_of_mols, problem_mols = check_mols(lfile)
+                if problem_mols:
+                    logging.warning(f'Ligand molecules: {problem_mols} from {lfile} cannot be processed.'
+                                    f' Such molecules will be skipped.')
+
+                var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, protein_resid_set=protein_resid_set, script_path=script_path,
+                                                      project_dir=project_dir, wdir_ligand=wdir_ligand,
+                                                      gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
+                                                      gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
+                                                      hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
+                if number_of_mols != len(var_lig_wdirs):
+                    logging.warning(f'Problem with ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
+                                    f' Such molecules will be skipped.')
+
+                logging.info(f'Successfully finished {len(var_lig_wdirs)} ligand preparation\n')
+            else:
+                var_lig_wdirs = [[]]  # run protein in water only simulation
+
+            if not var_lig_wdirs:
+                return None
+            # Part 2 Complex preparation
+            try:
+                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)), ncpu=ncpu)
+                # make all.itp and create complex
+                logging.info('Start complex preparation')
+                var_complex_prepared_dirs = []
+    # check conflict
+                # Part 2.1 MCPBPY Metal-Complex preparation
+                if metal_resnames and gaussian_exe and activate_gaussian:
+                    logging.info('Start MCPBPY procedure')
+                    for res in calc_dask(mcbpy_md.main, var_lig_wdirs, dask_client,
+                                  protein_name=pname, protein_file=protein,
+                                  metal_resnames=metal_resnames, metal_charges=metal_charges,
+                                  wdir_metal=wdir_metal, system_lig_wdirs=system_lig_wdirs,
+                                  wdir_md=wdir_md, script_path=script_path, ncpu=ncpu,
+                                  activate_gaussian=activate_gaussian, gaussian_version=gaussian_exe,
+                                  gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
+                                  bash_log=bash_log, seed=seed, nvt_time_ps=nvt_time_ps, npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
+                                  cut_off=mcpbpy_cut_off, env=os.environ.copy()):
+                        if res:
+                            var_complex_prepared_dirs.append(res)
+
+                    logging.info('MCPBPY procedure: Finish MCPBPY preparation')
+                else:
+                    for res in calc_dask(run_complex_preparation, var_lig_wdirs, dask_client,
+                                         wdir_system_ligand_list=system_lig_wdirs,
+                                         protein_name=pname, wdir_protein=wdir_protein,
+                                         clean_previous=clean_previous, wdir_md=wdir_md,
+                                         script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
+                                         npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log, seed=seed, env=os.environ.copy()):
+                        if res:
+                            var_complex_prepared_dirs.append(res)
+
+                logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
+            finally:
+                if dask_client:
+                    dask_client.retire_workers(dask_client.scheduler_info()['workers'],
+                                               close_workers=True, remove=True)
+                    dask_client.shutdown()
+                if cluster:
+                    cluster.close()
+
+            if not var_complex_prepared_dirs:
                 return None
 
-            system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
-                                                     project_dir=project_dir, wdir_ligand=wdir_system_ligand,
-                                                     gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
-                                                     gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                                                     hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
-            if number_of_mols != len(system_lig_wdirs):
-                logging.exception(f'Error with cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
-                                  f' The calculation will be interrupted')
-                return None
-
-            logging.info(f'Successfully finished {len(system_lig_wdirs)} cofactor preparation\n')
         else:
-            system_lig_wdirs = []
-
-        if lfile is not None:
-            logging.info('Start ligand preparation')
-            number_of_mols, problem_mols = check_mols(lfile)
-            if problem_mols:
-                logging.warning(f'Ligand molecules: {problem_mols} from {lfile} cannot be processed.'
-                                f' Such molecules will be skipped.')
-
-            var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, protein_resid_set=protein_resid_set, script_path=script_path,
-                                                  project_dir=project_dir, wdir_ligand=wdir_ligand,
-                                                  gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
-                                                  gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                                                  hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
-            if number_of_mols != len(var_lig_wdirs):
-                logging.warning(f'Problem with ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
-                                f' Such molecules will be skipped.')
-
-            logging.info(f'Successfully finished {len(var_lig_wdirs)} ligand preparation\n')
-        else:
-            var_lig_wdirs = [[]]  # run protein in water only simulation
-
-        if not var_lig_wdirs:
-            return None
-        # Part 2 Complex preparation
-        try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)), ncpu=ncpu)
-            # make all.itp and create complex
-            logging.info('Start complex preparation')
-            var_complex_prepared_dirs = []
-# check conflict
-            # Part 2.1 MCPBPY Metal-Complex preparation
-            if metal_resnames and gaussian_exe and activate_gaussian:
-                logging.info('Start MCPBPY procedure')
-                for res in calc_dask(mcbpy_md.main, var_lig_wdirs, dask_client,
-                              protein_name=pname, protein_file=protein,
-                              metal_resnames=metal_resnames, metal_charges=metal_charges,
-                              wdir_metal=wdir_metal, system_lig_wdirs=system_lig_wdirs,
-                              wdir_md=wdir_md, script_path=script_path, ncpu=ncpu,
-                              activate_gaussian=activate_gaussian, gaussian_version=gaussian_exe,
-                              gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                              bash_log=bash_log, seed=seed, nvt_time_ps=nvt_time_ps, npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
-                              cut_off=mcpbpy_cut_off, env=os.environ.copy()):
-                    if res:
-                        var_complex_prepared_dirs.append(res)
-
-                logging.info('MCPBPY procedure: Finish MCPBPY preparation')
-            else:
-                for res in calc_dask(run_complex_preparation, var_lig_wdirs, dask_client,
-                                     wdir_system_ligand_list=system_lig_wdirs,
-                                     protein_name=pname, wdir_protein=wdir_protein,
-                                     clean_previous=clean_previous, wdir_md=wdir_md,
-                                     script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                     npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log, seed=seed, env=os.environ.copy()):
-                    if res:
-                        var_complex_prepared_dirs.append(res)
-
-            logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
-        finally:
-            if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
-                                           close_workers=True, remove=True)
-                dask_client.shutdown()
-            if cluster:
-                cluster.close()
-
-        if not var_complex_prepared_dirs:
-            return None
+            var_complex_prepared_dirs = wdir_to_continue_list
 
         # Part 3. Equilibration and MD simulation. Run on all cpu
-        try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
-                                                     n_tasks_per_node=1,
-                                                     use_multi_servers=True if len(var_complex_prepared_dirs) > 1 else False,
-                                                     ncpu=ncpu)
-            logging.info('Start Equilibration steps')
-            var_eq_dirs = []
-            for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir,
-                                 bash_log=bash_log, env=os.environ.copy()):
-                if res:
-                    var_eq_dirs.append(res)
-            logging.info(f'Successfully finished {len(var_eq_dirs)} Equilibration step\n')
+        if steps is None or 2 in steps or 3 in steps:
+            try:
+                dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                         n_tasks_per_node=1,
+                                                         use_multi_servers=True if len(var_complex_prepared_dirs) > 1 else False,
+                                                         ncpu=ncpu)
+                if steps is None or 2 in steps:
+                    logging.info('Start Equilibration steps')
+                    var_eq_dirs = []
+                    for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir,
+                                         bash_log=bash_log, env=os.environ.copy()):
+                        if res:
+                            var_eq_dirs.append(res)
+                    logging.info(f'Successfully finished {len(var_eq_dirs)} Equilibration step\n')
+                else:
+                    var_eq_dirs = wdir_to_continue_list
 
-            var_md_dirs = []
-            logging.info('Start Simulation step')
-            for res in calc_dask(run_simulation, var_eq_dirs, dask_client, project_dir=project_dir, bash_log=bash_log,
-                                 env=os.environ.copy()):
-                if res:
-                    var_md_dirs.append(res)
+                if steps is None or 3 in steps:
+                    var_md_dirs_deffnm = []
+                    logging.info('Start Simulation step')
+                    for res in calc_dask(run_simulation, var_eq_dirs, dask_client,
+                                         project_dir=project_dir, bash_log=bash_log,
+                                         mdtime_ns=mdtime_ns,
+                                         tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
+                                         deffnm_prev=deffnm_prev, deffnm_next=f'{deffnm_prev}_{mdtime_ns}',
+                                         env=os.environ.copy()):
+                        if res:
+                            var_md_dirs_deffnm.append(res)
 
-        finally:
-            if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
-                                           close_workers=True, remove=True)
-                dask_client.shutdown()
-            if cluster:
-                cluster.close()
+            finally:
+                if dask_client:
+                    dask_client.retire_workers(dask_client.scheduler_info()['workers'],
+                                               close_workers=True, remove=True)
+                    dask_client.shutdown()
+                if cluster:
+                    cluster.close()
 
-        deffnm = 'md_out'
-        logging.info(f'Simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
+            # deffnm = 'md_out'
+            logging.info(f'Simulation of {len(var_md_dirs_deffnm)} were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
 
-    else:  # continue prev md
-        if tpr_prev and cpt_prev and xtc_prev:
-            wdir_to_continue_list = [wdir]
-        try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
-                                                     n_tasks_per_node=1,
-                                                     use_multi_servers=True if len(wdir_to_continue_list) > 1 else False,
-                                                     ncpu=ncpu)
-            logging.info('Start Continue Simulation step')
-            var_md_dirs = []
-            deffnm = f'{deffnm_prev}_{mdtime_ns}'
-            #  continue simulations not created by tool
+        else:
+            var_md_dirs_deffnm = [(i, deffnm_prev) for i in wdir_to_continue_list]
 
-
-            for res in calc_dask(continue_md_from_dir, wdir_to_continue_list, dask_client,
-                                 tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
-                                 deffnm_prev=deffnm_prev, deffnm_next=deffnm, mdtime_ns=mdtime_ns,
-                                 project_dir=project_dir, bash_log=bash_log,
-                                 env=os.environ.copy()):
-                if res:
-                    var_md_dirs.append(res)
-
-        finally:
-            if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
-                                           close_workers=True, remove=True)
-                dask_client.shutdown()
-            if cluster:
-                cluster.close()
-        logging.info(
-            f'Continue of simulation of {len(var_md_dirs)} were successfully finished\nFinished: {var_md_dirs}\n')
-
-    if not var_md_dirs:
+    if not var_md_dirs_deffnm:
         return None
 
     # Part 3. MD Analysis. Run on each cpu
-    try:
-        dask_client, cluster = init_dask_cluster(hostfile=hostfile,
-                                                 n_tasks_per_node=min(ncpu, len(var_md_dirs)),
-                                                 use_multi_servers=True if len(var_md_dirs) > ncpu else False,
-                                                 ncpu=ncpu)
-        logging.info('Start Analysis of the simulations')
-        var_md_analysis_dirs = []
-        # os.path.dirname(var_lig)
-        for res in calc_dask(run_md_analysis, var_md_dirs,
-                             dask_client, deffnm=deffnm, mdtime_ns=mdtime_ns, project_dir=project_dir,
-                             bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev,
-                             env=os.environ.copy()):
-            if res:
-                var_md_analysis_dirs.append(res)
-    finally:
-        if dask_client:
-            dask_client.retire_workers(dask_client.scheduler_info()['workers'],
-                                       close_workers=True, remove=True)
-            dask_client.shutdown()
-        if cluster:
-            cluster.close()
+    if steps is None or 4 in steps:
+        try:
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                     n_tasks_per_node=min(ncpu, len(var_md_dirs_deffnm)),
+                                                     use_multi_servers=True if len(var_md_dirs_deffnm) > ncpu else False,
+                                                     ncpu=ncpu)
+            logging.info('Start Analysis of the simulations')
+            var_md_analysis_dirs = []
+            # os.path.dirname(var_lig)
+            for res in calc_dask(run_md_analysis, var_md_dirs_deffnm,
+                                 dask_client, mdtime_ns=mdtime_ns, project_dir=project_dir,
+                                 bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev,
+                                 env=os.environ.copy()):
+                if res:
+                    var_md_analysis_dirs.append(res)
+        finally:
+            if dask_client:
+                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
+                                           close_workers=True, remove=True)
+                dask_client.shutdown()
+            if cluster:
+                cluster.close()
 
-    logging.info(
-        f'Analysis of md simulation of {len(var_md_analysis_dirs)} were successfully finished\nFinished: {var_md_analysis_dirs}')
+        logging.info(
+            f'Analysis of md simulation of {len(var_md_analysis_dirs)} were successfully finished\nFinished: {var_md_analysis_dirs}')
 
     if not not_clean_log_files:
         if wdir_to_continue_list is None:
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
-                os.remove(f)
+                if '.tpr.' not in f and '.xtc.' not in f:
+                    os.remove(f)
             for f in glob(os.path.join(wdir_md, '*', '*.trr')):
                 os.remove(f)
         else:
             for wdir_md in wdir_to_continue_list:
                 for f in glob(os.path.join(wdir_md, '#*#')):
-                    os.remove(f)
+                    if '.tpr.' not in f and '.xtc.' not in f:
+                        os.remove(f)
                 for f in glob(os.path.join(wdir_md, '*', '*.trr')):
                     os.remove(f)
 
@@ -421,19 +417,22 @@ def main():
                         help='seed')
     parser1.add_argument('--not_clean_log_files', action='store_true', default=False,
                         help='Not to remove all backups of md files')
-    parser1.add_argument('--step', default=False, nargs='*', type=int,
+    parser1.add_argument('--steps', default=None, nargs='*', type=int,
                         help='Run a particular step(s) of the StreaMD run. '
                              'Options:'
-                             '1 - run preparation step (protein, ligand, cofactor preporation)'
-                             '2 - run MD equlibration step (minimization, NVT, NPT)'
+                             '1 - run preparation step (protein, ligand, cofactor preparation)'
+                             '2 - run MD equilibration step (minimization, NVT, NPT)'
                              '3 - run MD simulation'
                              '4 - run MD analysis.'
-                             'Ex: 3 4')
+                             'Ex: 3 4'
+                             'If 2/3/4 step(s) are used --wdir_to_continue argument should be used to provide '
+                             'directories with files obtained during the step 1')
     # continue md
     parser2 = parser.add_argument_group('Continue or Extend Molecular Dynamics Simulation')
     parser2.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),
-                        help='''single or multiple directories contain simulations created by the tool. Use to extend or continue the simulation.\n'
+                        help='''single or multiple directories contain simulations created by the tool.
+                         Use with steps 2,3,4 to continue run.\n'
                                  Should consist of: tpr, cpt, xtc and all_ligand_resid.txt files. 
                                  File all_ligand_resid.txt is optional and used to run md analysis for the ligands.\n
                                  If you want to continue your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments 
@@ -488,8 +487,13 @@ def main():
     else:
         wdir = args.wdir
 
-    if args.step is not None and args.step not in [1, 2, 3, 4]:
-            raise ValueError(f'--step {args.step} argument is not valid. Please choose from: 1, 2, 3, 4')
+    if args.steps is not None:
+        if not all([i in [1, 2, 3, 4] for i in args.steps]):
+            raise ValueError(f'--steps {args.steps} argument is not valid. Please choose the combination from: 1, 2, 3, 4')
+        if any([i in [2, 3, 4] for i in args.steps]) and args.wdir_to_continue is None:
+            raise ValueError(f'--wdir_to_continue argument is not valid. '
+                         f'If you set up --step {args.steps} you need to provide directories containing md files'
+                         f' created by previous steps')
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
     log_file = os.path.join(wdir,
@@ -521,7 +525,7 @@ def main():
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
-              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed, step=args.step,
+              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges, mcpbpy_cut_off=args.metal_cutoff,
               bash_log=bash_log)

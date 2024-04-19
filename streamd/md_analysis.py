@@ -18,7 +18,8 @@ def md_lig_rmsd_analysis(molid, resid, tpr, xtc, wdir, tu, bash_log, project_dir
     run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir, bash_log), env=env)
 
 
-def run_md_analysis(wdir, deffnm, mdtime_ns, project_dir, bash_log, ligand_resid='UNL', ligand_list_file_prev=None, env=None):
+def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log, ligand_resid='UNL', ligand_list_file_prev=None, env=None):
+    wdir, deffnm = var_md_dirs_deffnm
     if ligand_list_file_prev is None:
         molid_resid_pairs_fname = os.path.join(wdir, 'all_ligand_resid.txt')
     else:
