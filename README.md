@@ -3,21 +3,10 @@
 ## installation
 *Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
 
-We recommend to install the package using `conda` and `mamba`. To use exclusively `conda` one can simply replace `mamba` calls with `conda`.
+[env.yml]()
 ```
-conda install -n base -c conda-forge mamba
+conda env create -n md --file env.yml
 
-conda create -n md python=3.9 -y -q
-conda activate md
-
-mamba install -c conda-forge mpi4py=3.1.3 ambertools=21.12 compilers=1.2.0 gromacs==2022.4 rdkit dask distributed -y -q
-
-python -m pip install git+https://github.com/Valdes-Tresanco-MS/ParmEd.git@v3.4
-python -m pip install gmx_MMPBSA
-
-pip install paramiko asyncssh prolif plotnine
-
-pip install git+https://github.com/ci-lab-cz/md-scripts.git
 ```
 
 ## **Description**
