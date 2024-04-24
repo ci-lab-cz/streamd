@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import filepath_type
-from streamd.prolif.prolif2png import convertplif2png
+from streamd.prolif.prolif2png import convertprolif2png
+from streamd.prolif.prolif_frame_map import convertplifbyframe2png
 plt.ioff()
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -32,7 +33,7 @@ def backup_output(output):
 
 
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
-                    save_visual=True, dpi=300, plot_width=15, plot_height=8):
+                    save_pics=True, dpi=300, plot_width=15, plot_height=8):
     '''
 
     :param tpr:
@@ -43,7 +44,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     :param verbose:
     :param output:
     :param n_jobs:
-    :param save_visual: save barcode in png and network in html
+    :param save_pics: save barcode in png and network in html
     :param dpi:
     :param plot_width:  in inches
     :param plot_height: in inches
@@ -63,16 +64,18 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     df = df.reindex(sorted(df.columns), axis=1)
     df.to_csv(output, sep='\t')
 
-    if save_visual:
+    if save_pics:
         # barcode
         Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
         # Net
         LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit')).save(f'{output.rstrip(".csv")}.html')
+        convertplifbyframe2png(plif_out_file=output, plot_width=plot_width, plot_height=plot_height)
 
     return df
 
 
-def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs):
+def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
+                         plot_width, plot_height, save_viz, n_jobs):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     output = os.path.join(wdir, output)
@@ -82,7 +85,9 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
         print(f'{wdir}: cannot run gbsa. Check if there are missing files: {tpr} {xtc}. Skip such directory')
         return None
 
-    run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs)
+    run_prolif_task(tpr=tpr, xtc=xtc, protein_selection=protein_selection,
+                    ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
+                    plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, n_jobs=n_jobs)
     return output
 
 
@@ -103,17 +108,10 @@ def collect_outputs(output_list, output):
     df_aggregated.loc[:, sorted_columns].to_csv(output, sep='\t', index=False)
 
 
-def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, ligand_resid, hostfile, ncpu, verbose):
+def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, ligand_resid, hostfile, ncpu,
+          occupancy, plot_width, plot_height, save_viz, verbose):
     output = 'plifs.csv'
     output_aggregated = os.path.join(wdir_output, 'prolif_output.csv')
-
-    # problem with n_jobs
-    # if hostfile:
-    #     with open(hostfile) as f:
-    #         hosts = [line.strip() for line in f if line.strip()]
-    #         n_servers = len(hosts)
-    # else:
-    #     n_servers = 1
 
     if append_protein_selection is None:
         protein_selection = 'protein'
@@ -124,16 +122,16 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
 
     if wdir_to_run is not None:
         dask_client, cluster = None, None
-        # n_tasks_per_node = min(math.ceil(len(wdir_to_run) / n_servers), ncpu)
-        n_tasks_per_node = min(len(wdir_to_run), ncpu)
         njobs_per_task = 1
-        # njobs_per_task = math.floor(ncpu / n_tasks_per_node)
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=n_tasks_per_node, ncpu=ncpu)
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(len(wdir_to_run), ncpu),
+                                                     use_multi_servers=True if len(wdir_to_run) > ncpu else False,
+                                                     ncpu=ncpu)
             var_prolif_out_files = []
             for res in calc_dask(run_prolif_from_wdir, wdir_to_run, dask_client=dask_client,
                                  tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                                  ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
+                                 plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
                                  n_jobs=njobs_per_task):
                 if res:
                     var_prolif_out_files.append(res)
@@ -152,7 +150,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
     backup_output(output_aggregated)
     collect_outputs(var_prolif_out_files, output=output_aggregated)
 
-    convertplif2png(output_aggregated)
+    convertprolif2png(output_aggregated,occupancy=occupancy, plot_width=plot_width, plot_height=plot_height)
 
 
 def main():
@@ -186,6 +184,15 @@ def main():
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
                         help='number of CPU per server. Use all cpus by default.')
+    parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
+                        help='width of the output pictures')
+    parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
+                        help='height of the output pictures')
+    parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0.6, type=float,
+                        help='occupancy of the unique contacts to show')
+    parser.add_argument('--not_save_pics', default=False, action='store_true',
+                        help='not create html and png files (by frames) for each unique trajectory.'
+                             ' Only overall prolif png file will be created.')
 
     args = parser.parse_args()
 
@@ -203,7 +210,10 @@ def main():
 
     start(wdir_to_run=args.wdir_to_run, wdir_output=wdir, tpr=tpr,
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
-          ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu, verbose=args.verbose)
+          ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
+          occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
+          save_viz=not args.not_save_pics,
+          verbose=args.verbose)
 
 
 if __name__ == '__main__':

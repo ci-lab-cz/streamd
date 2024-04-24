@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import re
 import matplotlib.pyplot as plt
-import seaborn as sns
 from plotnine import ggplot, geom_point, aes, theme, element_text, element_blank, theme_bw, scale_color_manual, element_rect, scale_x_discrete
 plt.ioff()
 
@@ -30,7 +29,7 @@ plt.ioff()
 #     # return f'{resid_chain} {contact}'
 #     return f'{split_row[0]}{chain} {split_row[-1]}'
 
-def convertplif2png(plif_out_file, occupancy=0.6,  plot_width=None, plot_height=None):
+def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height=None):
 
     new_names = {"HBACCEPTOR": "A", "ANIONIC": "N", "HYDROPHOBIC": "H", 'METALACCEPTOR':'MeA',
                  "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONIC": "P"}
@@ -38,7 +37,7 @@ def convertplif2png(plif_out_file, occupancy=0.6,  plot_width=None, plot_height=
     # label_colors = {"A": "red", "D": "forestgreen", "N": "blue", "P": "magenta",
     #                 "H": "orange", "pi+": "black", "pi-s": 'black','MeA': 'pink'}
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
-                    "hydrophobic": "orange", "pication": "black", "pistacking": 'black','metalacceptor': 'pink'}
+                    "hydrophobic": "orange", "pication": "black", "pistacking": 'black','metalacceptor': 'cyan'}
 
     df = pd.read_csv(plif_out_file, sep='\t')
     df_occup = df.drop('Frame', axis=1).groupby('Name').apply(lambda x: round(x.sum() / len(x), 1))
@@ -79,10 +78,22 @@ def convertplif2png(plif_out_file, occupancy=0.6,  plot_width=None, plot_height=
     else:
         plot.save(output_name, dpi=300, verbose=False)
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='''Returns the formal charge for the molecule using RDKiT''')
-    parser.add_argument('-i', '--input', metavar='FILENAME', required=True,
+    parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='+',
                         help='input file with compound. Supported formats: *.csv')
+    parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0.6, type=float,
+                        help='occupancy of the unique contacts to show')
+    parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
+                        help='width of the output picture')
+    parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
+                        help='height of the output picture')
+
     args = parser.parse_args()
 
-    convertplif2png(args.input)
+    for input_file in args.input:
+        convertprolif2png(input_file, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height)
+
+
+if __name__ == '__main__':
+    main()

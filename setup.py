@@ -28,6 +28,8 @@ setuptools.setup(
     entry_points={'console_scripts':
                       ['run_md = streamd.run_md:main',
                        'run_gbsa = streamd.run_gbsa:main',
-                       'run_prolif = streamd.prolif.run_prolif:main']},
+                       'run_prolif = streamd.prolif.run_prolif:main',
+                       'prolif_map_png = streamd.prolif.prolif2png:main',
+                       'prolif_framemap_png = streamd.prolif.prolif_frame_map:main']},
     include_package_data=True
 )

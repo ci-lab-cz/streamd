@@ -6,24 +6,20 @@ from plotnine import (ggplot, geom_point, aes, theme, element_text, element_blan
                       theme_bw, scale_color_manual, element_rect, facet_wrap, labs, scale_x_continuous, element_line,facet_grid )
 plt.ioff()
 
-def convertplif2png(plif_out_file, occupancy=0, plot_width=15, plot_height=5):
+def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
 
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
-                    "hydrophobic": "orange", "pication": "black", "pistacking": 'black', 'metalacceptor': 'pink'}
+                    "hydrophobic": "orange", "pication": "black", "pistacking": 'black', 'metalacceptor': 'cyan'}
 
     df = pd.read_csv(plif_out_file, sep='\t')
     subdf = pd.melt(df, id_vars=['Frame'])
+    subdf = subdf[subdf['value']]
     subdf['residue'] = subdf['variable'].apply(lambda x: '.'.join(x.split('.')[:-1]).upper())
     subdf['interaction'] = subdf['variable'].apply(lambda x: x.split('.')[-1])#.replace(new_names, regex=True)
     subdf['color'] = subdf['interaction'].apply(lambda x: label_colors.get(x, 'grey'))
-    occupancy_df = subdf.groupby('variable').apply(lambda x: round(x['value'].sum() / len(x), 1))
-    occupancy_30 = occupancy_df[occupancy_df >= occupancy]
-    contact_list_within_occupancy = occupancy_30.index.to_list()
-    subdf_occupancy = subdf[(subdf['variable'].isin(contact_list_within_occupancy)) & (subdf['value'])]
-    # subdf_occupancy = subdf[(subdf['variable'].isin(contact_list_within_occupancy))]
 
-    subdf_occupancy.loc[:,'Time (ns)'] = subdf_occupancy.loc[:, 'Frame'].apply(lambda x: x/100)
-    plot = (ggplot(subdf_occupancy, aes(y="interaction",x="Time (ns)", color="interaction"))+ theme_bw(12)+
+    subdf.loc[:,'Time (ns)'] = subdf.loc[:, 'Frame'].apply(lambda x: x/100)
+    plot = (ggplot(subdf, aes(y="interaction",x="Time (ns)", color="interaction"))+ theme_bw(12)+
             geom_point(alpha=0.9, shape='|', size=5) +
     theme(panel_background = element_rect(fill="white", color="white"),
           panel_grid = element_blank(),
@@ -31,7 +27,7 @@ def convertplif2png(plif_out_file, occupancy=0, plot_width=15, plot_height=5):
           strip_background = element_rect(fill="white", colour="white"),
           strip_text_y=element_text(angle = 0),
           axis_text_y=element_blank(),
-          axis_ticks_y=element_blank(),
+          # axis_ticks_y=element_blank(),
           legend_title = element_text(), legend_text = element_text(),
           legend_position="bottom",
           legend_key=element_rect(color="white"),
@@ -43,19 +39,25 @@ def convertplif2png(plif_out_file, occupancy=0, plot_width=15, plot_height=5):
         labs(y='', title='')+ scale_color_manual(values = label_colors, na_value="white"))
 
     output_name = os.path.join(os.path.dirname(plif_out_file),
-                               f"{os.path.basename(plif_out_file).strip('.csv')}_occupancy{occupancy}.png")
+                               f"{os.path.basename(plif_out_file).strip('.csv')}_framemap.png")
 
     if plot_width and plot_height:
         plot.save(output_name, width=plot_width, height=plot_height, dpi=300, verbose=False)
     else:
         plot.save(output_name, dpi=300, verbose=False)
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='''Returns the formal charge for the molecule using RDKiT''')
-    parser.add_argument('-i', '--input', metavar='FILENAME', required=True,
+    parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='*',
                         help='input file with compound. Supported formats: *.csv')
-    parser.add_argument('-i', '--input', metavar='FILENAME', required=True,
-                        help='input file with compound. Supported formats: *.csv')
+    parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
+                        help='width of the output picture')
+    parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
+                        help='height of the output picture')
     args = parser.parse_args()
+    for input_file in args.input:
+        convertplifbyframe2png(input_file, plot_width=args.width, plot_height=args.height)
 
-    convertplif2png(args.input)
+
+if __name__ == '__main__':
+    main()
