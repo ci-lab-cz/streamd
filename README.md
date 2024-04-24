@@ -173,6 +173,12 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 
 ```
 
+**To run simulations with MCPBPY using parametrization procedure**  
+*Gaussian Software* should be available.
+```
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
+
+```
 **To run simulations using multiple servers**
 ```
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile $PBS_NODEFILE --ncpu 128
@@ -273,7 +279,7 @@ frame.pdb - a frame for topology
 ```
 - **Analysis data**  
 ```
-potential.png - m
+potential.png 
 temperature.png
 pressure.png
 density.png
@@ -284,8 +290,6 @@ rmsd_ligand_1.png - rmsd of the ligand
 rmsf.png - root mean square fluctuation (RMSF, i.e. standard deviation) of atomic positions in the trajectory
 gyrate.png - radius of gyration
 ```
-_All analysis results you can visualize with xmgrace:_  
-`` for i in *.xvg; do gracebat $i;done `` 
 
 ### MM-PBSA/MM-GBSA energy calculation
 #### **USAGE**
