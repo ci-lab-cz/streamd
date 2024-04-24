@@ -225,7 +225,10 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         startframe, endframe, interval = get_mmpbsa_start_end_interval(mmpbsa)
         if wdir_to_run is not None:
             try:
-                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=ncpu, ncpu=ncpu)
+                dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                         n_tasks_per_node=min(ncpu, len(wdir_to_run)),
+                                                         use_multi_servers=True if len(wdir_to_run) > ncpu else False,
+                                                         ncpu=ncpu)
                 var_number_of_frames = []
                 for res in calc_dask(run_get_frames_from_wdir, wdir_to_run, dask_client=dask_client,
                                      xtc=xtc, env=os.environ.copy()):

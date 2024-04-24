@@ -234,7 +234,9 @@ def start(protein, wdir, lfile, system_lfile,
                 return None
             # Part 2 Complex preparation
             try:
-                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)), ncpu=ncpu)
+                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)),
+                                                         use_multi_servers=True if len(var_lig_wdirs) > ncpu else False,
+                                                         ncpu=ncpu)
                 # make all.itp and create complex
                 logging.info('Start complex preparation')
                 var_complex_prepared_dirs = []
