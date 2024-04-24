@@ -3,7 +3,7 @@
 ## installation
 *Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
 
-[env.yml](https://raw.githubusercontent.com/ci-lab-cz/streamd/master/env.yml)
+[env.yml](https://github.com/ci-lab-cz/streamd/blob/master/env.yml)
 ```
 conda env create -n md --file env.yml
 
