@@ -32,42 +32,48 @@ def run_equilibration(wdir, project_dir, bash_log, env=None):
 
 
 def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
-                   tpr, cpt, xtc, deffnm_prev, deffnm_next,
+                   tpr, cpt, xtc, deffnm, deffnm_next,
                    env=None):
     # continue/extend simulation if checkpoint files exist
     if (tpr is not None and os.path.isfile(tpr) and cpt is not None and os.path.isfile(cpt) and xtc is not None and os.path.isfile(str(xtc))) or \
-        (os.path.isfile(os.path.join(wdir, f'{deffnm_prev}.tpr')) and os.path.isfile(os.path.join(wdir, f'{deffnm_prev}.cpt'))
-            and os.path.isfile(os.path.join(wdir, f'{deffnm_prev}.xtc')) ) :
-        logging.warning(f'{wdir}. md_out.xtc and md_out.tpr and  md_out.cpt exist. '
+        (os.path.isfile(os.path.join(wdir, f'{deffnm}.tpr')) and os.path.isfile(os.path.join(wdir, f'{deffnm}.cpt'))
+         and os.path.isfile(os.path.join(wdir, f'{deffnm}.xtc'))) :
+        logging.warning(f'{wdir}. {deffnm}.xtc and {deffnm}.tpr and  {deffnm}.cpt exist. '
                         f'MD simulation will be continued until the setup simulation steps are reached.')
         if continue_md_from_dir(wdir_to_continue=wdir, tpr=tpr, cpt=cpt, xtc=xtc,
-                             deffnm_prev=deffnm_prev, deffnm_next=deffnm_next,
-                             mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log, env=env) is None:
+                                deffnm=deffnm, deffnm_next=deffnm_next,
+                                mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log, env=env) is None:
             return None
 
-        return (wdir,deffnm_next)
+        return (wdir, deffnm)
 
-    cmd = f'wdir={wdir} deffnm={deffnm_prev} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
+    cmd = f'wdir={wdir} deffnm={deffnm} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
         return None
-    return (wdir, deffnm_prev)
+    return (wdir, deffnm)
 
 
-def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_next, mdtime_ns, project_dir, bash_log, env=None):
-    def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log):
+def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next, mdtime_ns, project_dir, bash_log, env=None):
+    def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log, env):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
               f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
               f'>> {os.path.join(wdir, bash_log)} 2>&1'
-        if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
-            return None
-        return wdir
+        if run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
+            return wdir
+        return None
+
+    def backup_prev_files(file_to_backup, wdir):
+        n = len(glob(os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.*#'))) + 1
+        new_f = os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.{n}#')
+        shutil.move(file_to_backup, new_f)
+        logging.warning(f'Backup previous file {file_to_backup} to {new_f}')
 
     if tpr is None:
-        tpr = os.path.join(wdir_to_continue, f'{deffnm_prev}.tpr')
+        tpr = os.path.join(wdir_to_continue, f'{deffnm}.tpr')
     if cpt is None:
-        cpt = os.path.join(wdir_to_continue, f'{deffnm_prev}.cpt')
+        cpt = os.path.join(wdir_to_continue, f'{deffnm}.cpt')
     if xtc is None:
-        xtc = os.path.join(wdir_to_continue, f'{deffnm_prev}.xtc')
+        xtc = os.path.join(wdir_to_continue, f'{deffnm}.xtc')
 
     for i in [tpr, cpt, xtc]:
         if not os.path.isfile(i):
@@ -78,25 +84,26 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm_prev, deffnm_ne
 
     new_mdtime_ps = int(mdtime_ns * 1000)
 
-    # check previous existing files with the same name
-    for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}*')):
-        n = len(glob(os.path.join(wdir_to_continue, f'#{os.path.basename(f)}.*#'))) + 1
-        new_f = os.path.join(wdir_to_continue, f'#{os.path.basename(f)}.{n}#')
-        shutil.move(f, new_f)
-        logging.warning(f'Backup previous file {f} to {new_f}')
+    if continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
+                   new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir,
+                   env=env, bash_log=bash_log):
+        for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}.*')):
+            # check previous existing files with the same name
+            backup_prev_files(file_to_backup=os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)),
+                              wdir=wdir_to_continue)
+            shutil.move(f, os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)))
 
-    return continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
-                       new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir, bash_log=bash_log)
+        return wdir_to_continue
 
 
 def start(protein, wdir, lfile, system_lfile,
           forcefield_name, npt_time_ps, nvt_time_ps, mdtime_ns,
           topol, topol_itp_list, posre_list_protein,
-          wdir_to_continue_list, deffnm_prev,
+          wdir_to_continue_list, deffnm,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
-          seed, steps, hostfile, ncpu, clean_previous, not_clean_log_files, bash_log=None):
+          seed, steps, hostfile, ncpu, clean_previous, not_clean_log_files, out_time, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -307,7 +314,7 @@ def start(protein, wdir, lfile, system_lfile,
                                          project_dir=project_dir, bash_log=bash_log,
                                          mdtime_ns=mdtime_ns,
                                          tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
-                                         deffnm_prev=deffnm_prev, deffnm_next=f'{deffnm_prev}_{mdtime_ns}',
+                                         deffnm=deffnm, deffnm_next=f'{deffnm}_{out_time}',
                                          env=os.environ.copy()):
                         if res:
                             var_md_dirs_deffnm.append(res)
@@ -320,11 +327,10 @@ def start(protein, wdir, lfile, system_lfile,
                 if cluster:
                     cluster.close()
 
-            # deffnm = 'md_out'
             logging.info(f'Simulation of {len(var_md_dirs_deffnm)} were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
 
         else:
-            var_md_dirs_deffnm = [(i, deffnm_prev) for i in wdir_to_continue_list]
+            var_md_dirs_deffnm = [(i, deffnm) for i in wdir_to_continue_list]
 
     if not var_md_dirs_deffnm:
         return None
@@ -359,15 +365,17 @@ def start(protein, wdir, lfile, system_lfile,
     if not not_clean_log_files:
         if wdir_to_continue_list is None:
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
-                if '.tpr.' not in f and '.xtc.' not in f:
-                    os.remove(f)
+                # if '.tpr.' not in f and '.xtc.' not in f:
+                #     os.remove(f)
+                os.remove(f)
             for f in glob(os.path.join(wdir_md, '*', '*.trr')):
                 os.remove(f)
         else:
             for wdir_md in wdir_to_continue_list:
                 for f in glob(os.path.join(wdir_md, '#*#')):
-                    if '.tpr.' not in f and '.xtc.' not in f:
-                        os.remove(f)
+                    # if '.tpr.' not in f and '.xtc.' not in f:
+                    #     os.remove(f)
+                    os.remove(f)
                 for f in glob(os.path.join(wdir_md, '*', '*.trr')):
                     os.remove(f)
 
@@ -440,8 +448,8 @@ def main():
                                  If you want to continue your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments 
                                  (--ligand_list_file is optional and required to run md analysis after simulation )''')
     parser2.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
-                        help='''preffix for the previous md files. Use to extend or continue the simulation.
-                            Required if --wdir_to_continue is used. Files deffnm.tpr, deffnm.cpt, deffnm.xtc will be used from --wdir_to_continue directories''')
+                        help='''preffix for the md files. Use to run, extend or continue the simulation.
+                            If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt, deffnm.xtc will be searched from --wdir_to_continue directories''')
     parser2.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='tpr file from the previous MD simulation')
     parser2.add_argument('--cpt', metavar='FILENAME', required=False, default=None, type=filepath_type,
@@ -522,7 +530,7 @@ def main():
               lfile=args.ligand, system_lfile=args.cofactor,
               topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
               forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
-              wdir_to_continue_list=args.wdir_to_continue, deffnm_prev=args.deffnm,
+              wdir_to_continue_list=args.wdir_to_continue, deffnm=args.deffnm,
               tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
@@ -530,6 +538,6 @@ def main():
               hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges, mcpbpy_cut_off=args.metal_cutoff,
-              bash_log=bash_log)
+              out_time=out_time, bash_log=bash_log)
     finally:
         logging.shutdown()

@@ -1,6 +1,5 @@
 #!/bin/bash
 #  args: wdir
-OMP_NUM_THREADS=2
 cd $wdir
 # MD
 >&2 echo 'Script running:***************************** Continue MD simulation *********************************'
@@ -12,3 +11,4 @@ gmx trjcat -f $xtc $deffnm_next\.part*.xtc -o $deffnm_next\.xtc -settime -tu fs 
 0
 c
 INPUT
+rm $deffnm_next\.part*.*
