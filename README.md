@@ -18,8 +18,9 @@ conda env create -n md --file env.yml
     - Protein - Ligand;  
     - Protein - Cofactor (multiple);  
     - Protein - Ligand - Cofactor (multiple);  
-    
+  
 - supports of simulations of boron-containing molecules using Gaussian Software
+- supports of simulations of ligand binding metalloproteins with MCPB.py
 - supports distributed computing using dask library
 - supports of running of parallel simulations on multiple servers
 - supports to extend time of MD simulations 
@@ -70,8 +71,12 @@ Standard Molecular Dynamics Simulation Run:
   --seed int            seed
   --not_clean_log_files
                         Not to remove all backups of md files
-  --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:1 - run preparation step (protein, ligand, cofactor preparation)2 - run MD equilibration
-                        step (minimization, NVT, NPT)3 - run MD simulation4 - run MD analysis.Ex: 3 4. 
+  --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:
+                        1 - run preparation step (protein, ligand, cofactor preparation)
+                        2 - run MD equilibration step (minimization, NVT, NPT)
+                        3 - run MD simulation
+                        4 - run MD analysis
+                        Ex: 3 4. 
                         If 2 or 3 or 4 step(s) are used --wdir_to_continue argument should be
                         used to provide directories with files obtained during the previous steps
 
@@ -143,7 +148,7 @@ Required to obtain relevant poses of the ligand if need
 https://github.com/ci-lab-cz/easydock
 
 #### Run molecular dynamics simulation
-``` source activate gmxMMPBSA ```  
+``` source activate md ```  
  
 **Run simulation for different sytems:**
 - Protein in Water
@@ -181,12 +186,18 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 ```
 **To run simulations using multiple servers**
 ```
+PBS:
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile $PBS_NODEFILE --ncpu 128
+
+SLURM:
+srun hostname | sort | uniq > hostfile  
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile hostfile --ncpu 128
+
 ```
 
 **To extend the simulation**
 ```
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ md_preparation/md_files/protein_H_HIS_ligand_*/ --md_time 0.2 --deffnm md_out
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_*/ --md_time 0.2 --deffnm md_out --step 3 4
 ```
 you can continue your simulation unlimited times just use previous extended deffnm OR tpr, cpt and xtc arguments 
 ```
@@ -336,8 +347,8 @@ run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/p
  2) a unique bash log file. 
  log_mmpbsa_bash_*start-time*.log   
  Contains stdout from gmx_MMPBSA 
- 3) GBSA_output_*start*.csv with summary csv if MMGBSA method was run
- 4) PBSA_output_*start*.csv with summary csv if MMPBSA method was run
+ 3) GBSA_output_*start-time*.csv with summary csv if MMGBSA method was run
+ 4) PBSA_output_*start-time*.csv with summary csv if MMPBSA method was run
  
  each wdir_to_run has FINAL_RESULTS_MMPBSA_*start-time*.csv with GBSA/PBSA output. 
  
