@@ -448,7 +448,7 @@ def main():
                                  If you want to continue your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments 
                                  (--ligand_list_file is optional and required to run md analysis after simulation )''')
     parser2.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
-                        help='''preffix for the md files. Use to run, extend or continue the simulation.
+                        help='''preffix for the md files. Used to run, extend or continue the simulation.
                             If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt, deffnm.xtc will be searched from --wdir_to_continue directories''')
     parser2.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='tpr file from the previous MD simulation')

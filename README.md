@@ -87,8 +87,8 @@ Continue or Extend Molecular Dynamics Simulation:
                         your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments (--ligand_list_file is optional and required to
                         run md analysis after simulation )
   --deffnm preffix for md files
-                        preffix for the previous md files. Use to extend or continue the simulation. Required if --wdir_to_continue is used. Files deffnm.tpr,
-                        deffnm.cpt, deffnm.xtc will be used from --wdir_to_continue directories
+                        Used to run, extend or continue the simulation.
+                        If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt, deffnm.xtc will be searched from --wdir_to_continue directories
   --tpr FILENAME        tpr file from the previous MD simulation
   --cpt FILENAME        cpt file from previous simulation
   --xtc FILENAME        xtc file from previous simulation
@@ -196,16 +196,18 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 ```
 
 **To extend the simulation**
+you can continue your simulation unlimited times just use previous extended deffnm
 ```
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_*/ --md_time 0.2 --deffnm md_out --step 3 4
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_*/ --md_time 0.2
 ```
-you can continue your simulation unlimited times just use previous extended deffnm OR tpr, cpt and xtc arguments 
+or use tpr, cpt and xtc arguments
 ```
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --deffnm md_out_0.2
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr md_preparation/md_files/protein_H_HIS_ligand_1/md_out.tpr --cpt md_preparation/md_files/protein_H_HIS_ligand_1/md_out.cpt --xtc md_preparation/md_files/protein_H_HIS_ligand_1/md_out.xtc
 ```
-or 
+in case you don't want to check/run all preparation steps you can use --steps argument 
 ```
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.tpr --cpt md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.cpt --xtc md_preparation/md_files/protein_H_HIS_ligand_1/md_out_0.2.xtc
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ --md_time 0.3 --steps 3 4
+run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ --md_time 0.4 --steps 3 4
 ```
   
 **Output**   
