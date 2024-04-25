@@ -425,7 +425,7 @@ def main():
                         help='time of NVT equilibration in ps')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
-    parser1.add_argument('--not_clean_log_files', action='store_true', default=False,
+    parser1.add_argument('--not_clean_backup_files', action='store_true', default=False,
                         help='Not to remove all backups of md files')
     parser1.add_argument('--steps', default=None, nargs='*', type=int,
                         help='Run a particular step(s) of the StreaMD run. '
