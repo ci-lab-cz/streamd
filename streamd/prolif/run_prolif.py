@@ -33,7 +33,7 @@ def backup_output(output):
 
 
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
-                    save_pics=True, dpi=300, plot_width=15, plot_height=8):
+                    save_viz=True, dpi=300, plot_width=15, plot_height=8):
     '''
 
     :param tpr:
@@ -64,7 +64,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     df = df.reindex(sorted(df.columns), axis=1)
     df.to_csv(output, sep='\t')
 
-    if save_pics:
+    if save_viz:
         # barcode
         Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
         # Net
