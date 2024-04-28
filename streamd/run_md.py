@@ -103,7 +103,7 @@ def start(protein, wdir, lfile, system_lfile,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
-          seed, steps, hostfile, ncpu, clean_previous, not_clean_log_files, out_time, bash_log=None):
+          seed, steps, hostfile, ncpu, clean_previous, not_clean_backup_files, out_time, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -362,7 +362,7 @@ def start(protein, wdir, lfile, system_lfile,
         logging.info(
             f'Analysis of md simulation of {len(var_md_analysis_dirs)} were successfully finished\nFinished: {var_md_analysis_dirs}')
 
-    if not not_clean_log_files:
+    if not not_clean_backup_files:
         if wdir_to_continue_list is None:
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
                 # if '.tpr.' not in f and '.xtc.' not in f:
