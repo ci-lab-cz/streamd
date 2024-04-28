@@ -536,7 +536,7 @@ def main():
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
               hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed, steps=args.steps,
-              clean_previous=args.clean_previous_md, not_clean_log_files=args.not_clean_log_files,
+              clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges, mcpbpy_cut_off=args.metal_cutoff,
               out_time=out_time, bash_log=bash_log)
     finally:
