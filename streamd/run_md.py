@@ -315,6 +315,8 @@ def start(protein, wdir, lfile, system_lfile,
                                          env=os.environ.copy()):
                         if res:
                             var_md_dirs_deffnm.append(res)
+                    logging.info(
+                        f'Simulation of {len(var_md_dirs_deffnm)} were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
 
             finally:
                 if dask_client:
@@ -324,7 +326,6 @@ def start(protein, wdir, lfile, system_lfile,
                 if cluster:
                     cluster.close()
 
-            logging.info(f'Simulation of {len(var_md_dirs_deffnm)} were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
 
         elif 4 in steps:
             if wdir_to_continue_list:
