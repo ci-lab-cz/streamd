@@ -283,14 +283,11 @@ def start(protein, wdir, lfile, system_lfile,
                 if cluster:
                     cluster.close()
 
-            if not var_complex_prepared_dirs:
-                return None
-
         else:
             var_complex_prepared_dirs = wdir_to_continue_list
 
         # Part 3. Equilibration and MD simulation. Run on all cpu
-        if steps is None or 2 in steps or 3 in steps:
+        if (steps is None or 2 in steps or 3 in steps) and var_complex_prepared_dirs:
             try:
                 dask_client, cluster = init_dask_cluster(hostfile=hostfile,
                                                          n_tasks_per_node=1,
@@ -330,13 +327,13 @@ def start(protein, wdir, lfile, system_lfile,
             logging.info(f'Simulation of {len(var_md_dirs_deffnm)} were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
 
         elif 4 in steps:
-            var_md_dirs_deffnm = [(i, deffnm) for i in wdir_to_continue_list]
-
-    if not var_md_dirs_deffnm:
-        return None
+            if wdir_to_continue_list:
+                var_md_dirs_deffnm = [(i, deffnm) for i in wdir_to_continue_list]
+            else:
+                var_md_dirs_deffnm = []
 
     # Part 3. MD Analysis. Run on each cpu
-    if steps is None or 4 in steps:
+    if (steps is None or 4 in steps) and var_md_dirs_deffnm:
         try:
             dask_client, cluster = init_dask_cluster(hostfile=hostfile,
                                                      n_tasks_per_node=min(ncpu, len(var_md_dirs_deffnm)),
