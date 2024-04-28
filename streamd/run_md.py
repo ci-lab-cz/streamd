@@ -287,6 +287,8 @@ def start(protein, wdir, lfile, system_lfile,
             var_complex_prepared_dirs = wdir_to_continue_list
 
         # Part 3. Equilibration and MD simulation. Run on all cpu
+        var_eq_dirs = []
+        var_md_dirs_deffnm = []
         if (steps is None or 2 in steps or 3 in steps) and var_complex_prepared_dirs:
             try:
                 dask_client, cluster = init_dask_cluster(hostfile=hostfile,
@@ -295,7 +297,6 @@ def start(protein, wdir, lfile, system_lfile,
                                                          ncpu=ncpu)
                 if steps is None or 2 in steps:
                     logging.info('Start Equilibration steps')
-                    var_eq_dirs = []
                     for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir,
                                          bash_log=bash_log, env=os.environ.copy()):
                         if res:
@@ -305,7 +306,6 @@ def start(protein, wdir, lfile, system_lfile,
                     var_eq_dirs = wdir_to_continue_list
 
                 if steps is None or 3 in steps:
-                    var_md_dirs_deffnm = []
                     logging.info('Start Simulation step')
                     for res in calc_dask(run_simulation, var_eq_dirs, dask_client,
                                          project_dir=project_dir, bash_log=bash_log,
@@ -328,10 +328,7 @@ def start(protein, wdir, lfile, system_lfile,
 
 
         elif 4 in steps:
-            if wdir_to_continue_list:
-                var_md_dirs_deffnm = [(i, deffnm) for i in wdir_to_continue_list]
-            else:
-                var_md_dirs_deffnm = []
+            var_md_dirs_deffnm = [(i, deffnm) for i in wdir_to_continue_list]
 
     # Part 3. MD Analysis. Run on each cpu
     if (steps is None or 4 in steps) and var_md_dirs_deffnm:
