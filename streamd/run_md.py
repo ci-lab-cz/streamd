@@ -329,7 +329,7 @@ def start(protein, wdir, lfile, system_lfile,
 
             logging.info(f'Simulation of {len(var_md_dirs_deffnm)} were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
 
-        else:
+        elif 4 in steps:
             var_md_dirs_deffnm = [(i, deffnm) for i in wdir_to_continue_list]
 
     if not var_md_dirs_deffnm:
