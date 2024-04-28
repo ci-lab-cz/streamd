@@ -134,6 +134,8 @@ def start(protein, wdir, lfile, system_lfile,
     script_path = os.path.join(project_dir, 'scripts')
     script_mdp_path = os.path.join(script_path, 'mdp')
 
+    wdir_md = os.path.join(wdir, 'md_files', 'md_run')
+
     dask_client, cluster = None, None
 
     if tpr_prev is None or cpt_prev is None or xtc_prev is None:
@@ -146,8 +148,6 @@ def start(protein, wdir, lfile, system_lfile,
             wdir_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'ligands')
             wdir_system_ligand = os.path.join(wdir, 'md_files', 'md_preparation', 'cofactors')
             wdir_metal = os.path.join(wdir, 'md_files', 'md_preparation', 'metals', pname)
-
-            wdir_md = os.path.join(wdir, 'md_files', 'md_run')
 
             os.makedirs(wdir_md, exist_ok=True)
             os.makedirs(wdir_protein, exist_ok=True)
