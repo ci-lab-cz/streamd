@@ -9,7 +9,8 @@ plt.ioff()
 def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
 
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
-                    "hydrophobic": "orange", "pication": "black", "pistacking": 'black', 'metalacceptor': 'cyan'}
+                    "hydrophobic": "orange", "pication": "black", "cationpi": "darkblue",
+                    "pistacking": 'darkslategray', 'metalacceptor': 'cyan'}
 
     df = pd.read_csv(plif_out_file, sep='\t')
     subdf = pd.melt(df, id_vars=['Frame'])
@@ -18,8 +19,8 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
     subdf['interaction'] = subdf['variable'].apply(lambda x: x.split('.')[-1])#.replace(new_names, regex=True)
     subdf['color'] = subdf['interaction'].apply(lambda x: label_colors.get(x, 'grey'))
 
-    subdf.loc[:,'Time (ns)'] = subdf.loc[:, 'Frame'].apply(lambda x: x/100)
-    plot = (ggplot(subdf, aes(y="interaction",x="Time (ns)", color="interaction"))+ theme_bw(12)+
+    subdf.loc[:,'Time, ns'] = subdf.loc[:, 'Frame'].apply(lambda x: x/100)
+    plot = (ggplot(subdf, aes(y="interaction",x="Time, ns", color="interaction"))+ theme_bw(12)+
             geom_point(alpha=0.9, shape='|', size=5) +
     theme(panel_background = element_rect(fill="white", color="white"),
           panel_grid = element_blank(),
@@ -36,7 +37,7 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
         # scale_x_continuous(breaks = range(min(subdf_occupancy['Frame']),
         #                max(subdf_occupancy['Frame']), 1000))
             facet_grid('residue', scales = 'free_y')+
-        labs(y='', title='')+ scale_color_manual(values = label_colors, na_value="white"))
+        labs(y='', title='', x= '\nTime, ns')+ scale_color_manual(values = label_colors, na_value="white"))
 
     output_name = os.path.join(os.path.dirname(plif_out_file),
                                f"{os.path.basename(plif_out_file).strip('.csv')}_framemap.png")

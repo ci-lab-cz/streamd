@@ -32,12 +32,13 @@ plt.ioff()
 def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height=None):
 
     new_names = {"HBACCEPTOR": "A", "ANIONIC": "N", "HYDROPHOBIC": "H", 'METALACCEPTOR':'MeA',
-                 "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONIC": "P"}
+                 "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONPI": "+pi", "CATIONIC": "P"}
 
     # label_colors = {"A": "red", "D": "forestgreen", "N": "blue", "P": "magenta",
     #                 "H": "orange", "pi+": "black", "pi-s": 'black','MeA': 'pink'}
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
-                    "hydrophobic": "orange", "pication": "black", "pistacking": 'black','metalacceptor': 'cyan'}
+                    "hydrophobic": "orange", "pication": "black",
+                    "cationpi": "darkblue", "pistacking": 'darkslategray', 'metalacceptor': 'cyan'}
 
     df = pd.read_csv(plif_out_file, sep='\t')
     df_occup = df.drop('Frame', axis=1).groupby('Name').apply(lambda x: round(x.sum() / len(x), 1))
@@ -58,7 +59,7 @@ def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height
     subdf['variable'] = pd.Categorical(subdf.variable, categories=pd.unique(subdf.variable))
 
     plot = (ggplot(subdf)+ geom_point(aes( x="variable", y="Name", color = "interaction"))
-        + theme_bw(base_size=8)  + scale_color_manual(values = label_colors)+
+        + theme_bw(base_size=12)  + scale_color_manual(values = label_colors)+
             theme(axis_text_x=element_text(rotation=90, hjust=0.5),
                 axis_text_y=element_text(vjust=0.5),
                   axis_title_y=element_blank(),
