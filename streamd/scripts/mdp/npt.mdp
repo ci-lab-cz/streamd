@@ -1,4 +1,4 @@
-title                   = OPLS Lysozyme NPT equilibration 
+title                   = OPLS NPT equilibration
 define                  = -DPOSRES  ; position restrain the protein and ligand
 ; Run parameters
 integrator              = md        ; leap-frog integrator
