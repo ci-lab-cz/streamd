@@ -139,7 +139,8 @@ def start(protein, wdir, lfile, system_lfile,
     dask_client, cluster = None, None
 
     if tpr_prev is None or cpt_prev is None or xtc_prev is None:
-        if steps is None or 1 in steps:
+        # preparation
+        if (steps is None or 1 in steps) and wdir_to_continue_list is None:
             # create dirs
             ligand_resid = 'UNL'
             pname, p_ext = os.path.splitext(os.path.basename(protein))
