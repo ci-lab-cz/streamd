@@ -400,11 +400,11 @@ run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run
 ```
 **Output**  
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html' file for each simulation will be created
-2) *prolif_output.csv/png* - aggregated csv/png output file for all analyzed simulations
+2) *prolif_output_start-time.csv/png* - aggregated csv/png output file for all analyzed simulations
 
 #### Supplementary scripts
-run_prolif applies all this scripts automatically. Use it if you want more detailed analysis or to change the picture/fonts sizes. 
-#### prolif_drawmap
+_run_prolif applies all this scripts automatically. Use it if you want more detailed analysis or to change the picture/fonts sizes._  
+**prolif_drawmap**  
 Draw prolif plot for analysis binding mode of multiple ligands
 ````
 prolif_drawmap  -h
@@ -417,15 +417,15 @@ options:
   -i FILENAME [FILENAME ...], --input FILENAME [FILENAME ...]
                         input file with prolif output for the set of molecules. Supported formats: *.csv
                         Ex: prolif_output.csv
-  -o FILENAME, --occupancy FILENAME
+  --occupancy float
                         minimum occupancy of the unique contacts to show
-  --width FILENAME      width of the output picture
-  --height FILENAME     height of the output picture
-  --base_size FILENAME  base size of the output picture
+  --width int      width of the output picture
+  --height int     height of the output picture
+  --base_size int  base size of the output picture
 
 ````
 
-#### prolif_draw_by_frame
+**prolif_draw_by_frame**
 
 ```
 prolif_draw_by_frame -h
@@ -436,12 +436,12 @@ options:
   -i [FILENAME ...], --input [FILENAME ...]
                         input file with prolif output for the unique molecule. Supported formats: *.csv
                         Ex: plifs.csv
-  -o FILENAME, --occupancy FILENAME
+  --occupancy float
                         minimum occupancy of the unique contacts to show. Show all contacts by default.
   --filt_only_H         filt residues where only hydrophobic contacts occur
-  --width FILENAME      width of the output picture
-  --height FILENAME     height of the output picture
-  --base_size FILENAME  base size of the output picture
+  --width int      width of the output picture
+  --height int     height of the output picture
+  --base_size int  base size of the output picture
 ```
 
 ### Logging

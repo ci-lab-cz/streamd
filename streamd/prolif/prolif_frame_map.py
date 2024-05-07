@@ -67,15 +67,15 @@ def main():
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='*',
                         help='input file with prolif output for the unique molecule. Supported formats: *.csv.'
                              ' Ex: plifs.csv')
-    parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0, type=float,
-                        help='minimum occupancy of the unique contacts to show. Show all contacts by default.')
+    parser.add_argument('--occupancy', metavar='float', default=0, type=float,
+                        help='minimum occupancy of the unique contacts to show. Show all contacts by default')
     parser.add_argument('--filt_only_H', action='store_true', default=False,
                         help='filt residues where only hydrophobic contacts occur')
-    parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
+    parser.add_argument('--width', metavar='int', default=15, type=int,
                         help='width of the output picture')
-    parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
+    parser.add_argument('--height', metavar='int', default=10, type=int,
                         help='height of the output picture')
-    parser.add_argument('--base_size', metavar='FILENAME', default=12, type=int,
+    parser.add_argument('--base_size', metavar='int', default=12, type=int,
                         help='base size of the output picture')
     args = parser.parse_args()
     for input_file in args.input:
