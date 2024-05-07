@@ -79,23 +79,24 @@ Standard Molecular Dynamics Simulation Run:
                         Ex: 3 4. 
                         If 2 or 3 or 4 step(s) are used --wdir_to_continue argument should be
                         used to provide directories with files obtained during the previous steps
-
-Continue or Extend Molecular Dynamics Simulation:
   --wdir_to_continue DIRNAME [DIRNAME ...]
-                        single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. ' Should consist of: tpr, cpt,
+                        single or multiple directories contain simulations created by the tool. 
+                        Use with steps 2,3,4 to continue the run. Should consist of: tpr, cpt,
                         xtc and all_ligand_resid.txt files. File all_ligand_resid.txt is optional and used to run md analysis for the ligands. If you want to continue
                         your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments (--ligand_list_file is optional and required to
                         run md analysis after simulation )
+
+Continue or Extend Molecular Dynamics Simulation:
   --deffnm preffix for md files
                         Used to run, extend or continue the simulation.
                         If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt, deffnm.xtc will be searched from --wdir_to_continue directories
-  --tpr FILENAME        tpr file from the previous MD simulation
-  --cpt FILENAME        cpt file from previous simulation
-  --xtc FILENAME        xtc file from previous simulation
+  --tpr FILENAME        use explicit tpr to continue a non-StreaMD simulation
+  --cpt FILENAME        use explicit cpt to continue a non-StreaMD simulation
+  --xtc FILENAME        use explicit xtc to continue a non-StreaMD simulation
   --ligand_list_file all_ligand_resid.txt
-                        If you want automatic md analysis for ligands was run after continue of simulation you should set ligand_list file. Format of the file (no
+                        If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you should set ligand_list file. Format of the file (no
                         headers): user_ligand_id gromacs_ligand_id. Example: my_ligand UNL. Can be set up or placed into --wdir_to_continue directory(ies)
-  --ligand_id UNL       If you want to run an automatic md analysis for the ligand after continue of simulation you can set ligand_id if it is not UNL default value
+  --ligand_id UNL       If you want to run an automatic md analysis for a ligand after continue of simulation you can set ligand_id if it is not UNL as a default value
 
 Boron-containing molecules or MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run arguments group):
   --activate_gaussian module load Gaussian/09-d01
@@ -196,18 +197,17 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 ```
 
 **To extend the simulation**
-you can continue your simulation unlimited times just use previous extended deffnm
+you can continue your simulation unlimited times. As the --md_time argument user should set up the overall time of the simulation
 ```
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_*/ --md_time 0.2
+run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 0.2
 ```
-or use tpr, cpt and xtc arguments
+or use explicit tpr, cpt and xtc arguments to continue a non-StreaMD simulation
 ```
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr md_preparation/md_files/protein_H_HIS_ligand_1/md_out.tpr --cpt md_preparation/md_files/protein_H_HIS_ligand_1/md_out.cpt --xtc md_preparation/md_files/protein_H_HIS_ligand_1/md_out.xtc
+run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc
 ```
-in case you don't want to check/run all preparation steps you can use --steps argument 
+in case you don't want to check/run all preparation steps with using non-StreaMD simulations you can use --steps argument 
 ```
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ --md_time 0.3 --steps 3 4
-run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ --md_time 0.4 --steps 3 4
+run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 0.3 --steps 3 4
 ```
   
 **Output**   
@@ -222,11 +222,12 @@ run_md --wdir_to_continue md_preparation/md_files/protein_H_HIS_ligand_1/ --md_t
 will be created the next folders:
 ```
 md_files/
-- md_files/md_preparation/
- -- md_files/md_preparation/protein/
- -- md_files/md_preparation/ligands/
- -- md_files/md_preparation/cofactors/
-- md_files/md_run/
+- md_preparation/
+ -- protein/
+ -- ligands/
+ -- cofactors/
+- md_run/
+ -- protein-id_ligand-id
 ```
 
 ```
@@ -234,7 +235,7 @@ md_files/md_preparation/protein/:
 protein.gro  posre.itp  topol.top
 
 OR for multiple chain protein:
-md_preparation/protein/:
+md_files/md_preparation/protein/:
 protein.gro 
 topol.top
 posre_Protein_chain_A.itp    
@@ -268,11 +269,10 @@ cofactor_1.inpcrd  cofactor_1.mol2    posre_cofactor_1.itp  sqm.pdb
 cofactor_1.itp     cofactor_1.prmtop  resid.txt             tleap.in
 
 cofactor_2/
-...
 ```
 
 ```
-md_files/md_run/md_files/
+md_files/md_run/
 
 protein_H_HIS_ligand_1/
 ligand_1.itp          density.xvg  em.trr      ions.tpr                md_out.edr         md_out.tpr             npt.cpt  npt.tpr  nvt.log    potential.xvg         rmsd.xvg       temperature.xvg
@@ -298,13 +298,18 @@ pressure.png
 density.png
 rmsd.png - rmsd of the protein against minimized structure
 rmsd_xtal.png - rmsd of the protein against crystal structure
-rmsd_cofactor_1.png - rmsd of each cofactors
-rmsd_ligand_1.png - rmsd of the ligand
+rmsd_cofactor_1.png - rmsd of cofactor against minimized structure
+rmsd_cofactor_1_xtal.png - rmsd of the ligand against crystal structure
+rmsd_ligand_1.png - rmsd of the ligand against minimized structure
+rmsd_ligand_1_xtal.png - rmsd of the ligand against crystal structure
 rmsf.png - root mean square fluctuation (RMSF, i.e. standard deviation) of atomic positions in the trajectory
 gyrate.png - radius of gyration
 ```
 
+## Supplementary tools
 ### MM-PBSA/MM-GBSA energy calculation
+#### The tool is based on [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/)
+Calculation arguments can be changed/added by customized [mmpbsa.in](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/input_file/) file 
 #### **USAGE**
 ```
 run_gbsa -h
@@ -397,5 +402,17 @@ run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html' file for each simulation will be created
 2) *prolif_output.csv/png* - aggregated csv/png output file for all analyzed simulations
 
+### Logging
+all system info or errors are saved into logging files which would be placed into your main working directory (the current working directory or the path which was passed through --wdir argument):
+```
+run_md:
+log_protein-fname_ligand-fname_cofactor-fname_current-date.log - StreaMD logging user info (status of the )
+streamd_bash_protein-fname_ligand-fname_cofactor-fname_current-date.log - StreaMD bash system logging info
+
+run_gbsa:
+log_mmpbsa_current-date.log - StreaMD logging user info
+log_mmpbsa_bash_current-date.log - StreaMD bash system logging info
+
+```
 ### Licence
-BSD-3
+MIT
