@@ -433,27 +433,27 @@ def main():
                              'Ex: 3 4'
                              'If 2/3/4 step(s) are used --wdir_to_continue argument should be used to provide '
                              'directories with files obtained during the step 1')
+    parser1.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
+                         type=partial(filepath_type, exist_type='dir'),
+                         help='''single or multiple directories contain simulations created by the tool.
+                            Use with steps 2,3,4 to continue run.\n'
+                                    Should consist of: tpr, cpt, xtc and all_ligand_resid.txt files. 
+                                    File all_ligand_resid.txt is optional and used to run md analysis for the ligands.\n
+                                    If you want to continue your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments 
+                                    (--ligand_list_file is optional and required to run md analysis after simulation )''')
     # continue md
     parser2 = parser.add_argument_group('Continue or Extend Molecular Dynamics Simulation')
-    parser2.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
-                        type=partial(filepath_type, exist_type='dir'),
-                        help='''single or multiple directories contain simulations created by the tool.
-                         Use with steps 2,3,4 to continue run.\n'
-                                 Should consist of: tpr, cpt, xtc and all_ligand_resid.txt files. 
-                                 File all_ligand_resid.txt is optional and used to run md analysis for the ligands.\n
-                                 If you want to continue your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments 
-                                 (--ligand_list_file is optional and required to run md analysis after simulation )''')
     parser2.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
                         help='''preffix for the md files. Used to run, extend or continue the simulation.
                             If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt, deffnm.xtc will be searched from --wdir_to_continue directories''')
     parser2.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='tpr file from the previous MD simulation')
+                        help='use explicit tpr arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--cpt', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='cpt file from previous simulation')
+                        help='use explicit cpt arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--xtc', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='xtc file from previous simulation')
+                        help='use explicit xtc arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--ligand_list_file', metavar='all_ligand_resid.txt', default=None, type=filepath_type,
-                        help='''If you want automatic md analysis for ligands was run after continue of simulation you should set ligand_list file. 
+                        help='''If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you should set ligand_list file. 
                                  Format of the file (no headers): user_ligand_id\tgromacs_ligand_id. Example: my_ligand\tUNL.
                                  Can be set up or placed into --wdir_to_continue directory(ies)''')
     parser2.add_argument('--ligand_id', metavar='UNL', default='UNL', type=str,
