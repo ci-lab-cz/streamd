@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+from datetime import datetime
 import os
 import shutil
 from functools import partial
 from glob import glob
 from multiprocessing import cpu_count
+import logging
 import pathlib
 
 import MDAnalysis as mda
@@ -109,9 +111,9 @@ def collect_outputs(output_list, output):
 
 
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, ligand_resid, hostfile, ncpu,
-          occupancy, plot_width, plot_height, save_viz, verbose):
+          occupancy, plot_width, plot_height, save_viz, out_time, verbose):
     output = 'plifs.csv'
-    output_aggregated = os.path.join(wdir_output, 'prolif_output.csv')
+    output_aggregated = os.path.join(wdir_output, f'prolif_output_{out_time}.csv')
 
     if append_protein_selection is None:
         protein_selection = 'protein'
@@ -150,7 +152,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
     backup_output(output_aggregated)
     collect_outputs(var_prolif_out_files, output=output_aggregated)
 
-    convertprolif2png(output_aggregated,occupancy=occupancy, plot_width=plot_width, plot_height=plot_height)
+    convertprolif2png(output_aggregated, occupancy=occupancy, plot_width=plot_width, plot_height=plot_height)
 
 
 def main():
@@ -201,6 +203,15 @@ def main():
     else:
         wdir = args.wdir
 
+    out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
+    log_file = os.path.join(wdir, f'log_prolif_{out_time}.log')
+
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+                        level=logging.INFO,
+                        handlers=[logging.FileHandler(log_file),
+                                  logging.StreamHandler()])
+
+
     if args.wdir_to_run is not None:
         tpr = 'md_out.tpr'
         xtc = 'md_fit.xtc'
@@ -208,12 +219,25 @@ def main():
         tpr = args.tpr
         xtc = args.xtc
 
-    start(wdir_to_run=args.wdir_to_run, wdir_output=wdir, tpr=tpr,
+    logging.getLogger('distributed').setLevel('CRITICAL')
+    logging.getLogger('distributed.core').setLevel('CRITICAL')
+    logging.getLogger('asyncssh').setLevel('CRITICAL')
+    logging.getLogger('distributed.worker').setLevel('CRITICAL')
+    logging.getLogger('distributed.comm').setLevel('CRITICAL')
+    logging.getLogger('distributed.nanny').setLevel('CRITICAL')
+    logging.getLogger('bockeh').setLevel('CRITICAL')
+    logging.getLogger('matplotlib.font_manager').setLevel('CRITICAL')
+
+    logging.info(args)
+    try:
+        start(wdir_to_run=args.wdir_to_run, wdir_output=wdir, tpr=tpr,
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
           ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
           occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
-          save_viz=not args.not_save_pics,
+          save_viz=not args.not_save_pics, out_time=out_time,
           verbose=args.verbose)
+    finally:
+        logging.shutdown()
 
 
 if __name__ == '__main__':

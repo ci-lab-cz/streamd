@@ -445,16 +445,22 @@ options:
 ```
 
 ### Logging
-all system info or errors are saved into logging files which would be placed into your main working directory (the current working directory or the path which was passed through --wdir argument):
+all system info or errors are saved into logging files which would be placed into your main working directory (the current working directory or the path which was passed through --wdir argument):  
+**run_md:**
 ```
-run_md:
 log_protein-fname_ligand-fname_cofactor-fname_current-date.log - StreaMD logging user info (status of the )
-streamd_bash_protein-fname_ligand-fname_cofactor-fname_current-date.log - StreaMD bash system logging info
+streamd_bash_protein-fname_ligand-fname_cofactor-fname_start-time.log - StreaMD bash system logging info
+```
 
-run_gbsa:
-log_mmpbsa_current-date.log - StreaMD logging user info
-log_mmpbsa_bash_current-date.log - StreaMD bash system logging info
+**run_gbsa:**
+```
+log_mmpbsa_start-time.log - StreaMD logging user info
+log_mmpbsa_bash_start-time.log - StreaMD bash system logging info
+```
 
+**run_prolif:**
+```
+log_prolif_start-time.log - StreaMD logging user info
 ```
 ### Licence
 MIT
