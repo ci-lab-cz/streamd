@@ -6,7 +6,7 @@ from plotnine import (ggplot, geom_point, aes, theme, element_text, element_blan
                       theme_bw, scale_color_manual, element_rect, facet_wrap, labs, scale_x_continuous, element_line,facet_grid )
 plt.ioff()
 
-def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
+def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10, occupancy=0, filter_only_hydrophobic=False, base_size=12):
 
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
                     "hydrophobic": "orange", "pication": "black", "cationpi": "darkblue",
@@ -14,13 +14,22 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
 
     df = pd.read_csv(plif_out_file, sep='\t')
     subdf = pd.melt(df, id_vars=['Frame'])
-    subdf = subdf[subdf['value']]
+
     subdf['residue'] = subdf['variable'].apply(lambda x: '.'.join(x.split('.')[:-1]).upper())
-    subdf['interaction'] = subdf['variable'].apply(lambda x: x.split('.')[-1])#.replace(new_names, regex=True)
+    subdf['interaction'] = subdf['variable'].apply(lambda x: x.split('.')[-1])  # .replace(new_names, regex=True)
     subdf['color'] = subdf['interaction'].apply(lambda x: label_colors.get(x, 'grey'))
 
-    subdf.loc[:,'Time, ns'] = subdf.loc[:, 'Frame'].apply(lambda x: x/100)
-    plot = (ggplot(subdf, aes(y="interaction",x="Time, ns", color="interaction"))+ theme_bw(12)+
+    occupancy_df = subdf.groupby('variable').apply(lambda x: round(x['value'].sum() / len(x), 1))
+    contact_list_within_occupancy = occupancy_df[occupancy_df >= occupancy].index.to_list()
+    subdf_occupancy = subdf.loc[(subdf['variable'].isin(contact_list_within_occupancy)) & (subdf['value']), :]
+#    subdf = subdf[subdf['value']]
+    if filter_only_hydrophobic:
+        not_only_H_residue_mask = subdf_occupancy.groupby('residue').apply(lambda x: True if x['interaction'].unique().tolist() != ['hydrophobic'] else False)
+        not_only_H_residue_list = not_only_H_residue_mask[not_only_H_residue_mask].index
+        subdf_occupancy = subdf_occupancy.loc[subdf_occupancy['residue'].isin(not_only_H_residue_list),:]
+
+    subdf_occupancy.loc[:,'Time, ns'] = subdf_occupancy.loc[:, 'Frame'].apply(lambda x: x/100)
+    plot = (ggplot(subdf_occupancy, aes(y="interaction",x="Time, ns", color="interaction"))+ theme_bw(base_size)+
             geom_point(alpha=0.9, shape='|', size=5) +
     theme(panel_background = element_rect(fill="white", color="white"),
           panel_grid = element_blank(),
@@ -28,7 +37,7 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
           strip_background = element_rect(fill="white", colour="white"),
           strip_text_y=element_text(angle = 0),
           axis_text_y=element_blank(),
-          # axis_ticks_y=element_blank(),
+          #axis_ticks_y=element_blank(),
           legend_title = element_text(), legend_text = element_text(),
           legend_position="bottom",
           legend_key=element_rect(color="white"),
@@ -40,7 +49,13 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10):
         labs(y='', title='', x= '\nTime, ns')+ scale_color_manual(values = label_colors, na_value="white"))
 
     output_name = os.path.join(os.path.dirname(plif_out_file),
-                               f"{os.path.basename(plif_out_file).strip('.csv')}_framemap.png")
+                               f"{os.path.basename(plif_out_file).strip('.csv')}_framemap")
+    if occupancy > 0:
+        output_name = f'{output_name}_occupancy{occupancy}'
+    if filter_only_hydrophobic:
+        output_name = f'{output_name}_filterNotHydrophobicyOnly'
+
+    output_name = f'{output_name}.png'
 
     if plot_width and plot_height:
         plot.save(output_name, width=plot_width, height=plot_height, dpi=300, verbose=False)
@@ -51,13 +66,20 @@ def main():
     parser = argparse.ArgumentParser(description='''Returns the formal charge for the molecule using RDKiT''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='*',
                         help='input file with compound. Supported formats: *.csv')
+    parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0, type=float,
+                        help='minimum occupancy of the unique contacts to show. Show all contacts by default.')
+    parser.add_argument('--filt_only_H', action='store_true', default=False,
+                        help='filt residues where only hydrophobic contacts occur')
     parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
                         help='width of the output picture')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
                         help='height of the output picture')
+    parser.add_argument('--base_size', metavar='FILENAME', default=12, type=int,
+                        help='base size of the output picture')
     args = parser.parse_args()
     for input_file in args.input:
-        convertplifbyframe2png(input_file, plot_width=args.width, plot_height=args.height)
+        convertplifbyframe2png(input_file, plot_width=args.width, plot_height=args.height,
+                               occupancy=args.occupancy, filter_only_hydrophobic=args.filt_only_H, base_size=args.base_size)
 
 
 if __name__ == '__main__':
