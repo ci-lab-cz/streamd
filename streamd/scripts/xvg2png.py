@@ -63,7 +63,7 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
         plot1.figure.savefig(xvg_file.replace('.xvg','.png'), bbox_inches="tight")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='''Returns the formal charge for the molecule using RDKiT''')
+    parser = argparse.ArgumentParser(description='''Draw png plot for xvg outputs of md analysis''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True,
                         help='input file with compound. Supported formats: *.csv')
     parser.add_argument('--convert_to_A', action='store_true', default=False,

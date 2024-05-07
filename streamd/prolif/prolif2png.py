@@ -77,7 +77,7 @@ def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height
         plot.save(output_name, dpi=300, verbose=False)
 
 def main():
-    parser = argparse.ArgumentParser(description='''Returns the formal charge for the molecule using RDKiT''')
+    parser = argparse.ArgumentParser(description='''Draw prolif plot for analysis binding mode of multiple ligands''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='+',
                         help='input file with compound. Supported formats: *.csv')
     parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0.6, type=float,

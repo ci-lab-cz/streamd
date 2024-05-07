@@ -63,9 +63,10 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10, occupan
         plot.save(output_name, dpi=300, verbose=False)
 
 def main():
-    parser = argparse.ArgumentParser(description='''Returns the formal charge for the molecule using RDKiT''')
+    parser = argparse.ArgumentParser(description='''Draw prolif plot for analysis of contacts by each frame of the unique ligand''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='*',
-                        help='input file with compound. Supported formats: *.csv')
+                        help='input file with prolif output for the unique molecule. Supported formats: *.csv.'
+                             ' Ex: plifs.csv')
     parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0, type=float,
                         help='minimum occupancy of the unique contacts to show. Show all contacts by default.')
     parser.add_argument('--filt_only_H', action='store_true', default=False,
