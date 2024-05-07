@@ -29,13 +29,10 @@ plt.ioff()
 #     # return f'{resid_chain} {contact}'
 #     return f'{split_row[0]}{chain} {split_row[-1]}'
 
-def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height=None):
+def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height=None, base_size=12):
 
     new_names = {"HBACCEPTOR": "A", "ANIONIC": "N", "HYDROPHOBIC": "H", 'METALACCEPTOR':'MeA',
                  "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONPI": "+pi", "CATIONIC": "P"}
-
-    # label_colors = {"A": "red", "D": "forestgreen", "N": "blue", "P": "magenta",
-    #                 "H": "orange", "pi+": "black", "pi-s": 'black','MeA': 'pink'}
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
                     "hydrophobic": "orange", "pication": "black",
                     "cationpi": "darkblue", "pistacking": 'darkslategray', 'metalacceptor': 'cyan'}
@@ -59,7 +56,7 @@ def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height
     subdf['variable'] = pd.Categorical(subdf.variable, categories=pd.unique(subdf.variable))
 
     plot = (ggplot(subdf)+ geom_point(aes( x="variable", y="Name", color = "interaction"))
-        + theme_bw(base_size=12)  + scale_color_manual(values = label_colors)+
+        + theme_bw(base_size=base_size) + scale_color_manual(values = label_colors)+
             theme(axis_text_x=element_text(rotation=90, hjust=0.5),
                 axis_text_y=element_text(vjust=0.5),
                   axis_title_y=element_blank(),
@@ -84,16 +81,20 @@ def main():
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='+',
                         help='input file with compound. Supported formats: *.csv')
     parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0.6, type=float,
-                        help='occupancy of the unique contacts to show')
+                        help='minimum occupancy of the unique contacts to show')
     parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
                         help='width of the output picture')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
                         help='height of the output picture')
+    parser.add_argument('--base_size', metavar='FILENAME', default=12, type=int,
+                        help='base size of the output picture')
 
     args = parser.parse_args()
 
     for input_file in args.input:
-        convertprolif2png(input_file, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height)
+        convertprolif2png(input_file, occupancy=args.occupancy,
+                          plot_width=args.width, plot_height=args.height,
+                          base_size=args.base_size)
 
 
 if __name__ == '__main__':
