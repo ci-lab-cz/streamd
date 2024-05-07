@@ -43,7 +43,7 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
     if coords and len(coords[0]) == 2:
         d = pd.DataFrame(coords, columns=[xaxis, yaxis])
         if transform_nm_to_A and 'nm' in yaxis.lower():
-            logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
+            #logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
             plot1 = plt.plot(d[xaxis], d[yaxis].apply(lambda x: round(x*10,3)), marker='o', linewidth=2, markersize=5)
         else:
             plot1 = plt.plot(d[xaxis], d[yaxis], marker='o', linewidth=2, markersize=5)
@@ -52,7 +52,7 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
         d = pd.DataFrame(coords, columns=[xaxis]+legend_list)
         plt.legend(legend_list, loc='upper right', bbox_to_anchor=(0, 0), borderaxespad=-1)
         if transform_nm_to_A and 'nm' in yaxis.lower():
-            logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
+            #logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
             plot1 = plt.plot(d[xaxis], d[legend_list].apply(lambda x: round(x*10,3)), marker='o', linewidth=2, markersize=5)
         else:
             plot1 = plt.plot(d[xaxis], d[legend_list], marker='o', linewidth=2, markersize=5)
