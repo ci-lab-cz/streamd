@@ -399,7 +399,7 @@ options:
 run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -v -s 5
 ```
 **Output**  
-1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html' file for each simulation will be created
+1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html* file for each simulation will be created
 2) *prolif_output_start-time.csv/png* - aggregated csv/png output file for all analyzed simulations
 
 #### Supplementary scripts
