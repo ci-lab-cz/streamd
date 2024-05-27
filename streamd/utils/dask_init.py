@@ -56,7 +56,7 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
                 nworkers = len(dask_client.scheduler_info()['workers'])
                 futures = []
                 for i, arg in enumerate(main_arg, 1):
-                    logging.warning(f'Start argument:{i}, {arg}')
+                    #logging.warning(f'Start argument:{i}, {arg}')
                     futures.append(dask_client.submit(func, arg, **kwargs))
                     if i == nworkers:
                         break
@@ -66,7 +66,7 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
                     del future
                     try:
                         arg = next(main_arg)
-                        logging.warning(f'Start argument: {i}, {arg}')
+                        #logging.warning(f'Start argument: {i}, {arg}')
                         new_future = dask_client.submit(func, arg, **kwargs)
                         seq.add(new_future)
                     except StopIteration:
