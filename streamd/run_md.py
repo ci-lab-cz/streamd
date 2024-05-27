@@ -426,12 +426,12 @@ def main():
     parser1.add_argument('--steps', default=None, nargs='*', type=int,
                         help='Run a particular step(s) of the StreaMD run. '
                              'Options:'
-                             '1 - run preparation step (protein, ligand, cofactor preparation)'
-                             '2 - run MD equilibration step (minimization, NVT, NPT)'
-                             '3 - run MD simulation'
-                             '4 - run MD analysis.'
-                             'Ex: 3 4'
-                             'If 2/3/4 step(s) are used --wdir_to_continue argument should be used to provide '
+                             '1 - run preparation step (protein, ligand, cofactor preparation)\n'
+                             '2 - run MD equilibration step (minimization, NVT, NPT)\n'
+                             '3 - run MD simulation\n'
+                             '4 - run MD analysis.\n'
+                             'Ex: 3 4\n'
+                             'If 2/3/4 step(s) are used --wdir_to_continue argument should be used to provide\n'
                              'directories with files obtained during the step 1')
     parser1.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
                          type=partial(filepath_type, exist_type='dir'),
