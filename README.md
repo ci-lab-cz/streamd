@@ -13,6 +13,7 @@ conda env create -n md --file env.yml
 #### **Fully automatic pipeline for molecular dynamics**
 
 #### Features:  
+- supports run of multiple simultaneous molecular dynamics simulations
 - supports simulation for different systems:  
     - Protein in Water;  
     - Protein - Ligand;  
@@ -49,8 +50,8 @@ Standard Molecular Dynamics Simulation Run:
                         input file of protein. Supported formats: *.pdb or gro
   -d WDIR, --wdir WDIR  Working directory. If not set the current directory will be used.
   -l FILENAME, --ligand FILENAME
-                        input file with compound. Supported formats: *.mol or sdf
-  --cofactor FILENAME   input file with compound. Supported formats: *.mol or sdf
+                        input file with compound(s). Supported formats: *.mol or sdf
+  --cofactor FILENAME   input file with compound(s). Supported formats: *.mol or sdf
   --clean_previous_md   remove a production MD simulation directory if it exists to re-initialize production MD setup
   --hostfile FILENAME   text file with addresses of nodes of dask SSH cluster. The most typical, it can be passed as $PBS_NODEFILE variable from inside a PBS script.
                         The first line in this file will be the address of the scheduler running on the standard port 8786. If omitted, calculations will run on a
