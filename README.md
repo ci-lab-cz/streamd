@@ -121,7 +121,8 @@ MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run and B
 ```
 
 ### **Examples**
-! Before run MD simulation it is important to prepare protein by yourself to make sure you simulate correct system.
+Before run MD simulation it is important to prepare protein by yourself to make sure you simulate correct system.
+#### Example of preparation steps before MD: 
 #### 1) Target Preparation:  
 *Manual preparation:*
 - **Fill missing residues and loops**  
@@ -145,11 +146,11 @@ setattr r type HIE :HIS@HE2
 ```
 
 #### 2) Docking procedure
-Required to obtain relevant poses of the ligand if need
+Required to obtain relevant poses of the ligand if needed
 * **Perform docking procedure**  
 https://github.com/ci-lab-cz/easydock
 
-#### Run molecular dynamics simulation
+### Run molecular dynamics simulation
 ``` source activate md ```  
  
 **Run simulation for different sytems:**
