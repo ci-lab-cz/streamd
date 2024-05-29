@@ -18,4 +18,4 @@ gmx rms -s em.tpr -f md_fit.xtc -o rmsd_xtal.xvg -n index.ndx -tu $tu <<< "Backb
 gmx gyrate -s $tpr -f md_fit.xtc -n index.ndx -o gyrate.xvg <<< "Protein" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
 gmx rmsf -s $tpr -f md_fit.xtc -n index.ndx -o rmsf.xvg -oq rmsf.pdb -res <<< "Protein" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
 
-gmx trjconv -s $tpr -f md_fit.xtc -o frame.pdb -b 10 -e 11  -n index.ndx -conect <<< "System" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
+gmx trjconv -s $tpr -f md_fit.xtc -o frame.pdb -b 10 -e 11  -n index.ndx <<< "System" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
