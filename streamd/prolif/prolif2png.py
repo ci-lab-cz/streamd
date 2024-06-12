@@ -45,7 +45,7 @@ def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height
 
     subdf['resi'] = subdf['variable'].apply(lambda x: int(re.findall('[0-9]+', x)[0]))
     subdf['chain'] = subdf['variable'].apply(lambda x: x.split('.')[1])
-    subdf = subdf.sort_values(by=['chain','resi'])
+    #subdf = subdf.sort_values(by=['chain','resi'])
 
     subdf['interaction'] = subdf['variable'].apply(lambda x: x.split('.')[-1])
 

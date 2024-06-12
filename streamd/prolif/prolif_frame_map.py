@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import pandas as pd
 import matplotlib.pyplot as plt
 from plotnine import (ggplot, geom_point, aes, theme, element_text, element_blank,
@@ -15,6 +16,9 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10, occupan
     df = pd.read_csv(plif_out_file, sep='\t')
     subdf = pd.melt(df, id_vars=['Frame'])
 
+    subdf['resi'] = subdf['variable'].apply(lambda x: int(re.findall('[0-9]+', x)[0]))
+    subdf['chain'] = subdf['variable'].apply(lambda x: x.split('.')[1])
+
     subdf['residue'] = subdf['variable'].apply(lambda x: '.'.join(x.split('.')[:-1]).upper())
     subdf['interaction'] = subdf['variable'].apply(lambda x: x.split('.')[-1])  # .replace(new_names, regex=True)
     subdf['color'] = subdf['interaction'].apply(lambda x: label_colors.get(x, 'grey'))
@@ -29,6 +33,10 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10, occupan
         subdf_occupancy = subdf_occupancy.loc[subdf_occupancy['residue'].isin(not_only_H_residue_list),:]
 
     subdf_occupancy.loc[:,'Time, ns'] = subdf_occupancy.loc[:, 'Frame'].apply(lambda x: x/100)
+
+    subdf_occupancy = subdf_occupancy.sort_values(by=['chain', 'resi', 'interaction']).reset_index(drop=True)
+    subdf_occupancy['residue'] = pd.Categorical(subdf_occupancy.residue, categories=pd.unique(subdf_occupancy.residue))
+
     plot = (ggplot(subdf_occupancy, aes(y="interaction",x="Time, ns", color="interaction"))+ theme_bw(base_size)+
             geom_point(alpha=0.9, shape='|', size=5) +
     theme(panel_background = element_rect(fill="white", color="white"),
