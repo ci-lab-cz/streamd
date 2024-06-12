@@ -388,10 +388,10 @@ def main():
                         help='Working directory. If not set the current directory will be used.')
     parser1.add_argument('-l', '--ligand', metavar='FILENAME', required=False,
                         type=partial(filepath_type, ext=('mol', 'sdf', 'mol2')),
-                        help='input file with compound. Supported formats: *.mol or sdf')
+                        help='input file with compound(s). Supported formats: *.mol or sdf or mol2')
     parser1.add_argument('--cofactor', metavar='FILENAME', default=None,
-                        type=partial(filepath_type, ext=('mol', 'sdf')),
-                        help='input file with compound. Supported formats: *.mol or sdf')
+                        type=partial(filepath_type, ext=('mol', 'sdf', 'mol2')),
+                        help='input file with compound(s). Supported formats: *.mol or sdf or mol2')
     parser1.add_argument('--clean_previous_md', action='store_true', default=False,
                         help='remove a production MD simulation directory if it exists to re-initialize production MD setup')
     parser1.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
@@ -412,7 +412,8 @@ def main():
                         help='posre file(s) (required if a gro-file is provided for the protein).'
                              'All output files obtained from gmx2pdb should preserve the original names')
     parser1.add_argument('--protein_forcefield', metavar='amber99sb-ildn', required=False, default='amber99sb-ildn', type=str,
-                        help='Force Field for protein preparation')
+                        help='Force Field for protein preparation.'
+                             'Available FF can be found at Miniconda3/envs/md_new/share/gromacs/top')
     parser1.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='time of MD simulation in ns')
     parser1.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
