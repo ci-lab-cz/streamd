@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import subprocess
 
 from streamd.preparation.ligand_preparation import make_all_itp
 from streamd.preparation.md_files_preparation import prep_md_files, add_ligands_to_topol, \
