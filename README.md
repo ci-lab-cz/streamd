@@ -186,7 +186,7 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 
 ```
 
-**To run simulations with MCPBPY using parametrization procedure**  
+**To run simulations of Ligand Binding Metalloprotein with MCPB.py**  
 *Gaussian Software* should be available.
 ```
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
