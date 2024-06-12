@@ -413,7 +413,7 @@ def main():
                              'All output files obtained from gmx2pdb should preserve the original names')
     parser1.add_argument('--protein_forcefield', metavar='amber99sb-ildn', required=False, default='amber99sb-ildn', type=str,
                         help='Force Field for protein preparation.'
-                             'Available FF can be found at Miniconda3/envs/md_new/share/gromacs/top')
+                             'Available FF can be found at Miniconda3/envs/md/share/gromacs/top')
     parser1.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='time of MD simulation in ns')
     parser1.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,

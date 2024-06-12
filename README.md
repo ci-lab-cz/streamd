@@ -5,9 +5,14 @@
 ```
 conda env create --file env.yml
 conda activate md
-pip install stremd
 ```
-
+```
+pip install streamd
+```
+or the latest version from github
+```
+pip install git+https://github.com/ci-lab-cz/streamd.git
+```
 ## **Description**
 #### **Fully automated pipeline for molecular dynamics**
 
@@ -64,7 +69,8 @@ Standard Molecular Dynamics Simulation Run:
   --posre posre.itp [posre.itp ...]
                         posre file(s) (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
   --protein_forcefield amber99sb-ildn
-                        Force Field for protein preparation
+                        Force Field for protein preparation. 
+                        Other available FF can be found at Miniconda3/envs/md/share/gromacs/top 
   --md_time ns          time of MD simulation in ns
   --npt_time ps         time of NPT equilibration in ps
   --nvt_time ps         time of NVT equilibration in ps
