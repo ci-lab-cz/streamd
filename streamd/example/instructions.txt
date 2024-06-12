@@ -2,3 +2,5 @@ conda activate md
 
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 0.01 --nvt_time 10 --npt_time 10 --ncpu 8 -d mdrun
 run_gbsa -i mdrun/md_files/md_run/protein_HIS_1ke7_LS3/
+run_prolif -i mdrun/md_files/md_run/protein_HIS_1ke7_LS3/ -s 1
+prolif_drawmap -i prolif_output_*start-time*.csv --width 6 --height 8 --base_size 12 --occupancy 0.6
