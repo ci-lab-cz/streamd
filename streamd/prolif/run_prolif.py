@@ -35,7 +35,7 @@ def backup_output(output):
 
 
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
-                    save_viz=True, dpi=300, plot_width=15, plot_height=8):
+                    save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None):
     '''
 
     :param tpr:
@@ -57,6 +57,14 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     protein = u.atoms.select_atoms(protein_selection)
     ligand = u.atoms.select_atoms(ligand_selection)
 
+    if pdb:
+        u1 = mda.Universe(pdb)
+        protein_pdb = u1.atoms.select_atoms(protein_selection)
+        if len(protein.residues.resids) == len(protein_pdb.residues.resids):
+            protein.residues.resids = protein_pdb.residues.resids
+        if len(protein.residues.segids) == len(protein_pdb.residues.segids):
+            protein.residues.segids = protein_pdb.residues.segids
+
     fp = plf.Fingerprint(['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
                           'PiStacking', 'MetalAcceptor'])
     fp.run(u.trajectory[::step], ligand, protein, progress=verbose, n_jobs=n_jobs)
@@ -77,19 +85,21 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 
 
 def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
-                         plot_width, plot_height, save_viz, n_jobs):
+                         plot_width, plot_height, save_viz, pdb, n_jobs):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
+    if pdb:
+        pdb = os.path.join(wdir, pdb)
     output = os.path.join(wdir, output)
     backup_output(output)
 
     if not os.path.isfile(tpr) or not os.path.isfile(xtc):
-        print(f'{wdir}: cannot run gbsa. Check if there are missing files: {tpr} {xtc}. Skip such directory')
+        print(f'{wdir}: cannot run prolif. Check if there are missing files: {tpr} {xtc}. Skip such directory')
         return None
 
     run_prolif_task(tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                     ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
-                    plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, n_jobs=n_jobs)
+                    plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb, n_jobs=n_jobs)
     return output
 
 
@@ -111,7 +121,7 @@ def collect_outputs(output_list, output):
 
 
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, ligand_resid, hostfile, ncpu,
-          occupancy, plot_width, plot_height, save_viz, out_time, verbose):
+          occupancy, plot_width, plot_height, save_viz, out_time, pdb, verbose):
     output = 'plifs.csv'
     output_aggregated = os.path.join(wdir_output, f'prolif_output_{out_time}.csv')
 
@@ -133,7 +143,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
             for res in calc_dask(run_prolif_from_wdir, wdir_to_run, dask_client=dask_client,
                                  tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                                  ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
-                                 plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
+                                 plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb,
                                  n_jobs=njobs_per_task):
                 if res:
                     var_prolif_out_files.append(res)
@@ -146,7 +156,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
                 cluster.close()
     else:
         output = os.path.join(os.path.dirname(xtc), output)
-        run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs=ncpu)
+        run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, pdb=pdb, n_jobs=ncpu)
         var_prolif_out_files = [output]
 
     backup_output(output_aggregated)
@@ -215,9 +225,11 @@ def main():
     if args.wdir_to_run is not None:
         tpr = 'md_out.tpr'
         xtc = 'md_fit.xtc'
+        pdb = 'frame.pdb'
     else:
         tpr = args.tpr
         xtc = args.xtc
+        pdb = None
 
     logging.getLogger('distributed').setLevel('CRITICAL')
     logging.getLogger('distributed.core').setLevel('CRITICAL')
@@ -234,7 +246,7 @@ def main():
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
           ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
           occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
-          save_viz=not args.not_save_pics, out_time=out_time,
+          save_viz=not args.not_save_pics, out_time=out_time, pdb=pdb,
           verbose=args.verbose)
     finally:
         logging.shutdown()
