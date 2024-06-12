@@ -13,11 +13,11 @@ setuptools.setup(
     description="Streamd Python module to facilitate molecular dynamics",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ci-lab-cz/md-scripts",
+    url="https://github.com/ci-lab-cz/streamd",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Operating System :: LINUX",
+        "Operating System :: POSIX :: Linux ",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Topic :: Scientific/Engineering :: Chemistry"
     ],

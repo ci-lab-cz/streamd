@@ -1,16 +1,15 @@
 # StreaMD: a tool to perform high-throughput automated molecular dynamics simulations
 
 ## installation
-*Source: https://valdes-tresanco-ms.github.io/gmx_MMPBSA/installation/*
 
-[env.yml](https://github.com/ci-lab-cz/streamd/blob/master/env.yml)
 ```
-conda env create -n md --file env.yml
-
+conda env create --file env.yml
+conda activate md
+pip install stremd
 ```
 
 ## **Description**
-#### **Fully automatic pipeline for molecular dynamics**
+#### **Fully automated pipeline for molecular dynamics**
 
 #### Features:  
 - supports run of multiple simultaneous molecular dynamics simulations
