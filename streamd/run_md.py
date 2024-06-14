@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+# ==============================================================================
+# author          : Aleksandra Ivanova, Olena Mokshyna, Pavel Polishchuk 
+# date            : 14-06-2024
+# version         :
+# python_version  :
+# copyright       : 
+# license         : MIT
+# ==============================================================================
 import argparse
 import logging
 import os
