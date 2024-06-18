@@ -163,6 +163,8 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
     collect_outputs(var_prolif_out_files, output=output_aggregated)
 
     convertprolif2png(output_aggregated, occupancy=occupancy, plot_width=plot_width, plot_height=plot_height)
+    logging.info(
+        f'ProLIF calculation of {len(var_prolif_out_files)} were successfully finished.\nFinished: {var_prolif_out_files}\n')
 
 
 def main():
