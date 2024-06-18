@@ -78,7 +78,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         # barcode
         Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
         # Net
-        LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit')).save(f'{output.rstrip(".csv")}.html')
+        LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit'), threshold=0.6).save(f'{output.rstrip(".csv")}.html')
         convertplifbyframe2png(plif_out_file=output, plot_width=plot_width, plot_height=plot_height)
 
     return df
