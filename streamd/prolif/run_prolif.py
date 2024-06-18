@@ -62,8 +62,8 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         protein_pdb = u1.atoms.select_atoms(protein_selection)
         if len(protein.residues.resids) == len(protein_pdb.residues.resids):
             protein.residues.resids = protein_pdb.residues.resids
-        if len(protein.residues.segids) == len(protein_pdb.residues.segids):
-            protein.residues.segids = protein_pdb.residues.segids
+        if len(protein.segments.segids) == len(protein_pdb.segments.segids):
+            protein.segments.segids = protein_pdb.segments.segids
 
     fp = plf.Fingerprint(['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
                           'PiStacking', 'MetalAcceptor'])
