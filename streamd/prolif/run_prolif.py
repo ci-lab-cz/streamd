@@ -35,7 +35,7 @@ def backup_output(output):
 
 
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
-                    save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None):
+                    occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None):
     '''
 
     :param tpr:
@@ -78,14 +78,14 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         # barcode
         Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
         # Net
-        LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit'), threshold=0.6).save(f'{output.rstrip(".csv")}.html')
+        LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit'), threshold=occupancy).save(f'{output.rstrip(".csv")}_occupancy{occupancy}.html')
         convertplifbyframe2png(plif_out_file=output, plot_width=plot_width, plot_height=plot_height)
 
     return df
 
 
 def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
-                         plot_width, plot_height, save_viz, pdb, n_jobs):
+                         plot_width, plot_height, save_viz, pdb, n_jobs, occupancy):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     if pdb:
@@ -99,7 +99,8 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
 
     run_prolif_task(tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                     ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
-                    plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb, n_jobs=n_jobs)
+                    plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, occupancy=occupancy,
+                    pdb=pdb, n_jobs=n_jobs)
     return output
 
 
@@ -144,7 +145,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
                                  tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                                  ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
                                  plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb,
-                                 n_jobs=njobs_per_task):
+                                 n_jobs=njobs_per_task, occupancy=occupancy):
                 if res:
                     var_prolif_out_files.append(res)
         finally:
@@ -156,7 +157,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
                 cluster.close()
     else:
         output = os.path.join(os.path.dirname(xtc), output)
-        run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, pdb=pdb, n_jobs=ncpu)
+        run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, pdb=pdb, n_jobs=ncpu, occupancy=occupancy)
         var_prolif_out_files = [output]
 
     backup_output(output_aggregated)
@@ -203,7 +204,9 @@ def main():
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
                         help='height of the output pictures')
     parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0.6, type=float,
-                        help='occupancy of the unique contacts to show')
+                        help='occupancy of the unique contacts to show. '
+                             'Applied for plifs_occupancyX.html (for each complex) and'
+                             ' prolif_output_occupancyX.png (all systems aggregated plot)')
     parser.add_argument('--not_save_pics', default=False, action='store_true',
                         help='not create html and png files (by frames) for each unique trajectory.'
                              ' Only overall prolif png file will be created.')
