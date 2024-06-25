@@ -28,20 +28,23 @@ class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argpar
     pass
 
 
-def run_equilibration(wdir, project_dir, bash_log, env=None):
+def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device, env=None):
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
-    cmd = f'wdir={wdir} bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")}>> {os.path.join(wdir, bash_log)} 2>&1',
+    ntmpi = ncpu if compute_device=="gpu" else 0 #When GPUs usage, Gromacs cannot guess OpenMP threads without ntmpi. For CPU usage - auto guess
+    cmd = (f'wdir={wdir} ncpu={ncpu} ntmpi={ntmpi} compute_device={compute_device} '
+           f'bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")} '
+           f'>> {os.path.join(wdir, bash_log)} 2>&1'),
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
         return None
     return wdir
 
 
 def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
-                   tpr, cpt, xtc, deffnm, deffnm_next,
-                   env=None):
+                   tpr, cpt, xtc, deffnm, deffnm_next, ncpu,
+                   compute_device, env=None):
     # continue/extend simulation if checkpoint files exist
     if (tpr is not None and os.path.isfile(tpr) and cpt is not None and os.path.isfile(cpt) and xtc is not None and os.path.isfile(str(xtc))) or \
         (os.path.isfile(os.path.join(wdir, f'{deffnm}.tpr')) and os.path.isfile(os.path.join(wdir, f'{deffnm}.cpt'))
@@ -50,21 +53,24 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
                         f'MD simulation will be continued until the setup simulation steps are reached.')
         if continue_md_from_dir(wdir_to_continue=wdir, tpr=tpr, cpt=cpt, xtc=xtc,
                                 deffnm=deffnm, deffnm_next=deffnm_next,
-                                mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log, env=env) is None:
+                                mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log,
+                                ncpu=ncpu, compute_device=compute_device,
+                                env=env) is None:
             return None
 
         return (wdir, deffnm)
-
-    cmd = f'wdir={wdir} deffnm={deffnm} bash {os.path.join(project_dir, "scripts/script_sh/md.sh")}>> {os.path.join(wdir, bash_log)} 2>&1'
+    cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} deffnm={deffnm} '
+           f'bash {os.path.join(project_dir, "scripts/script_sh/md.sh")} >> {os.path.join(wdir, bash_log)} 2>&1')
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
         return None
     return (wdir, deffnm)
 
 
-def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next, mdtime_ns, project_dir, bash_log, env=None):
-    def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log, env):
+def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
+                         mdtime_ns, project_dir, bash_log, ncpu, compute_device, env=None):
+    def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log, compute_device, env):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
-              f'deffnm_next={deffnm_next} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
+              f'deffnm_next={deffnm_next} ncpu={ncpu} compute_device={compute_device} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
               f'>> {os.path.join(wdir, bash_log)} 2>&1'
         if run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
             return wdir
@@ -94,7 +100,7 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next, m
 
     if continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
                    new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir,
-                   env=env, bash_log=bash_log):
+                   compute_device=compute_device, env=env, bash_log=bash_log):
         for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}.*')):
             # check previous existing files with the same name
             backup_prev_files(file_to_backup=os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)),
@@ -111,7 +117,7 @@ def start(protein, wdir, lfile, system_lfile,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
-          seed, steps, hostfile, ncpu, clean_previous, not_clean_backup_files, out_time, bash_log=None):
+          seed, steps, hostfile, ncpu, compute_device, clean_previous, not_clean_backup_files, out_time, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -134,6 +140,7 @@ def start(protein, wdir, lfile, system_lfile,
     :param deffnm_prev: md_out
     :param hostfile: None or file
     :param ncpu:
+    :param compute_device:
     not_clean_log_files: boolean. Remove backup md files (starts with #)
     :return:
     '''
@@ -306,8 +313,10 @@ def start(protein, wdir, lfile, system_lfile,
                                                          ncpu=ncpu)
                 if steps is None or 2 in steps:
                     logging.info('Start Equilibration steps')
-                    for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client, project_dir=project_dir,
-                                         bash_log=bash_log, env=os.environ.copy()):
+                    for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client,
+                                         project_dir=project_dir, bash_log=bash_log,
+                                         ncpu=ncpu, compute_device=compute_device,
+                                         env=os.environ.copy()):
                         if res:
                             var_eq_dirs.append(res)
                     logging.info(f'Successfully finished {len(var_eq_dirs)} Equilibration step\n')
@@ -321,6 +330,7 @@ def start(protein, wdir, lfile, system_lfile,
                                          mdtime_ns=mdtime_ns,
                                          tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
                                          deffnm=deffnm, deffnm_next=f'{deffnm}_{out_time}',
+                                         ncpu=ncpu, compute_device=compute_device,
                                          env=os.environ.copy()):
                         if res:
                             var_md_dirs_deffnm.append(res)
@@ -410,6 +420,9 @@ def main():
     parser1.add_argument('-c', '--ncpu', metavar='INTEGER', required=False,
                          default=len(os.sched_getaffinity(0)), #returns set of CPUs available
                          type=int, help='number of CPU per server. Use all available cpus by default.')
+    parser1.add_argument('--device', metavar='cpu', required=False, default='auto',
+                         choices=['cpu','gpu','auto'], type=lambda x: str(x).lower(),
+                         help='Calculate non-bonded interactions on: auto, cpu, gpu')
     parser1.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
                         help='topology file (required if a gro-file is provided for the protein).'
                              'All output files obtained from gmx2pdb should preserve the original names')
