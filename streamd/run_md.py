@@ -15,7 +15,6 @@ from datetime import datetime
 from functools import partial
 from glob import glob
 import json
-from multiprocessing import cpu_count
 
 from streamd.md_analysis import run_md_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
@@ -408,8 +407,9 @@ def main():
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
                              'will be the address of the scheduler running on the standard port 8786. If omitted, '
                              'calculations will run on a single machine as usual.')
-    parser1.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
-                        help='number of CPU per server. Use all cpus by default.')
+    parser1.add_argument('-c', '--ncpu', metavar='INTEGER', required=False,
+                         default=len(os.sched_getaffinity(0)), #returns set of CPUs available
+                         type=int, help='number of CPU per server. Use all available cpus by default.')
     parser1.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
                         help='topology file (required if a gro-file is provided for the protein).'
                              'All output files obtained from gmx2pdb should preserve the original names')
@@ -541,7 +541,7 @@ def main():
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
-              hostfile=args.hostfile, ncpu=args.ncpu, wdir=wdir, seed=args.seed, steps=args.steps,
+              hostfile=args.hostfile, ncpu=args.ncpu, compute_device=args.device, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges, mcpbpy_cut_off=args.metal_cutoff,
               out_time=out_time, bash_log=bash_log)
