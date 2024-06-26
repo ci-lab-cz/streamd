@@ -28,13 +28,12 @@ class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argpar
     pass
 
 
-def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device, env=None):
+def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device, device_param, gpu_args, env=None):
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
                         f'Equilibration step will be skipped ')
         return wdir
-    ntmpi = ncpu if compute_device=="gpu" else 0 #When GPUs usage, Gromacs cannot guess OpenMP threads without ntmpi. For CPU usage - auto guess
-    cmd = (f'wdir={wdir} ncpu={ncpu} ntmpi={ntmpi} compute_device={compute_device} '
+    cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} device_param={device_param} gpu_args={gpu_args} '
            f'bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")} '
            f'>> {os.path.join(wdir, bash_log)} 2>&1'),
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
@@ -44,7 +43,7 @@ def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device, env=Non
 
 def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
                    tpr, cpt, xtc, deffnm, deffnm_next, ncpu,
-                   compute_device, env=None):
+                   compute_device, device_param, gpu_args, env=None):
     # continue/extend simulation if checkpoint files exist
     if (tpr is not None and os.path.isfile(tpr) and cpt is not None and os.path.isfile(cpt) and xtc is not None and os.path.isfile(str(xtc))) or \
         (os.path.isfile(os.path.join(wdir, f'{deffnm}.tpr')) and os.path.isfile(os.path.join(wdir, f'{deffnm}.cpt'))
@@ -54,12 +53,12 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
         if continue_md_from_dir(wdir_to_continue=wdir, tpr=tpr, cpt=cpt, xtc=xtc,
                                 deffnm=deffnm, deffnm_next=deffnm_next,
                                 mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log,
-                                ncpu=ncpu, compute_device=compute_device,
-                                env=env) is None:
+                                ncpu=ncpu, compute_device=compute_device, device_param=device_param,
+                                gpu_args=gpu_args, env=env) is None:
             return None
 
         return (wdir, deffnm)
-    cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} deffnm={deffnm} '
+    cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} gpu_args={gpu_args} device_param={device_param} deffnm={deffnm} '
            f'bash {os.path.join(project_dir, "scripts/script_sh/md.sh")} >> {os.path.join(wdir, bash_log)} 2>&1')
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
         return None
@@ -67,10 +66,10 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
 
 
 def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
-                         mdtime_ns, project_dir, bash_log, ncpu, compute_device, env=None):
+                         mdtime_ns, project_dir, bash_log, ncpu, compute_device, device_param, gpu_args, env=None):
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log, compute_device, env):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
-              f'deffnm_next={deffnm_next} ncpu={ncpu} compute_device={compute_device} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
+              f'deffnm_next={deffnm_next} ncpu={ncpu} compute_device={compute_device} device_param={device_param} gpu_args={gpu_args} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
               f'>> {os.path.join(wdir, bash_log)} 2>&1'
         if run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
             return wdir
@@ -117,7 +116,8 @@ def start(protein, wdir, lfile, system_lfile,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
-          seed, steps, hostfile, ncpu, compute_device, clean_previous, not_clean_backup_files, out_time, bash_log=None):
+          seed, steps, hostfile, ncpu, compute_device, gpu_ids, clean_previous,
+          not_clean_backup_files, out_time, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -153,6 +153,27 @@ def start(protein, wdir, lfile, system_lfile,
 
     dask_client, cluster = None, None
 
+    device_param = ''
+    gpu_args = ''
+
+    if compute_device == 'gpu':
+        # Use all cpus and 1 GPU
+        gpu_args = f"-ntmpi 1 -ntomp {ncpu}"
+        device_param = "'-update gpu -pme gpu -bonded gpu -pmefft gpu'"
+        if gpu_ids:
+            if len(gpu_ids) > 1:
+                # https://gromacs.bioexcel.eu/t/using-multiple-gpus-on-one-machine/5974
+                k = len(gpu_ids)*2
+                gpu_args = f"-ntmpi {k} -ntomp {ncpu//k}"
+                # pme and update cannot be run on multiple GPUs
+                device_param = "'-update auto -pme auto -bonded gpu -pmefft auto'"
+
+            gpu_args = gpu_args + f" -gpu_id {','.join(gpu_ids)}"
+        gpu_args = f"'{gpu_args}'"
+
+    elif compute_device == 'cpu':
+        device_param = "'-update cpu -pme cpu -bonded cpu -pmefft cpu'"
+
     if tpr_prev is None or cpt_prev is None or xtc_prev is None:
         # preparation
         if (steps is None or 1 in steps) and wdir_to_continue_list is None:
@@ -180,7 +201,7 @@ def start(protein, wdir, lfile, system_lfile,
                         cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
                               f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
                               f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
-                        if not run_check_subprocess(cmd, protein, log=os.path.join(wdir, bash_log)):
+                        if not run_check_subprocess(cmd, protein, log=os.path.join(wdir_protein, bash_log)):
                             return None
                         logging.info(f'Successfully finished protein preparation\n')
                     else:
@@ -274,8 +295,8 @@ def start(protein, wdir, lfile, system_lfile,
                                   wdir_md=wdir_md, script_path=script_path, ncpu=ncpu,
                                   activate_gaussian=activate_gaussian, gaussian_version=gaussian_exe,
                                   gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                                  bash_log=bash_log, seed=seed, nvt_time_ps=nvt_time_ps, npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
-                                  cut_off=mcpbpy_cut_off, env=os.environ.copy()):
+                                  bash_log=bash_log, seed=seed, nvt_time_ps=nvt_time_ps, npt_time_ps=npt_time_ps,
+                                  mdtime_ns=mdtime_ns, cut_off=mcpbpy_cut_off, env=os.environ.copy()):
                         if res:
                             var_complex_prepared_dirs.append(res)
 
@@ -316,6 +337,7 @@ def start(protein, wdir, lfile, system_lfile,
                     for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client,
                                          project_dir=project_dir, bash_log=bash_log,
                                          ncpu=ncpu, compute_device=compute_device,
+                                         device_param=device_param, gpu_args=gpu_args,
                                          env=os.environ.copy()):
                         if res:
                             var_eq_dirs.append(res)
@@ -331,6 +353,7 @@ def start(protein, wdir, lfile, system_lfile,
                                          tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
                                          deffnm=deffnm, deffnm_next=f'{deffnm}_{out_time}',
                                          ncpu=ncpu, compute_device=compute_device,
+                                         device_param=device_param, gpu_args=gpu_args,
                                          env=os.environ.copy()):
                         if res:
                             var_md_dirs_deffnm.append(res)
@@ -423,6 +446,8 @@ def main():
     parser1.add_argument('--device', metavar='cpu', required=False, default='auto',
                          choices=['cpu','gpu','auto'], type=lambda x: str(x).lower(),
                          help='Calculate non-bonded interactions on: auto, cpu, gpu')
+    parser1.add_argument('--gpu_ids', metavar='GPU ID', required=False, default=None,
+                         nargs='+', type=str, help='List of unique GPU device IDs available to use')
     parser1.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
                         help='topology file (required if a gro-file is provided for the protein).'
                              'All output files obtained from gmx2pdb should preserve the original names')
@@ -508,7 +533,6 @@ def main():
                              'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up,'
                              'Otherwise standard gmx2pdb procedure will be run.')
 
-
     args = parser.parse_args()
 
     if args.wdir is None:
@@ -548,15 +572,17 @@ def main():
         start(protein=args.protein,
               lfile=args.ligand, system_lfile=args.cofactor,
               topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
-              forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time, nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
+              forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time,
+              nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
               wdir_to_continue_list=args.wdir_to_continue, deffnm=args.deffnm,
               tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
-              hostfile=args.hostfile, ncpu=args.ncpu, compute_device=args.device, wdir=wdir, seed=args.seed, steps=args.steps,
+              hostfile=args.hostfile, ncpu=args.ncpu, compute_device=args.device,
+              gpu_ids=args.gpu_ids, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
-              metal_resnames=args.metal_resnames, metal_charges=args.metal_charges, mcpbpy_cut_off=args.metal_cutoff,
-              out_time=out_time, bash_log=bash_log)
+              metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
+              mcpbpy_cut_off=args.metal_cutoff, out_time=out_time, bash_log=bash_log)
     finally:
         logging.shutdown()
