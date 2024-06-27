@@ -116,7 +116,7 @@ def start(protein, wdir, lfile, system_lfile,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
-          seed, steps, hostfile, ncpu, compute_device, gpu_ids, clean_previous,
+          seed, steps, hostfile, ncpu, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
           not_clean_backup_files, out_time, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
@@ -153,27 +153,26 @@ def start(protein, wdir, lfile, system_lfile,
 
     dask_client, cluster = None, None
 
-    device_param = ''
+    # GPU calculations settings
     gpu_args = ''
+    # To set where to execute (cpu or gpu) the interactions and update steps during gmx mdrun
+    device_param = f"-update {compute_device} -pme {compute_device} -bonded {compute_device} -pmefft {compute_device}"
 
     if compute_device == 'gpu':
         # Use all cpus and 1 GPU
-        gpu_args = f"-ntmpi 1 -ntomp {ncpu}"
-        device_param = "'-update gpu -pme gpu -bonded gpu -pmefft gpu'"
+        ngpus = len(gpu_ids) if gpu_ids else 1
+        k = ngpus * ntmpi_per_gpu
+        # https://gromacs.bioexcel.eu/t/using-multiple-gpus-on-one-machine/5974
+        gpu_args = f"-ntmpi {k} -ntomp {ncpu // k}"
+        if k > 1:
+            device_param = f"{device_param} -npme 1"
         if gpu_ids:
-            if len(gpu_ids) > 1:
-                # https://gromacs.bioexcel.eu/t/using-multiple-gpus-on-one-machine/5974
-                k = len(gpu_ids)*2
-                gpu_args = f"-ntmpi {k} -ntomp {ncpu//k}"
-                # pme and update cannot be run on multiple GPUs
-                device_param = "'-update auto -pme auto -bonded gpu -pmefft auto'"
-
             gpu_args = gpu_args + f" -gpu_id {','.join(gpu_ids)}"
         gpu_args = f"'{gpu_args}'"
 
-    elif compute_device == 'cpu':
-        device_param = "'-update cpu -pme cpu -bonded cpu -pmefft cpu'"
+    device_param = f"'{device_param}'"
 
+    # Start
     if tpr_prev is None or cpt_prev is None or xtc_prev is None:
         # preparation
         if (steps is None or 1 in steps) and wdir_to_continue_list is None:
@@ -423,37 +422,39 @@ def main():
     parser1 = parser.add_argument_group('Standard Molecular Dynamics Simulation Run')
     parser1.add_argument('-p', '--protein', metavar='FILENAME', required=False,
                         type=partial(filepath_type, ext=('pdb', 'gro'), check_exist=True),
-                        help='input file of protein. Supported formats: *.pdb or gro')
+                        help='Input file of protein. Supported formats: *.pdb or gro')
     parser1.add_argument('-d', '--wdir', metavar='WDIR', default=None,
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory. If not set the current directory will be used.')
     parser1.add_argument('-l', '--ligand', metavar='FILENAME', required=False,
                         type=partial(filepath_type, ext=('mol', 'sdf', 'mol2')),
-                        help='input file with compound(s). Supported formats: *.mol or sdf or mol2')
+                        help='Input file with compound(s). Supported formats: *.mol or sdf or mol2')
     parser1.add_argument('--cofactor', metavar='FILENAME', default=None,
                         type=partial(filepath_type, ext=('mol', 'sdf', 'mol2')),
-                        help='input file with compound(s). Supported formats: *.mol or sdf or mol2')
+                        help='Input file with compound(s). Supported formats: *.mol or sdf or mol2')
     parser1.add_argument('--clean_previous_md', action='store_true', default=False,
-                        help='remove a production MD simulation directory if it exists to re-initialize production MD setup')
+                        help='Remove a production MD simulation directory if it exists to re-initialize production MD setup')
     parser1.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
-                        help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
+                        help='Text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
                              'will be the address of the scheduler running on the standard port 8786. If omitted, '
                              'calculations will run on a single machine as usual.')
     parser1.add_argument('-c', '--ncpu', metavar='INTEGER', required=False,
                          default=len(os.sched_getaffinity(0)), #returns set of CPUs available
-                         type=int, help='number of CPU per server. Use all available cpus by default.')
+                         type=int, help='Number of CPU per server. Use all available cpus by default.')
     parser1.add_argument('--device', metavar='cpu', required=False, default='auto',
                          choices=['cpu','gpu','auto'], type=lambda x: str(x).lower(),
-                         help='Calculate non-bonded interactions on: auto, cpu, gpu')
+                         help='Calculate bonded and non-bonded interactions on: auto, cpu, gpu')
     parser1.add_argument('--gpu_ids', metavar='GPU ID', required=False, default=None,
                          nargs='+', type=str, help='List of unique GPU device IDs available to use')
+    parser1.add_argument('--ntmpi_per_gpu', metavar='int', required=False, default=1,
+                         type=int, help='The number of thread-MPI ranks to start per GPU. The default, 1, will start one rank per GPU')
     parser1.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
-                        help='topology file (required if a gro-file is provided for the protein).'
+                        help='Topology file (required if a gro-file is provided for the protein).'
                              'All output files obtained from gmx2pdb should preserve the original names')
     parser1.add_argument('--topol_itp', metavar='topol_chainA.itp topol_chainB.itp', required=False, nargs='+',
                         default=None, type=filepath_type,
-                        help='Itp files for individual protein chains (required if a gro-file is provided for the protein).'
+                        help='itp files for individual protein chains (required if a gro-file is provided for the protein).'
                              'All output files obtained from gmx2pdb should preserve the original names')
     parser1.add_argument('--posre', metavar='posre.itp', required=False, nargs='+', default=None, type=filepath_type,
                         help='posre file(s) (required if a gro-file is provided for the protein).'
@@ -462,11 +463,11 @@ def main():
                         help='Force Field for protein preparation.'
                              'Available FF can be found at Miniconda3/envs/md/share/gromacs/top')
     parser1.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
-                        help='time of MD simulation in ns')
+                        help='Time of MD simulation in ns')
     parser1.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
-                        help='time of NPT equilibration in ps')
+                        help='Time of NPT equilibration in ps')
     parser1.add_argument('--nvt_time', metavar='ps', required=False, default=100, type=int,
-                        help='time of NVT equilibration in ps')
+                        help='Time of NVT equilibration in ps')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
     parser1.add_argument('--not_clean_backup_files', action='store_true', default=False,
@@ -483,7 +484,7 @@ def main():
                              'directories with files obtained during the step 1')
     parser1.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
                          type=partial(filepath_type, exist_type='dir'),
-                         help='''single or multiple directories contain simulations created by the tool.
+                         help='''Single or multiple directories contain simulations created by the tool.
                             Use with steps 2,3,4 to continue run.\n'
                                     Should consist of: tpr, cpt, xtc and all_ligand_resid.txt files. 
                                     File all_ligand_resid.txt is optional and used to run md analysis for the ligands.\n
@@ -492,14 +493,14 @@ def main():
     # continue md
     parser2 = parser.add_argument_group('Continue or Extend Molecular Dynamics Simulation')
     parser2.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
-                        help='''preffix for the md files. Used to run, extend or continue the simulation.
+                        help='''Preffix for the md files. Used to run, extend or continue the simulation.
                             If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt, deffnm.xtc will be searched from --wdir_to_continue directories''')
     parser2.add_argument('--tpr', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='use explicit tpr arguments to continue a non-StreaMD simulation')
+                        help='Use explicit tpr arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--cpt', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='use explicit cpt arguments to continue a non-StreaMD simulation')
+                        help='Use explicit cpt arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--xtc', metavar='FILENAME', required=False, default=None, type=filepath_type,
-                        help='use explicit xtc arguments to continue a non-StreaMD simulation')
+                        help='Use explicit xtc arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--ligand_list_file', metavar='all_ligand_resid.txt', default=None, type=filepath_type,
                         help='''If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you should set ligand_list file. 
                                  Format of the file (no headers): user_ligand_id\tgromacs_ligand_id. Example: my_ligand\tUNL.
@@ -510,17 +511,17 @@ def main():
     parser3 = parser.add_argument_group('Boron-containing molecules or MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run arguments group)')
     # boron-containing molecules and mcpbpy
     parser3.add_argument('--activate_gaussian', metavar='module load Gaussian/09-d01', required=False, default=None,
-                        help='string that load gaussian module if necessary')
+                        help='String to load gaussian module if necessary')
     parser3.add_argument('--gaussian_exe', metavar='g09 or /apps/all/Gaussian/09-d01/g09/g09', required=False,
                         default=None,
-                        help='path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.')
+                        help='Path to gaussian executable or alias. Required to run preparation of boron-containing compounds.')
     parser3.add_argument('--gaussian_basis', metavar='B3LYP/6-31G*', required=False,
                         default='B3LYP/6-31G*', help='Gaussian Basis')
     parser3.add_argument('--gaussian_memory', metavar='120GB', required=False,
                         default='120GB', help='Gaussian Memory Usage')
     # mcpbpy
     parser4 = parser.add_argument_group(
-        'MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run and Boron-containing molecules arguments group)')
+        'MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and Boron-containing molecules arguments group)')
     parser4.add_argument('--metal_resnames', metavar='MN', required=False, default=None, nargs='*',
                         help='Metal residue names to run MCPB.py procedure. '
                              'Start MCPBPY procedure only if gaussian_exe and activate_gaussian arguments are set up,'
@@ -531,7 +532,7 @@ def main():
                         default={'MN':2, 'ZN':2, 'CA':2},
                         help='Metal residue charges in dictionary format'
                              'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up,'
-                             'Otherwise standard gmx2pdb procedure will be run.')
+                             'Otherwise standard gmx2pdb procedure will be run')
 
     args = parser.parse_args()
 
@@ -580,7 +581,7 @@ def main():
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
               hostfile=args.hostfile, ncpu=args.ncpu, compute_device=args.device,
-              gpu_ids=args.gpu_ids, wdir=wdir, seed=args.seed, steps=args.steps,
+              gpu_ids=args.gpu_ids, ntmpi_per_gpu=args.ntmpi_per_gpu, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
               mcpbpy_cut_off=args.metal_cutoff, out_time=out_time, bash_log=bash_log)

@@ -14,6 +14,20 @@ from rdkit.Chem import rdmolops
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import run_check_subprocess
 
+def reorder_hydrogens(mol):
+    """
+    Reorders the atoms in the molecule so that all hydrogens bonded to a heavy atom
+    are listed immediately after that heavy atom.
+    """
+    new_order = []
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 1:  # Not a hydrogen
+            new_order.append(atom.GetIdx())
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetAtomicNum() == 1:  # Is a hydrogen
+                    new_order.append(neighbor.GetIdx())
+    mol = rdmolops.RenumberAtoms(mol, new_order)
+    return mol
 
 def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
     def generate_resid(protein_resid_list):
@@ -167,6 +181,9 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
         mol_file = os.path.join(wdir_ligand_cur, f'{molid}.mol')
         # if addH:
         mol = Chem.AddHs(mol, addCoords=True)
+        # reorder hydrogens for Gromacs GPU update functionality
+        mol = reorder_hydrogens(mol)
+
         Chem.MolToMolFile(mol, mol_file)
 
         charge = rdmolops.GetFormalCharge(mol)
