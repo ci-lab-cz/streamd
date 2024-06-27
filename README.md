@@ -320,7 +320,7 @@ When run with "--device gpu" argument the StreaMD offloads -nb, -update, -pme, -
 More details on: https://manual.gromacs.org/documentation/current/user-guide/mdrun-performance.html
 
 The performance and gpu usage strongly depend on the type of hardware and size of the system.  
-It is always good to check the GPU usage (for example, by _nvidea-smi_ command).
+It is always good to check the GPU usage (for example, by _nvidia-smi_ command).
 
 **Run on 1 GPU:**
 ```
