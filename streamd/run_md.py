@@ -198,7 +198,7 @@ def start(protein, wdir, lfile, system_lfile,
                         logging.info('Start protein preparation')
                         cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
                               f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
-                              f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir, bash_log)} 2>&1'
+                              f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir_protein, bash_log)} 2>&1'
                         if not run_check_subprocess(cmd, protein, log=os.path.join(wdir_protein, bash_log)):
                             return None
                         logging.info(f'Successfully finished protein preparation\n')
