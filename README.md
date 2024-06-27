@@ -350,7 +350,7 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device cpu
 ```
 **To let GROMACS automatically offload calculations on CPU/GPU may be optimal on hardware where the CPUs are relatively powerful compared to the GPUs.**
 ```
-run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 1
 ```
 
 ## Supplementary tools
