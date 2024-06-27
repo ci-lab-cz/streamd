@@ -316,7 +316,7 @@ gyrate.png - radius of gyration
 ```
 
 ### GPU usage
-When run on GPU the StreaMD offloads -nb, -update, -pme, -bonded, -pmefft (all which can be run on GPU) computations to GPU.  
+When run with "--device gpu" argument the StreaMD offloads -nb, -update, -pme, -bonded, -pmefft (all which can be run on GPU) computations to GPU.  
 More details on: https://manual.gromacs.org/documentation/current/user-guide/mdrun-performance.html
 
 The performance and gpu usage strongly depend on the type of hardware and size of the system.  
