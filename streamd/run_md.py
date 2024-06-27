@@ -116,7 +116,7 @@ def start(protein, wdir, lfile, system_lfile,
           tpr_prev, cpt_prev, xtc_prev, ligand_list_file_prev, ligand_resid,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
-          seed, steps, hostfile, ncpu, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
+          seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
           not_clean_backup_files, out_time, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
@@ -159,13 +159,12 @@ def start(protein, wdir, lfile, system_lfile,
     device_param = f"-update {compute_device} -pme {compute_device} -bonded {compute_device} -pmefft {compute_device}"
 
     if compute_device == 'gpu':
-        # Use all cpus and 1 GPU
         ngpus = len(gpu_ids) if gpu_ids else 1
-        k = ngpus * ntmpi_per_gpu
         # https://gromacs.bioexcel.eu/t/using-multiple-gpus-on-one-machine/5974
-        gpu_args = f"-ntmpi {k} -ntomp {ncpu // k}"
+        k = ngpus * ntmpi_per_gpu
         if k > 1:
             device_param = f"{device_param} -npme 1"
+        gpu_args = f"-ntmpi {k} -ntomp {(ncpu // k) // mdrun_per_node}"
         if gpu_ids:
             gpu_args = gpu_args + f" -gpu_id {','.join(gpu_ids)}"
         gpu_args = f"'{gpu_args}'"
@@ -335,7 +334,7 @@ def start(protein, wdir, lfile, system_lfile,
                     logging.info('Start Equilibration steps')
                     for res in calc_dask(run_equilibration, var_complex_prepared_dirs, dask_client,
                                          project_dir=project_dir, bash_log=bash_log,
-                                         ncpu=ncpu, compute_device=compute_device,
+                                         ncpu=ncpu//mdrun_per_node, compute_device=compute_device,
                                          device_param=device_param, gpu_args=gpu_args,
                                          env=os.environ.copy()):
                         if res:
@@ -351,7 +350,7 @@ def start(protein, wdir, lfile, system_lfile,
                                          mdtime_ns=mdtime_ns,
                                          tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
                                          deffnm=deffnm, deffnm_next=f'{deffnm}_{out_time}',
-                                         ncpu=ncpu, compute_device=compute_device,
+                                         ncpu=ncpu//mdrun_per_node, compute_device=compute_device,
                                          device_param=device_param, gpu_args=gpu_args,
                                          env=os.environ.copy()):
                         if res:
@@ -442,11 +441,17 @@ def main():
     parser1.add_argument('-c', '--ncpu', metavar='INTEGER', required=False,
                          default=len(os.sched_getaffinity(0)), #returns set of CPUs available
                          type=int, help='Number of CPU per server. Use all available cpus by default.')
+    parser1.add_argument('--mdrun_per_node', metavar='INTEGER', required=False,
+                         default=1, type=int,
+                         help='Number of simulations to run per 1 server.'
+                              'In case of multiple simulations per node, the available CPU cores will be split evenly across these simulations.'
+                              'By default, run only 1 simulation per node and use all available cpus')
     parser1.add_argument('--device', metavar='cpu', required=False, default='auto',
                          choices=['cpu','gpu','auto'], type=lambda x: str(x).lower(),
                          help='Calculate bonded and non-bonded interactions on: auto, cpu, gpu')
     parser1.add_argument('--gpu_ids', metavar='GPU ID', required=False, default=None,
-                         nargs='+', type=str, help='List of unique GPU device IDs available to use')
+                         nargs='+', type=str, help='List of unique GPU device IDs available to use. '
+                                                   'Use in case of multiple GPUs usage or using exact GPU devices.')
     parser1.add_argument('--ntmpi_per_gpu', metavar='int', required=False, default=1,
                          type=int, help='The number of thread-MPI ranks to start per GPU. The default, 1, will start one rank per GPU')
     parser1.add_argument('--topol', metavar='topol.top', required=False, default=None, type=filepath_type,
@@ -531,8 +536,8 @@ def main():
     parser4.add_argument('--metal_charges', metavar='{MN:2, ZN:2, CA:2}', type=json.loads, required=False,
                         default={'MN':2, 'ZN':2, 'CA':2},
                         help='Metal residue charges in dictionary format'
-                             'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up,'
-                             'Otherwise standard gmx2pdb procedure will be run')
+                             'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up, '
+                             'otherwise standard gmx2pdb procedure will be run')
 
     args = parser.parse_args()
 
@@ -580,7 +585,7 @@ def main():
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
-              hostfile=args.hostfile, ncpu=args.ncpu, compute_device=args.device,
+              hostfile=args.hostfile, ncpu=args.ncpu, mdrun_per_node=args.mdrun_per_node, compute_device=args.device,
               gpu_ids=args.gpu_ids, ntmpi_per_gpu=args.ntmpi_per_gpu, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
