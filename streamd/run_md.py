@@ -276,9 +276,6 @@ def start(protein, wdir, lfile, system_lfile,
                 return None
             # Part 2 Complex preparation
             try:
-                dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(ncpu, len(var_lig_wdirs)),
-                                                         use_multi_servers=True if len(var_lig_wdirs) > ncpu else False,
-                                                         ncpu=ncpu)
                 # make all.itp and create complex
                 logging.info('Start complex preparation')
                 var_complex_prepared_dirs = []
@@ -286,6 +283,10 @@ def start(protein, wdir, lfile, system_lfile,
                 # Part 2.1 MCPBPY Metal-Complex preparation
                 if metal_resnames and gaussian_exe and activate_gaussian:
                     logging.info('Start MCPBPY procedure')
+                    dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                             n_tasks_per_node=1,
+                                                             use_multi_servers=True if len(var_lig_wdirs) > ncpu else False,
+                                                             ncpu=ncpu)
                     for res in calc_dask(mcbpy_md.main, var_lig_wdirs, dask_client,
                                   protein_name=pname, protein_file=protein,
                                   metal_resnames=metal_resnames, metal_charges=metal_charges,
@@ -300,6 +301,10 @@ def start(protein, wdir, lfile, system_lfile,
 
                     logging.info('MCPBPY procedure: Finish MCPBPY preparation')
                 else:
+                    dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                             n_tasks_per_node=min(ncpu, len(var_lig_wdirs)),
+                                                             use_multi_servers=True if len(var_lig_wdirs) > ncpu else False,
+                                                             ncpu=ncpu)
                     for res in calc_dask(run_complex_preparation, var_lig_wdirs, dask_client,
                                          wdir_system_ligand_list=system_lig_wdirs,
                                          protein_name=pname, wdir_protein=wdir_protein,
