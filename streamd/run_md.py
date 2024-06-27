@@ -158,7 +158,7 @@ def start(protein, wdir, lfile, system_lfile,
     # To set where to execute (cpu or gpu) the interactions and update steps during gmx mdrun
     device_param = f"-update {compute_device} -pme {compute_device} -bonded {compute_device} -pmefft {compute_device}"
 
-    if compute_device == 'gpu':
+    if compute_device == 'gpu' or gpu_args:
         ngpus = len(gpu_ids) if gpu_ids else 1
         # https://gromacs.bioexcel.eu/t/using-multiple-gpus-on-one-machine/5974
         k = ngpus * ntmpi_per_gpu
@@ -327,7 +327,7 @@ def start(protein, wdir, lfile, system_lfile,
         if (steps is None or 2 in steps or 3 in steps) and var_complex_prepared_dirs:
             try:
                 dask_client, cluster = init_dask_cluster(hostfile=hostfile,
-                                                         n_tasks_per_node=1,
+                                                         n_tasks_per_node=mdrun_per_node,
                                                          use_multi_servers=True if len(var_complex_prepared_dirs) > 1 else False,
                                                          ncpu=ncpu)
                 if steps is None or 2 in steps:

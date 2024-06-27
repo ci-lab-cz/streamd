@@ -2,14 +2,16 @@
 
 ## installation
 
+Choose the yaml file for cpu only (**env.yml**) or gpu/cpu (**env_gpu.yml**) usage.  
+
+The **env_gpu.yml** file can only be installed on a machine with an available GPU.
 ```
 conda env create --file env.yml
 conda activate md
-```
-```
 pip install streamd
 ```
 or the latest version from github
+(use it for GPU usage)
 ```
 pip install git+https://github.com/ci-lab-cz/streamd.git
 ```
@@ -32,13 +34,15 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 - supports to continue of interrupted MD simulation
 - interrupted MD preparation can be restarted by invoking the same command
 - implemented tools for end-state free energy calculations (gmx_MMPBSA) and Protein-Ligand Interaction analysis (ProLIF)
+- GPU support
 
 ### **USAGE**
 ```
 run_md -h
-usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--topol topol.top]
+usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--mdrun_per_node INTEGER]
+              [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
-              [--protein_forcefield amber99sb-ildn] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--not_clean_log_files] [--steps [STEPS ...]]
+              [--protein_forcefield amber99sb-ildn] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--not_clean_backup_files] [--steps [STEPS ...]]
               [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
               [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL] [--activate_gaussian module load Gaussian/09-d01]
               [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09] [--gaussian_basis B3LYP/6-31G*] [--gaussian_memory 120GB] [--metal_resnames [MN ...]]
@@ -51,80 +55,78 @@ options:
 
 Standard Molecular Dynamics Simulation Run:
   -p FILENAME, --protein FILENAME
-                        input file of protein. Supported formats: *.pdb or gro
+                        Input file of protein. Supported formats: *.pdb or gro
   -d WDIR, --wdir WDIR  Working directory. If not set the current directory will be used.
   -l FILENAME, --ligand FILENAME
-                        input file with compound(s). Supported formats: *.mol or sdf or mol2
-  --cofactor FILENAME   input file with compound(s). Supported formats: *.mol or sdf or mol2
-  --clean_previous_md   remove a production MD simulation directory if it exists to re-initialize production MD setup
-  --hostfile FILENAME   text file with addresses of nodes of dask SSH cluster. The most typical, it can be passed as $PBS_NODEFILE variable from inside a PBS script.
+                        Input file with compound(s). Supported formats: *.mol or sdf or mol2
+  --cofactor FILENAME   Input file with compound(s). Supported formats: *.mol or sdf or mol2
+  --clean_previous_md   Remove a production MD simulation directory if it exists to re-initialize production MD setup
+  --hostfile FILENAME   Text file with addresses of nodes of dask SSH cluster. The most typical, it can be passed as $PBS_NODEFILE variable from inside a PBS script.
                         The first line in this file will be the address of the scheduler running on the standard port 8786. If omitted, calculations will run on a
                         single machine as usual.
   -c INTEGER, --ncpu INTEGER
-                        number of CPU per server. Use all cpus by default.
-  --topol topol.top     topology file (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
+                        Number of CPU per server. Use all available cpus by default.
+  --mdrun_per_node INTEGER
+                        Number of simulations to run per 1 server.In case of multiple simulations per node, the available CPU cores will be split evenly across these
+                        simulations.By default, run only 1 simulation per node and use all available cpus
+  --device cpu          Calculate bonded and non-bonded interactions on: auto, cpu, gpu
+  --gpu_ids GPU ID [GPU ID ...]
+                        List of unique GPU device IDs available to use. Use in case of multiple GPUs usage or using exact GPU devices.
+  --ntmpi_per_gpu int   The number of thread-MPI ranks to start per GPU. The default, 1, will start one rank per GPU
+  --topol topol.top     Topology file (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names.
   --topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]
-                        Itp files for individual protein chains (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should
-                        preserve the original names
+                        itp files for individual protein chains (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should
+                        preserve the original names.
   --posre posre.itp [posre.itp ...]
-                        posre file(s) (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
+                        posre file(s) (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names.
   --protein_forcefield amber99sb-ildn
-                        Force Field for protein preparation. 
-                        Other available FF can be found at Miniconda3/envs/md/share/gromacs/top 
-  --md_time ns          time of MD simulation in ns
-  --npt_time ps         time of NPT equilibration in ps
-  --nvt_time ps         time of NVT equilibration in ps
+                        Force Field for protein preparation.Available FF can be found at Miniconda3/envs/md/share/gromacs/top
+  --md_time ns          Time of MD simulation in ns
+  --npt_time ps         Time of NPT equilibration in ps.
+  --nvt_time ps         Time of NVT equilibration in ps.
   --seed int            seed
-  --not_clean_log_files
-                        Not to remove all backups of md files
-  --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:
-                        1 - run preparation step (protein, ligand, cofactor preparation)
-                        2 - run MD equilibration step (minimization, NVT, NPT)
-                        3 - run MD simulation
-                        4 - run MD analysis
-                        Ex: 3 4. 
-                        If 2 or 3 or 4 step(s) are used --wdir_to_continue argument should be
-                        used to provide directories with files obtained during the previous steps
+  --not_clean_backup_files
+                        Not to remove all backups of md files.
+  --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:1 - run preparation step (protein, ligand, cofactor preparation) 2 - run MD equilibration
+                        step (minimization, NVT, NPT) 3 - run MD simulation 4 - run MD analysis. Ex: 3 4 If 2/3/4 step(s) are used --wdir_to_continue argument should
+                        be used to provide directories with files obtained during the step 1
   --wdir_to_continue DIRNAME [DIRNAME ...]
-                        single or multiple directories contain simulations created by the tool. 
-                        Use with steps 2,3,4 to continue the run. Should consist of: tpr, cpt,
+                        Single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. ' Should consist of: tpr, cpt,
                         xtc and all_ligand_resid.txt files. File all_ligand_resid.txt is optional and used to run md analysis for the ligands. If you want to continue
                         your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments (--ligand_list_file is optional and required to
                         run md analysis after simulation )
 
 Continue or Extend Molecular Dynamics Simulation:
   --deffnm preffix for md files
-                        Used to run, extend or continue the simulation.
-                        If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt, deffnm.xtc will be searched from --wdir_to_continue directories
-  --tpr FILENAME        use explicit tpr to continue a non-StreaMD simulation
-  --cpt FILENAME        use explicit cpt to continue a non-StreaMD simulation
-  --xtc FILENAME        use explicit xtc to continue a non-StreaMD simulation
+                        Preffix for the md files. Used to run, extend or continue the simulation. If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt,
+                        deffnm.xtc will be searched from --wdir_to_continue directories
+  --tpr FILENAME        Use explicit tpr arguments to continue a non-StreaMD simulation
+  --cpt FILENAME        Use explicit cpt arguments to continue a non-StreaMD simulation
+  --xtc FILENAME        Use explicit xtc arguments to continue a non-StreaMD simulation
   --ligand_list_file all_ligand_resid.txt
-                        If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you should set ligand_list file. Format of the file (no
-                        headers): user_ligand_id gromacs_ligand_id. Example: my_ligand UNL. Can be set up or placed into --wdir_to_continue directory(ies)
-  --ligand_id UNL       If you want to run an automatic md analysis for a ligand after continue of simulation you can set ligand_id if it is not UNL as a default value
+                        If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you should set ligand_list file. Format of the
+                        file (no headers): user_ligand_id gromacs_ligand_id. Example: my_ligand UNL. Can be set up or placed into --wdir_to_continue directory(ies)
+  --ligand_id UNL       If you want to run an automatic md analysis for the ligand after continue of simulation you can set ligand_id if it is not UNL default value
 
 Boron-containing molecules or MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run arguments group):
   --activate_gaussian module load Gaussian/09-d01
-                        string that load gaussian module if necessary
+                        String to load gaussian module if necessary
   --gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09
-                        path to gaussian executable or alias. Requred to run preparation of boron-containing compounds.
+                        Path to gaussian executable or alias. Required to run preparation of boron-containing compounds.
   --gaussian_basis B3LYP/6-31G*
                         Gaussian Basis
   --gaussian_memory 120GB
                         Gaussian Memory Usage
 
-MCPBPY usage (use together with Standard Molecular Dynamics Simulation Run and Boron-containing molecules arguments group):
+MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and Boron-containing molecules arguments group):
   --metal_resnames [MN ...]
                         Metal residue names to run MCPB.py procedure. Start MCPBPY procedure only if gaussian_exe and activate_gaussian arguments are set up,Otherwise
                         standard gmx2pdb procedure will be run.
   --metal_cutoff 2.8    Metal residue cutoff to run MCPB.py procedure
   --metal_charges {MN:2, ZN:2, CA:2}
                         Metal residue charges in dictionary formatStart MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are
-                        set up,Otherwise standard gmx2pdb procedure will be run.
-
+                        set up, otherwise standard gmx2pdb procedure will be run
 ```
-
 ### **Examples**
 Before run MD simulation it is important to prepare protein by yourself to make sure you simulate correct system.
 #### Example of preparation steps before MD: 
@@ -203,7 +205,7 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 
 ```
 
-**To extend the simulation**
+**To extend the simulation**  
 you can continue your simulation unlimited times. As the --md_time argument user should set up the overall time of the simulation
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 0.2
@@ -311,6 +313,44 @@ rmsd_ligand_1.png - rmsd of the ligand against minimized structure
 rmsd_ligand_1_xtal.png - rmsd of the ligand against crystal structure
 rmsf.png - root mean square fluctuation (RMSF, i.e. standard deviation) of atomic positions in the trajectory
 gyrate.png - radius of gyration
+```
+
+### GPU usage
+When run on GPU the StreaMD offloads -nb, -update, -pme, -bonded, -pmefft (all which can be run on GPU) computations to GPU.  
+More details on: https://manual.gromacs.org/documentation/current/user-guide/mdrun-performance.html
+
+The performance and gpu usage strongly depend on the type of hardware and size of the system.  
+It is always good to check the GPU usage (for example, by _nvidea-smi_ command).
+
+**Run on 1 GPU:**
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu
+```
+
+To improve the performance one can use multiple GPUs or start multiple ranks per GPU.
+
+**Run on multiple GPUs**  
+! Increasing the number of GPUs does not always improve performance.
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --gpu_ids 0 1 2 3
+```
+**Increase the number of thread-MPI ranks per GPU.**  
+_-ntmpi_per_gpu_ argument is used to calculate _total number of thread-MPI ranks_ (_gmx mdrun -ntmpi_ X, where X=ntmpi_per_gpu*number of GPU to use). By default, _ntmpi_per_gpu_ equals 1, although usage of 2 thread-MPI ranks per GPU may return better performance.
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu -ntmpi_per_gpu 2
+```
+
+**Sometimes for more full GPU usage user can start multiple runs on a single/multiple GPU(s) and the tool automatically splits the available CPU cores across these simulations:**
+```
+run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2
+```
+**To run mdrun only on CPUs on server where GPUs are available:**
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device cpu
+```
+**To let GROMACS automatically offload calculations on CPU/GPU may be optimal on hardware where the CPUs are relatively powerful compared to the GPUs.**
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto
 ```
 
 ## Supplementary tools
