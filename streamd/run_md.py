@@ -158,7 +158,7 @@ def start(protein, wdir, lfile, system_lfile,
     # To set where to execute (cpu or gpu) the interactions and update steps during gmx mdrun
     device_param = f"-update {compute_device} -pme {compute_device} -bonded {compute_device} -pmefft {compute_device}"
 
-    if compute_device == 'gpu' or gpu_args:
+    if compute_device == 'gpu' or gpu_ids:
         ngpus = len(gpu_ids) if gpu_ids else 1
         # https://gromacs.bioexcel.eu/t/using-multiple-gpus-on-one-machine/5974
         k = ngpus * ntmpi_per_gpu
