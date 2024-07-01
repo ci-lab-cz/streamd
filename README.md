@@ -135,8 +135,8 @@ MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and B
 Before run MD simulation it is important to prepare protein by yourself to make sure you simulate correct system.
 > [!CAUTION]  
 > To prevent problems with recognition of different atom names by Gromacs, we use the `-ignh` argument, which re-adds the hydrogen atoms, ignoring the original one,
-> while converting the protein to a gro file (`gmx pdb2gmx -water tip3p -ignh`). Make sure to rename residues (CYS-CYX, HIS-HIE-HIP) by proper protonation states (_more details in Target Preparation secstion_).  
-> As an option, the user can use the `--noignh` argument when running StreaMD, although there may be problems with atom name recognition that users must resolve themselves or, as another option, provide to Streamd the already prepared proteins.gro, topol.top and posre.itp files.   
+> while converting the protein to a gro file (`gmx pdb2gmx -water tip3p -ignh`). Make sure to rename residues (CYS-CYX, HIS-HIE-HIP) by proper protonation states (_more details in Target Preparation section_).  
+> As an option, the user can use the `--noignh` argument when running StreaMD, although there may be problems with atom name recognition that users must resolve themselves or, as another option, provide to Streamd the already prepared protein.gro, topol.top and posre.itp files.   
 #### Example of preparation steps before MD: 
 #### 1) Target Preparation:  
 *Manual preparation:*
@@ -161,11 +161,11 @@ setattr r type HIE :HIS@HE2
 ```
 
 #### 2) Docking procedure
-Required to obtain relevant poses of the ligand if needed
+Required to obtain relevant poses of the ligand(s) if needed
 * **Perform docking procedure**  
 https://github.com/ci-lab-cz/easydock
 
-### Run molecular dynamics simulation
+## Run molecular dynamics simulation
 ``` source activate md ```  
  
 **Run simulation for different sytems:**
@@ -518,5 +518,5 @@ log_mmpbsa_bash_start-time.log - StreaMD bash system logging info
 ```
 log_prolif_start-time.log - StreaMD logging user info
 ```
-### Licence
+## Licence
 MIT
