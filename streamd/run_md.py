@@ -109,7 +109,7 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
         return wdir_to_continue
 
 
-def start(protein, wdir, lfile, system_lfile,
+def start(protein, wdir, lfile, system_lfile, noignh,
           forcefield_name, npt_time_ps, nvt_time_ps, mdtime_ns,
           topol, topol_itp_list, posre_list_protein,
           wdir_to_continue_list, deffnm,
@@ -123,6 +123,7 @@ def start(protein, wdir, lfile, system_lfile,
     :param wdir: None or path
     :param lfile: None or file
     :param system_lfile: None or file. Mol or sdf format
+    :param noignh: don't use -ignh argument (gmx pdb2gmx)
     :param forcefield_name: str
     :param clean_previous: boolean. Remove all previous md files
     :param mdtime_ns: float. Time in ns
@@ -196,7 +197,7 @@ def start(protein, wdir, lfile, system_lfile,
                         os.path.join(wdir_protein, "topol.top")):
                     if p_ext != '.gro' or topol is None or posre_list_protein is None:
                         logging.info('Start protein preparation')
-                        cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p -ignh ' \
+                        cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p {"-ignh" if not noignh else "-noignh"} ' \
                               f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
                               f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir_protein, bash_log)} 2>&1'
                         if not run_check_subprocess(cmd, protein, log=os.path.join(wdir_protein, bash_log)):
@@ -472,6 +473,11 @@ def main():
     parser1.add_argument('--protein_forcefield', metavar='amber99sb-ildn', required=False, default='amber99sb-ildn', type=str,
                         help='Force Field for protein preparation.'
                              'Available FF can be found at Miniconda3/envs/md/share/gromacs/top')
+    parser1.add_argument('--noignh', required=False,  action='store_true', default=False,
+                         help="By default, Streamd uses gmx pdb2gmx -ignh, which re-adds hydrogens using residue names "
+                              "(the correct protonation states must be provided by the user) and ignores the original hydrogens."
+                              " If the --noignh argument is used, the original hydrogen atoms will be included in the preparation,"
+                              " although there may be problems with recognition of atom names by GROMACS.")
     parser1.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='Time of MD simulation in ns')
     parser1.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
@@ -581,7 +587,7 @@ def main():
     logging.info(args)
     try:
         start(protein=args.protein,
-              lfile=args.ligand, system_lfile=args.cofactor,
+              lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh,
               topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
               forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time,
               nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
