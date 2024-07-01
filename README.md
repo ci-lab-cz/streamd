@@ -42,8 +42,8 @@ run_md -h
 usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--mdrun_per_node INTEGER]
               [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
-              [--protein_forcefield amber99sb-ildn] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--not_clean_backup_files] [--steps [STEPS ...]]
-              [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
+              [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--not_clean_backup_files]
+              [--steps [STEPS ...]] [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
               [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL] [--activate_gaussian module load Gaussian/09-d01]
               [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09] [--gaussian_basis B3LYP/6-31G*] [--gaussian_memory 120GB] [--metal_resnames [MN ...]]
               [--metal_cutoff 2.8] [--metal_charges {MN:2, ZN:2, CA:2}]
@@ -73,20 +73,23 @@ Standard Molecular Dynamics Simulation Run:
   --gpu_ids GPU ID [GPU ID ...]
                         List of unique GPU device IDs available to use. Use in case of multiple GPUs usage or using exact GPU devices.
   --ntmpi_per_gpu int   The number of thread-MPI ranks to start per GPU. The default, 1, will start one rank per GPU
-  --topol topol.top     Topology file (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names.
+  --topol topol.top     Topology file (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
   --topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]
                         itp files for individual protein chains (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should
-                        preserve the original names.
+                        preserve the original names
   --posre posre.itp [posre.itp ...]
-                        posre file(s) (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names.
+                        posre file(s) (required if a gro-file is provided for the protein).All output files obtained from gmx2pdb should preserve the original names
   --protein_forcefield amber99sb-ildn
                         Force Field for protein preparation.Available FF can be found at Miniconda3/envs/md/share/gromacs/top
+  --noignh              By default, Streamd uses gmx pdb2gmx -ignh, which re-adds hydrogens using residue names (the correct protonation states must be provided by
+                        user) and ignores the original hydrogens. If the --noignh argument is used, the original hydrogen atoms will be preserved during the
+                        preparation, although there may be problems with recognition of atom names by GROMACS.
   --md_time ns          Time of MD simulation in ns
-  --npt_time ps         Time of NPT equilibration in ps.
-  --nvt_time ps         Time of NVT equilibration in ps.
+  --npt_time ps         Time of NPT equilibration in ps
+  --nvt_time ps         Time of NVT equilibration in ps
   --seed int            seed
   --not_clean_backup_files
-                        Not to remove all backups of md files.
+                        Not to remove all backups of md files
   --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:1 - run preparation step (protein, ligand, cofactor preparation) 2 - run MD equilibration
                         step (minimization, NVT, NPT) 3 - run MD simulation 4 - run MD analysis. Ex: 3 4 If 2/3/4 step(s) are used --wdir_to_continue argument should
                         be used to provide directories with files obtained during the step 1
@@ -126,9 +129,14 @@ MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and B
   --metal_charges {MN:2, ZN:2, CA:2}
                         Metal residue charges in dictionary formatStart MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are
                         set up, otherwise standard gmx2pdb procedure will be run
+
 ```
-### **Examples**
+## **Data preparation**
 Before run MD simulation it is important to prepare protein by yourself to make sure you simulate correct system.
+> [!CAUTION]  
+> To prevent problems with recognition of different atom names by Gromacs, we use the `-ignh` argument, which re-adds the hydrogen atoms, ignoring the original one,
+> while converting the protein to a gro file (`gmx pdb2gmx -water tip3p -ignh`). Make sure to rename residues (CYS-CYX, HIS-HIE-HIP) by proper protonation states (_more details in Target Preparation secstion_).  
+> As an option, the user can use the `--noignh` argument when running StreaMD, although there may be problems with atom name recognition that users must resolve themselves or, as another option, provide to Streamd the already prepared proteins.gro, topol.top and posre.itp files.   
 #### Example of preparation steps before MD: 
 #### 1) Target Preparation:  
 *Manual preparation:*
@@ -182,7 +190,7 @@ run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 0.1 --nvt_time 10
 *Gaussian Software* should be available.  
 Gaussian optimization and charge calculation will be run only for molecules with boron atoms, other molecules will be processed by regular procedure by Antechamber.
 If Gaussian cannot be load boron-containing molecules will be skipped.  
-Any --ligand or --cofactor files can consist of boron-containing compounds
+Any `--ligand` or `--cofactor` files can consist of boron-containing compounds
 ```
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128
 
@@ -206,15 +214,15 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 ```
 
 **To extend the simulation**  
-you can continue your simulation unlimited times. As the --md_time argument user should set up the overall time of the simulation
+you can continue your simulation unlimited times. As the `--md_time` argument user should set up the overall time of the simulation
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 0.2
 ```
-or use explicit tpr, cpt and xtc arguments to continue a non-StreaMD simulation
+or use explicit `--tpr`, `--cpt` and `--xtc` arguments to continue a non-StreaMD simulation
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc
 ```
-in case you don't want to check/run all preparation steps with using non-StreaMD simulations you can use --steps argument 
+in case you don't want to check/run all preparation steps with using non-StreaMD simulations you can use `--steps` argument 
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 0.3 --steps 3 4
 ```
@@ -316,11 +324,11 @@ gyrate.png - radius of gyration
 ```
 
 ### GPU usage
-When run with "--device gpu" argument the StreaMD offloads -nb, -update, -pme, -bonded, -pmefft (all which can be run on GPU) computations to GPU.  
+When run with `--device gpu` argument the StreaMD offloads nb, update, pme, bonded, pmefft (all which can be run on GPU) computations to GPU.  
 More details on: https://manual.gromacs.org/documentation/current/user-guide/mdrun-performance.html
 
 The performance and gpu usage strongly depend on the type of hardware and size of the system.  
-It is always good to check the GPU usage (for example, by _nvidia-smi_ command).
+It is always good to check the GPU usage (for example, by `nvidia-smi` command).
 
 **Run on 1 GPU:**
 ```
@@ -330,12 +338,13 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu
 To improve the performance one can use multiple GPUs or start multiple ranks per GPU.
 
 **Run on multiple GPUs**  
-! Increasing the number of GPUs does not always improve performance.
+> [!WARNING]
+> Increasing the number of GPUs does not always improve performance.
 ```
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --gpu_ids 0 1 2 3
 ```
-**Increase the number of thread-MPI ranks per GPU.**  
-_-ntmpi_per_gpu_ argument is used to calculate _total number of thread-MPI ranks_ (_gmx mdrun -ntmpi_ X, where X=ntmpi_per_gpu*number of GPU to use). By default, _ntmpi_per_gpu_ equals 1, although usage of 2 thread-MPI ranks per GPU may return better performance.
+**Increase the number of thread-MPI ranks per GPU**  
+```-ntmpi_per_gpu_``` argument is used to calculate _total number of thread-MPI ranks_ (```gmx mdrun -ntmpi_ X```, where **X**=ntmpi_per_gpu*number of GPUs to use). By default, ```ntmpi_per_gpu``` equals 1, although usage of 2 thread-MPI ranks per GPU may return better performance.
 ```
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu -ntmpi_per_gpu 2
 ```
@@ -350,7 +359,7 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device cpu
 ```
 **To let GROMACS automatically offload calculations on CPU/GPU may be optimal on hardware where the CPUs are relatively powerful compared to the GPUs.**
 ```
-run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 1
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
 ```
 
 ## Supplementary tools

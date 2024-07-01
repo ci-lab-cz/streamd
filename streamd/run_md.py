@@ -475,8 +475,8 @@ def main():
                              'Available FF can be found at Miniconda3/envs/md/share/gromacs/top')
     parser1.add_argument('--noignh', required=False,  action='store_true', default=False,
                          help="By default, Streamd uses gmx pdb2gmx -ignh, which re-adds hydrogens using residue names "
-                              "(the correct protonation states must be provided by the user) and ignores the original hydrogens."
-                              " If the --noignh argument is used, the original hydrogen atoms will be included in the preparation,"
+                              "(the correct protonation states must be provided by user) and ignores the original hydrogens."
+                              " If the --noignh argument is used, the original hydrogen atoms will be preserved during the preparation,"
                               " although there may be problems with recognition of atom names by GROMACS.")
     parser1.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='Time of MD simulation in ns')
