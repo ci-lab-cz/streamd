@@ -8,6 +8,8 @@ The **env_gpu.yml** file can only be installed on a machine with an available GP
 ```
 conda env create --file env.yml
 conda activate md
+```
+```
 pip install streamd
 ```
 or the latest version from github
