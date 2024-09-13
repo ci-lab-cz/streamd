@@ -215,7 +215,7 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 
 ```
 **To continue the interrupted simulations**  
-you can continue the interrupted run by calling the previous command. The tool will recognise the checkpoint files and continue the run from the unfinished step. 
+You can continue the interrupted run by re-executing the previous command. The tool will recognize the checkpoint files and continue the run from the unfinished step. 
 
 **To extend the simulation**  
 you can continue your simulation unlimited times. As the `--md_time` argument user should set up the overall time of the simulation
