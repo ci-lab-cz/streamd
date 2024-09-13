@@ -40,12 +40,17 @@ def init_dask_cluster(n_tasks_per_node, ncpu, use_multi_servers=True, hostfile=N
         dask_client = Client(n_workers=n_workers, threads_per_worker=n_threads)  # to run dask on a single server
 
     dask_client.forward_logging(level=logging.INFO)
+    dask_client.run(lambda: logging.getLogger().setLevel(logging.INFO))
+    dask_client.run(lambda: logging.getLogger('distributed.core').setLevel(logging.WARNING))
+
     return dask_client, cluster
 
 
 def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
     main_arg = iter(main_arg)
     Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+    task_times = {}  # Dictionary to store start times for each task
+
     try:
         if dask_client is not None:
             from dask.distributed import as_completed, performance_report
@@ -56,19 +61,24 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
                 nworkers = len(dask_client.scheduler_info()['workers'])
                 futures = []
                 for i, arg in enumerate(main_arg, 1):
-                    #logging.warning(f'Start argument:{i}, {arg}')
-                    futures.append(dask_client.submit(func, arg, **kwargs))
+                    future = dask_client.submit(func, arg, **kwargs)
+                    futures.append(future)
+                    task_times[future.key] = {'start': time.time()}
                     if i == nworkers:
                         break
                 seq = as_completed(futures, with_results=True)
                 for i, (future, results) in enumerate(seq, 1):
+                    logging.info(f'Finished task N: {i}. Argument: {results}. '
+                                    f'Function: {future.key.split("-")[0]}. '
+                                    f'Time: {round(time.time()-task_times[future.key]["start"], 3)} s.'
+                                    )
                     yield results
                     del future
                     try:
                         arg = next(main_arg)
-                        #logging.warning(f'Start argument: {i}, {arg}')
                         new_future = dask_client.submit(func, arg, **kwargs)
                         seq.add(new_future)
+                        task_times[new_future.key] = {'start': time.time()}
                     except StopIteration:
                         continue
     finally:
