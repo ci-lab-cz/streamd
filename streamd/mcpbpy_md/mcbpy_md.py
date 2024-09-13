@@ -43,6 +43,7 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
         for metal_pdb in metal_pdb_list:
             metal_mol2 = mcpbpy_preparation.convert_pdb2mol2(metal_pdb=metal_pdb,
                                                              charge_dict=metal_charges,
+                                                             bash_log_curr=bash_log_curr,
                                                              env=env)
             if metal_mol2 is not None:
                 metal_mol2_list.append(metal_mol2)
@@ -137,7 +138,8 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur,
                              all_resids=list(molids_pairs_dict.values())+list(set(metal_atomid_dict.values())),
                              script_path=os.path.join(script_path, 'mdp'), nvt_time_ps=nvt_time_ps,
-                             npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns, seed=seed):
+                             npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
+                             bash_log=bash_log, seed=seed):
         return None
     #add Position restraints
     # if not os.path.isfile(os.path.join(wdir_md_cur, 'posre.itp')):

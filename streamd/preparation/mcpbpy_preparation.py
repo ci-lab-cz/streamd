@@ -10,7 +10,7 @@ from streamd.utils.utils import run_check_subprocess, get_mol_resid_pair, get_in
 from streamd.preparation.ligand_preparation import prepare_gaussian_files
 from streamd.preparation.md_files_preparation import check_if_info_already_added_to_topol, edit_topology_file
 
-def convert_pdb2mol2(metal_pdb, charge_dict, env):
+def convert_pdb2mol2(metal_pdb, charge_dict, bash_log_curr, env):
     '''
 
     :param metal_pdb: metal pdb file path
@@ -28,8 +28,8 @@ def convert_pdb2mol2(metal_pdb, charge_dict, env):
 
     metal_mol2 = metal_pdb.replace(".pdb",".mol2")
 
-    cmd = f'metalpdb2mol2.py -i {metal_pdb} -o {metal_mol2} -c {charge}'
-    if not run_check_subprocess(cmd, metal_pdb, log=None, env=env):
+    cmd = f'metalpdb2mol2.py -i {metal_pdb} -o {metal_mol2} -c {charge} >> {bash_log_curr} 2>&1'
+    if not run_check_subprocess(cmd, metal_pdb, log=bash_log_curr, env=env):
         return None
     return metal_mol2
 
@@ -216,7 +216,9 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log
 
 
 def run_tleap(wdir, bash_log, env):
+    #TODO check
     cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out >> {bash_log} 2>&1'
+    # cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out'
     if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
     return wdir
@@ -272,7 +274,7 @@ def create_posre(all_resids, wdir, bash_log, env):
     couple_group = '_'.join(['Protein-H'] + all_resids)
 
     if couple_group not in index_list:
-        if not make_group_ndx(couple_group_ind, wdir):
+        if not make_group_ndx(couple_group_ind, wdir, bash_log=bash_log):
             return None
         index_list = get_index(os.path.join(wdir, 'index.ndx'))
 
