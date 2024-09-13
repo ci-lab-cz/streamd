@@ -30,7 +30,7 @@ class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argpar
 
 def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device, device_param, gpu_args, env=None):
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
-        logging.warning(f'{wdir}. Checkpoint files after Equilibration exist. '
+        logging.warning(f'{wdir}. Checkpoint files after Equilibration step exist. '
                         f'Equilibration step will be skipped ')
         return wdir
     cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} device_param={device_param} gpu_args={gpu_args} '
@@ -315,7 +315,7 @@ def start(protein, wdir, lfile, system_lfile, noignh,
                         if res:
                             var_complex_prepared_dirs.append(res)
 
-                logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complex preparation\n')
+                logging.info(f'Successfully finished {len(var_complex_prepared_dirs)} complexes preparation\n')
             finally:
                 if dask_client:
                     dask_client.retire_workers(dask_client.scheduler_info()['workers'],
@@ -362,7 +362,7 @@ def start(protein, wdir, lfile, system_lfile, noignh,
                         if res:
                             var_md_dirs_deffnm.append(res)
                     logging.info(
-                        f'Simulation of {len(var_md_dirs_deffnm)} were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
+                        f'Simulation of {len(var_md_dirs_deffnm)} complexes were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
 
             finally:
                 if dask_client:
@@ -401,7 +401,7 @@ def start(protein, wdir, lfile, system_lfile, noignh,
                 cluster.close()
 
         logging.info(
-            f'Analysis of md simulation of {len(var_md_analysis_dirs)} were successfully finished\nFinished: {var_md_analysis_dirs}')
+            f'Analysis of MD simulations of {len(var_md_analysis_dirs)} complexes were successfully finished\nFinished: {var_md_analysis_dirs}')
 
     if not not_clean_backup_files:
         if wdir_to_continue_list is None:

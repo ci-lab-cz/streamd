@@ -43,7 +43,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         if not os.path.isfile(os.path.join(wdir_md_cur, "all.itp")) or not all([os.path.isfile(os.path.join(wdir_md_cur, i)) for i in md_files_dict['itp']]):
             make_all_itp(fileitp_input_list=md_files_dict['itp_orig'], fileitp_output_list=[os.path.join(wdir_md_cur, j) for j in md_files_dict['itp']], out_file=os.path.join(wdir_md_cur, 'all.itp'))
         else:
-            logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip ligand all itp preparation step\n')
+            logging.warning(f'{wdir_md_cur}. Prepared itp files exist. Skip ligand all itp preparation step')
 
         # add ligands info to topology if there is no necessary row
         add_ligands_to_topol(md_files_dict['itp'], md_files_dict['posres'], md_files_dict['resid'],
@@ -66,7 +66,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
                             ligand_gro_list=md_files_dict['gro'],
                             out_file=os.path.join(wdir_md_cur, 'complex.gro'))
     else:
-        logging.warning(f'{wdir_md_cur}. Prepared complex file exists. Skip complex preparation step\n')
+        logging.warning(f'{wdir_md_cur}. Prepared complex file exists. Skip complex preparation step')
 
     for mdp_fname in ['ions.mdp', 'minim.mdp']:
         mdp_file = os.path.join(script_path, mdp_fname)
@@ -78,7 +78,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         if not run_check_subprocess(cmd=cmd, key=wdir_md_cur, log=os.path.join(wdir_md_cur, bash_log), env=env):
             return None
     else:
-        logging.warning(f'{wdir_md_cur}. Prepared solv_ions.gro file exists. Skip solvation and ion preparation step\n')
+        logging.warning(f'{wdir_md_cur}. Prepared solv_ions.gro file exists. Skip solvation and ion preparation step')
 
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=md_files_dict['resid'],
                              script_path=script_path, nvt_time_ps=nvt_time_ps,

@@ -168,8 +168,8 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
     if os.path.isfile(os.path.join(wdir_ligand_cur, f'{molid}.itp')) and os.path.isfile(
             os.path.join(wdir_ligand_cur, f'posre_{molid}.itp')):
         logging.warning(
-            f'{molid}.itp and posre_{molid}.itp files already exist.'
-            f'Mol preparation step will be skipped for such molecule\n')
+            f'{molid}.itp and posre_{molid}.itp files already exist. '
+            f'Mol preparation step will be skipped for such molecule')
         if not os.path.isfile(os.path.join(wdir_ligand_cur, 'resid.txt')):
             with open(os.path.join(wdir_ligand_cur, 'resid.txt'), 'w') as out:
                 out.write(f'{molid}\t{resid}\n')
@@ -217,7 +217,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
         mol2 = pmd.load_file(mol2_file).to_structure()
         mol2.residues[0].name = 'UNL'
         mol2.save(os.path.join(wdir_ligand_cur, f'{molid}.mol2'))
-        logging.warning(f'INFO: No mol2 file will be generated. {mol2_file} will be used instead')
+        logging.info(f'No mol2 file will be generated. {mol2_file} will be used instead')
 
     prepare_tleap(os.path.join(script_path, 'tleap.in'), tleap=os.path.join(wdir_ligand_cur, 'tleap.in'),
                   molid=molid, conda_env_path=conda_env_path)
