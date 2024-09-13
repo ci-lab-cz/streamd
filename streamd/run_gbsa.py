@@ -58,7 +58,7 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
             query = f"{index_list.index('Protein')}|{'|'.join(add_group_ids.keys())}"
             name_query = f"Protein_{'_'.join(add_group_ids.values())}"
             if name_query not in index_list:
-                if not make_group_ndx(query, wdir):
+                if not make_group_ndx(query, wdir, bash_log=bash_log):
                     return None
                 index_list = get_index(index)
 

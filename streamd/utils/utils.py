@@ -33,15 +33,15 @@ def get_index(index_file):
     return groups
 
 
-def make_group_ndx(query, wdir):
+def make_group_ndx(query, wdir, bash_log):
     cmd = f'''
         cd {wdir}
-        gmx make_ndx -f solv_ions.gro -n index.ndx << INPUT
+        gmx make_ndx -f solv_ions.gro -n index.ndx << INPUT  >> {os.path.join(wdir,bash_log)} 2>&1
         {query}
         q
         INPUT
         '''
-    if not run_check_subprocess(cmd, key=wdir, log=None):
+    if not run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir,bash_log)):
        return False
 
     return True
@@ -50,7 +50,7 @@ def create_ndx(index_file):
     wdir = os.path.dirname(index_file)
     cmd = f'''
         cd {wdir}
-        gmx make_ndx -f {os.path.join(wdir,"solv_ions.gro")} -o {index_file} << INPUT
+        gmx make_ndx -f {os.path.join(wdir, "solv_ions.gro")} -o {index_file} << INPUT 
         q
         INPUT
         '''
@@ -67,7 +67,7 @@ def get_mol_resid_pair(fname):
 
 def run_check_subprocess(cmd, key, log, env=None):
     try:
-        subprocess.check_output(cmd, shell=True, env=env)
+        subprocess.check_output(cmd, shell=True, env=env, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         logging.exception(f'{key}. {f"Check log {log}" if log else ""}\nError:{e}', stack_info=True)
         return False

@@ -8,7 +8,7 @@ from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, r
 def md_lig_rmsd_analysis(molid, resid, tpr, xtc, wdir, tu, bash_log, project_dir, env=None):
     index_list = get_index(os.path.join(wdir, 'index.ndx'))
     if f'{resid}_&_!H*' not in index_list:
-        if not make_group_ndx(query=f'{index_list.index(resid)} & ! a H*', wdir=wdir):
+        if not make_group_ndx(query=f'{index_list.index(resid)} & ! a H*', wdir=wdir, bash_log=bash_log):
             return None
         index_list = get_index(os.path.join(wdir, 'index.ndx'))
     index_ligand_noH = index_list.index(f'{resid}_&_!H*')
@@ -42,7 +42,7 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log, ligand
     if os.path.isfile(molid_resid_pairs_fname) and os.path.getsize(molid_resid_pairs_fname) > 0:
         molid_resid_pairs = get_mol_resid_pair(molid_resid_pairs_fname)
         if f'Protein_{ligand_resid}' not in index_list:
-            if not make_group_ndx(query=f'"Protein"|{index_list.index(ligand_resid)}', wdir=wdir):
+            if not make_group_ndx(query=f'"Protein"|{index_list.index(ligand_resid)}', wdir=wdir,  bash_log=bash_log):
                 return None
             index_list = get_index(os.path.join(wdir, 'index.ndx'))
 
