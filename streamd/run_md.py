@@ -585,6 +585,12 @@ def main():
     logging.getLogger('bockeh').setLevel('WARNING')
 
     logging.info(args)
+
+    ncpu = min(max(0, args.ncpu), len(os.sched_getaffinity(0)))
+    if ncpu != args.ncpu:
+        logging.warning('The number of available CPUs are less than specified value. '
+                        f'The tool will use only {ncpu} CPUs.')
+
     try:
         start(protein=args.protein,
               lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh,
@@ -596,7 +602,7 @@ def main():
               ligand_list_file_prev=args.ligand_list_file, ligand_resid=args.ligand_id,
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
-              hostfile=args.hostfile, ncpu=args.ncpu, mdrun_per_node=args.mdrun_per_node, compute_device=args.device,
+              hostfile=args.hostfile, ncpu=ncpu, mdrun_per_node=args.mdrun_per_node, compute_device=args.device,
               gpu_ids=args.gpu_ids, ntmpi_per_gpu=args.ntmpi_per_gpu, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
