@@ -92,16 +92,22 @@ Standard Molecular Dynamics Simulation Run:
   --seed int            seed
   --not_clean_backup_files
                         Not to remove all backups of md files
-  --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:1 - run preparation step (protein, ligand, cofactor preparation) 2 - run MD equilibration
-                        step (minimization, NVT, NPT) 3 - run MD simulation 4 - run MD analysis. Ex: 3 4 If 2/3/4 step(s) are used --wdir_to_continue argument should
-                        be used to provide directories with files obtained during the step 1
-  --wdir_to_continue DIRNAME [DIRNAME ...]
-                        Single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. Should consist of: tpr, cpt,
-                        xtc and all_ligand_resid.txt files. File all_ligand_resid.txt is optional and used to run md analysis for the ligands. If you want to continue
-                        your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments (--ligand_list_file is optional and required to
-                        run md analysis after simulation )
-
+  --steps [STEPS ...]   Run a particular step(s) of the StreaMD process. 
+                        Options: 1 - Run the preparation step (protein, ligand, cofactor preparation).
+                                 2 - Run the MD equilibration step (minimization, NVT, NPT). 
+                                 3 - Run the MD simulation.
+                                 4 - Run the MD analysis.
+                        Example: 3 4.
+                        If step(s) 2, 3, or 4 are used, the --wdir_to_continue argument must also be provided to specify directories containing files obtained during step 1.
+                        
 Extend Molecular Dynamics Simulation:
+  --wdir_to_continue DIRNAME [DIRNAME ...]
+                        Single or multiple directories contain simulations created by the tool.
+                        Use with steps 2,3 or 4 to continue a run or use the --md_time argument to extend previously finished simulations.
+                        The directories should contain the following files: tpr, cpt, xtc and all_ligand_resid.txt files.
+                        The all_ligand_resid.txt file is optional and used to run md analysis for the ligands. 
+                        If you want to continue your own simulation not created by the tool, use the --tpr, --cpt, --xtc and --wdir arguments 
+                        (--ligand_list_file is optional and required to run MD analysis after the simulation )
   --deffnm preffix for md files
                         Preffix for the md files. Used to run, extend or continue the simulation. If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt,
                         deffnm.xtc will be searched from --wdir_to_continue directories
