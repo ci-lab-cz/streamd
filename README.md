@@ -101,7 +101,7 @@ Standard Molecular Dynamics Simulation Run:
                         your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments (--ligand_list_file is optional and required to
                         run md analysis after simulation )
 
-Continue or Extend Molecular Dynamics Simulation:
+Extend Molecular Dynamics Simulation:
   --deffnm preffix for md files
                         Preffix for the md files. Used to run, extend or continue the simulation. If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt,
                         deffnm.xtc will be searched from --wdir_to_continue directories
@@ -214,6 +214,8 @@ srun hostname | sort | uniq > hostfile
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile hostfile --ncpu 128
 
 ```
+**To continue the interrupted simulations**  
+you can continue the interrupted run by calling the previous command. The tool will recognise the checkpoint files and continue the run from the unfinished step. 
 
 **To extend the simulation**  
 you can continue your simulation unlimited times. As the `--md_time` argument user should set up the overall time of the simulation
