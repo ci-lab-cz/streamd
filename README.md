@@ -69,8 +69,8 @@ Standard Molecular Dynamics Simulation Run:
   -c INTEGER, --ncpu INTEGER
                         Number of CPU per server. Use all available cpus by default.
   --mdrun_per_node INTEGER
-                        Number of simulations to run per 1 server.In case of multiple simulations per node, the available CPU cores will be split evenly across these
-                        simulations.By default, run only 1 simulation per node and use all available cpus
+                        Number of simulations to run per 1 server. In case of multiple simulations per node, the available CPU cores will be split evenly across these
+                        simulations. By default, run only 1 simulation per node and use all available cpus
   --device cpu          Calculate bonded and non-bonded interactions on: auto, cpu, gpu
   --gpu_ids GPU ID [GPU ID ...]
                         List of unique GPU device IDs available to use. Use in case of multiple GPUs usage or using exact GPU devices.
