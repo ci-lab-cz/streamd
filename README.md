@@ -96,7 +96,7 @@ Standard Molecular Dynamics Simulation Run:
                         step (minimization, NVT, NPT) 3 - run MD simulation 4 - run MD analysis. Ex: 3 4 If 2/3/4 step(s) are used --wdir_to_continue argument should
                         be used to provide directories with files obtained during the step 1
   --wdir_to_continue DIRNAME [DIRNAME ...]
-                        Single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. ' Should consist of: tpr, cpt,
+                        Single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. Should consist of: tpr, cpt,
                         xtc and all_ligand_resid.txt files. File all_ligand_resid.txt is optional and used to run md analysis for the ligands. If you want to continue
                         your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments (--ligand_list_file is optional and required to
                         run md analysis after simulation )
@@ -341,12 +341,16 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu
 
 To improve the performance one can use multiple GPUs or start multiple ranks per GPU.
 
-**Run on multiple GPUs**  
+**Run each simulation on multiple GPUs**  
 > [!WARNING]
 > Increasing the number of GPUs does not always improve performance.
+The each single simulation will use all provided GPUs. 
 ```
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --gpu_ids 0 1 2 3
 ```
+> [!WARNING]
+> If you want to split the simulations across multiple GPUs but still run the task on the same node use the --mdrun_per_node argument (see below).
+
 **Increase the number of thread-MPI ranks per GPU**  
 ```-ntmpi_per_gpu_``` argument is used to calculate _total number of thread-MPI ranks_ (```gmx mdrun -ntmpi_ X```, where **X**=ntmpi_per_gpu*number of GPUs to use). By default, ```ntmpi_per_gpu``` equals 1, although usage of 2 thread-MPI ranks per GPU may return better performance.
 ```
@@ -356,6 +360,12 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu -ntmpi_per_gpu 
 **Sometimes for more full GPU usage user can start multiple runs on a single/multiple GPU(s) and the tool automatically splits the available CPU cores across these simulations:**
 ```
 run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2
+```
+To split the simulations across multiple GPUs but still run the task on the same node:
+> [!WARNING]
+> Although all simulations will still be utilizing all provided GPUs which can lead to suboptimal GPU load. This feature is still under development.
+```
+run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2 --gpu_ids 0 1
 ```
 **To run mdrun only on CPUs on server where GPUs are available:**
 ```
