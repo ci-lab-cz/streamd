@@ -540,3 +540,5 @@ log_prolif_start-time.log - StreaMD logging user info
 ```
 ## Licence
 MIT
+## Authors
+Ivanova A, Mokshyna O, Polishchuk P. StreaMD: the toolkit for high-throughput molecular dynamics simulations. ChemRxiv. 2024; doi:10.26434/chemrxiv-2024-2rjqz
