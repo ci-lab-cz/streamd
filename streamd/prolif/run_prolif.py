@@ -203,7 +203,7 @@ def main():
                         help='width of the output pictures')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
                         help='height of the output pictures')
-    parser.add_argument('-o', '--occupancy', metavar='FILENAME', default=0.6, type=float,
+    parser.add_argument('--occupancy', metavar='float', default=0.6, type=float,
                         help='occupancy of the unique contacts to show. '
                              'Applied for plifs_occupancyX.html (for each complex) and'
                              ' prolif_output_occupancyX.png (all systems aggregated plot)')
