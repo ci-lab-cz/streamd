@@ -13,7 +13,6 @@ conda activate md
 pip install streamd
 ```
 or the latest version from github
-(use it for GPU usage)
 ```
 pip install git+https://github.com/ci-lab-cz/streamd.git
 ```
