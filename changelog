@@ -1,0 +1,6 @@
+version 0.2.5
+Added GPU support
+Fixed logging
+Added mdrun_per_node argument
+Use only available CPUs
+
