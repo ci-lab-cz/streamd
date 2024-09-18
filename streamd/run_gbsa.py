@@ -63,11 +63,11 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
                 index_list = get_index(index)
 
             protein_index = index_list.index(name_query)
-            logging.warning(f'INFO: {name_query} selection will be used as a protein system')
+            logging.info(f'{name_query} selection will be used as a protein system')
         else:
             protein_index = index_list.index('Protein')
 
-    logging.warning(f'INFO: {protein_index} number of index selection will be used as a protein system')
+    logging.info(f'{protein_index} number of index selection will be used as a protein system')
 
     ligand_index = index_list.index(ligand_resid)
 
@@ -186,7 +186,7 @@ def get_number_of_frames(xtc, env):
     res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
     frames = re.findall('Step[ ]*([0-9]*)[ ]*[0-9]*\n', res.stderr.decode("utf-8"))
     if frames:
-        logging.info(f'{xtc} has {frames} frames')
+        logging.info(f'{xtc} has {frames[0]} frames')
         return int(frames[0])
 
 
