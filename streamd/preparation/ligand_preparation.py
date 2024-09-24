@@ -157,7 +157,8 @@ def prepare_gaussian_files(file_template, file_out, ncpu, opt_restart=False, gau
         output.write(new_data)
 
 
-def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path, bash_log, gaussian_exe=None,
+def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
+                conda_env_path, bash_log, gaussian_exe=None,
                 activate_gaussian=None, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB', ncpu=1,
                 mol2_file=None, env=None):
     mol, molid, resid = mol_tuple
@@ -209,10 +210,20 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
                     return None
             else:
                 cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
-                      f'resid={resid} molid={molid} charge={charge} bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
+                      f'resid={resid} molid={molid} charge={charge} dr=yes bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
                       f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
-                if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
-                    return None
+                if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env,
+                                            ignore_error=True if no_dr else False):
+                    if not no_dr:
+                        return None
+                    else:
+                        logging.warning(f'Ambertools structure checking returned an error for the {mol_file} file.'
+                                        f'Check the input structure carefully. Continue with -dr no mode.')
+                        cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
+                          f'resid={resid} molid={molid} charge={charge} dr=no bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
+                          f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
+                        if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
+                            return None
     else:
         mol2 = pmd.load_file(mol2_file).to_structure()
         mol2.residues[0].name = 'UNL'
@@ -234,7 +245,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, conda_env_path
 
 
 def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_path, project_dir, wdir_ligand,
-                          gaussian_exe, activate_gaussian, gaussian_basis, gaussian_memory,
+                          no_dr, gaussian_exe, activate_gaussian, gaussian_basis, gaussian_memory,
                           hostfile, ncpu, bash_log):
     '''
 
@@ -242,7 +253,8 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
     :param preset_resid:
     :param script_path:
     :param project_dir:
-    :param wdir_system_ligand:
+    :param wdir_ligand:
+    :param no_dr:
     :param gaussian_exe: str or None
     :param activate_gaussian: str or None
     :param hostfile:
@@ -308,7 +320,8 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
                                                          ncpu=ncpu)
                 for res in calc_dask(prep_ligand, standard_mols, dask_client,
                                      script_path=script_path, project_dir=project_dir,
-                                     wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"],
+                                     wdir_ligand=wdir_ligand, no_dr=no_dr,
+                                     conda_env_path=os.environ["CONDA_PREFIX"],
                                      ncpu=ncpu, bash_log=bash_log,
                                      env=os.environ.copy()):
                     if res:

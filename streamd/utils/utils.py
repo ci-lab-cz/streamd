@@ -65,11 +65,14 @@ def get_mol_resid_pair(fname):
             molid, resid = pair
             yield molid, resid
 
-def run_check_subprocess(cmd, key, log, env=None):
+def run_check_subprocess(cmd, key, log, env=None, ignore_error=False):
     try:
         subprocess.check_output(cmd, shell=True, env=env, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        logging.exception(f'{key}. {f"Check log {log}" if log else ""}\nError:{e}', stack_info=True)
+        if log:
+            logging.warning(f'Failed run for {key}. Check log {log}\n')
+        if not ignore_error:
+            logging.exception(f'Failed run for {key}. Error:{e}', stack_info=True)
         return False
     return True
 

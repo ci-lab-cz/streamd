@@ -109,7 +109,7 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
         return wdir_to_continue
 
 
-def start(protein, wdir, lfile, system_lfile, noignh,
+def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           forcefield_name, npt_time_ps, nvt_time_ps, mdtime_ns,
           topol, topol_itp_list, posre_list_protein,
           wdir_to_continue_list, deffnm,
@@ -124,6 +124,7 @@ def start(protein, wdir, lfile, system_lfile, noignh,
     :param lfile: None or file
     :param system_lfile: None or file. Mol or sdf format
     :param noignh: don't use -ignh argument (gmx pdb2gmx)
+    :param no_dr: Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt.
     :param forcefield_name: str
     :param clean_previous: boolean. Remove all previous md files
     :param mdtime_ns: float. Time in ns
@@ -138,11 +139,14 @@ def start(protein, wdir, lfile, system_lfile, noignh,
     :param xtc_prev: None or file
     :param ligand_resid: UNL. Used for md analysis only if continue simulation
     :param ligand_list_file_prev: None or file
-    :param deffnm_prev: md_out
     :param hostfile: None or file
     :param ncpu:
     :param compute_device:
-    not_clean_log_files: boolean. Remove backup md files (starts with #)
+    :param gpu_ids:
+    :param ntmpi_per_gpu:
+    :param out_time:
+    :param bash_log:
+    :param not_clean_backup_files:
     :return:
     '''
 
@@ -240,12 +244,12 @@ def start(protein, wdir, lfile, system_lfile, noignh,
                     return None
 
                 system_lig_wdirs = prepare_input_ligands(system_lfile, preset_resid=None, protein_resid_set=protein_resid_set, script_path=script_path,
-                                                         project_dir=project_dir, wdir_ligand=wdir_system_ligand,
+                                                         project_dir=project_dir, wdir_ligand=wdir_system_ligand, no_dr=no_dr,
                                                          gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                          gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                                          hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
                 if number_of_mols != len(system_lig_wdirs):
-                    logging.exception(f'Error with cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
+                    logging.exception(f'Error with the cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
                                       f' The calculation will be interrupted')
                     return None
 
@@ -261,12 +265,12 @@ def start(protein, wdir, lfile, system_lfile, noignh,
                                     f' Such molecules will be skipped.')
 
                 var_lig_wdirs = prepare_input_ligands(lfile, preset_resid=ligand_resid, protein_resid_set=protein_resid_set, script_path=script_path,
-                                                      project_dir=project_dir, wdir_ligand=wdir_ligand,
+                                                      project_dir=project_dir, wdir_ligand=wdir_ligand, no_dr=no_dr,
                                                       gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                       gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                                       hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
                 if number_of_mols != len(var_lig_wdirs):
-                    logging.warning(f'Problem with ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
+                    logging.warning(f'Problem with the ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
                                     f' Such molecules will be skipped.')
 
                 logging.info(f'Successfully finished {len(var_lig_wdirs)} ligand preparation\n')
@@ -486,6 +490,10 @@ def main():
                         help='Time of NVT equilibration in ps')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
+    parser1.add_argument('--no_dr', action='store_true', default=False,
+                         help='Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file '
+                              'in the next attempt if the regular AmberTools run for ligand preparation fails. '
+                              'Use this argument carefully and ensure that you provide valid structures')
     parser1.add_argument('--not_clean_backup_files', action='store_true', default=False,
                         help='Not to remove all backups of md files')
     parser1.add_argument('--steps', default=None, nargs='*', type=int,
@@ -571,7 +579,7 @@ def main():
                             f'{out_time}.log')
     bash_log = f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_{out_time}.log'
 
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+    logging.basicConfig(format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
                         handlers=[logging.FileHandler(log_file),
                                   logging.StreamHandler()])
@@ -593,7 +601,7 @@ def main():
 
     try:
         start(protein=args.protein,
-              lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh,
+              lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh, no_dr=args.no_dr,
               topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
               forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time,
               nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
