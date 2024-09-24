@@ -35,6 +35,7 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 - supports to continue of interrupted MD simulation
 - interrupted MD preparation can be restarted by invoking the same command
 - implemented tools for end-state free energy calculations (gmx_MMPBSA) and Protein-Ligand Interaction analysis (ProLIF)
+- supports customized .mdp files
 - GPU support
 
 ### **USAGE**
