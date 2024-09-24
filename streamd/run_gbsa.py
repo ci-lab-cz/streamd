@@ -380,7 +380,7 @@ def main():
         topol = args.topol
         index = args.index
 
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+    logging.basicConfig(format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
                         handlers=[logging.FileHandler(log_file),
                                   logging.StreamHandler()])
