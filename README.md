@@ -385,6 +385,10 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
 ### MM-PBSA/MM-GBSA energy calculation
 #### The tool is based on [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/)
 Calculation arguments can be changed/added by customized [mmpbsa.in](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/input_file/) file 
+> [!NOTE] 
+> The user can control the length of the trajectory for analysis by editing 
+> the startframe, endframe, and interval arguments (in mmpbsa.in file), where every 100 frames equals 1 ns.
+
 #### **USAGE**
 ```
 run_gbsa -h
