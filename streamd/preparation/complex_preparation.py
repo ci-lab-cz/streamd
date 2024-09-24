@@ -7,6 +7,7 @@ from streamd.preparation.md_files_preparation import prep_md_files, add_ligands_
     edit_topology_file, prepare_mdp_files, check_if_info_already_added_to_topol
 from streamd.utils.utils import run_check_subprocess
 
+from glob import glob
 
 def complex_preparation(protein_gro, ligand_gro_list, out_file):
     atoms_list = []
@@ -29,12 +30,15 @@ def complex_preparation(protein_gro, ligand_gro_list, out_file):
 
 def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
                             protein_name, wdir_protein, wdir_md, script_path, project_dir,
-                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, seed, bash_log, env=None):
+                            mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, seed, bash_log,
+                            mdp_dir=None, env=None):
 
     wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
                                                wdir_system_ligand_list=wdir_system_ligand_list,
                                                wdir_protein=wdir_protein,
                                                wdir_md=wdir_md, clean_previous=clean_previous)
+
+    mdp_files_default = ['ions.mdp', 'minim.mdp', 'nvt.mdp', 'npt.mdp', 'md.mdp']
 
     protein_gro = os.path.join(wdir_protein, f'{protein_name}.gro')
     # ligands and cofactors
@@ -68,9 +72,20 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
     else:
         logging.warning(f'{wdir_md_cur}. Prepared complex file exists. Skip complex preparation step')
 
-    for mdp_fname in ['ions.mdp', 'minim.mdp']:
-        mdp_file = os.path.join(script_path, mdp_fname)
+
+    for mdp_fname in mdp_files_default:
+        if mdp_dir and os.path.isfile(os.path.join(mdp_dir, mdp_fname)):
+            mdp_file = os.path.join(mdp_dir, mdp_fname)
+            logging.warning(f'Use user provided mdp file: {mdp_file}')
+        else:
+            mdp_file = os.path.join(script_path, mdp_fname)
+
         shutil.copy(mdp_file, wdir_md_cur)
+
+    # if not mdp_dir:
+    #     for mdp_fname in ['ions.mdp', 'minim.mdp']:
+    #         mdp_file = os.path.join(script_path, mdp_fname)
+    #         shutil.copy(mdp_file, wdir_md_cur)
 
     if not os.path.isfile(os.path.join(wdir_md_cur, 'solv_ions.gro')):
         cmd = (f'wdir={wdir_md_cur} bash {os.path.join(project_dir, "scripts/script_sh/solv_ions.sh")} '
@@ -81,7 +96,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         logging.warning(f'{wdir_md_cur}. Prepared solv_ions.gro file exists. Skip solvation and ion preparation step')
 
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=md_files_dict['resid'],
-                             script_path=script_path, nvt_time_ps=nvt_time_ps,
+                             nvt_time_ps=nvt_time_ps,
                              npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
                              bash_log=bash_log, seed=seed):
         return None

@@ -1,4 +1,4 @@
-title                   = OPLS Lysozyme NPT equilibration 
+title                   = MD simulation
 ; Run parameters
 integrator              = md        ; leap-frog integrator
 nsteps                  = 45000000  ; 2 * 5000000 = 10000000 fs = 10000 ps (10 ns), 25000000*2 fs = 50 ns 100000000

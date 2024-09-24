@@ -43,11 +43,11 @@ run_md -h
 usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--mdrun_per_node INTEGER]
               [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
-              [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--not_clean_backup_files]
-              [--steps [STEPS ...]] [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
-              [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL] [--activate_gaussian module load Gaussian/09-d01]
-              [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09] [--gaussian_basis B3LYP/6-31G*] [--gaussian_memory 120GB] [--metal_resnames [MN ...]]
-              [--metal_cutoff 2.8] [--metal_charges {MN:2, ZN:2, CA:2}]
+              [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--no_dr] [--not_clean_backup_files]
+              [--steps [STEPS ...]] [--mdp_dir Path to directory with specific mdp files] [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files]
+              [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL]
+              [--activate_gaussian module load Gaussian/09-d01] [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09] [--gaussian_basis B3LYP/6-31G*]
+              [--gaussian_memory 120GB] [--metal_resnames [MN ...]] [--metal_cutoff 2.8] [--metal_charges {MN:2, ZN:2, CA:2}]
 
 Run or continue MD simulation. Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple)
 
@@ -68,8 +68,8 @@ Standard Molecular Dynamics Simulation Run:
   -c INTEGER, --ncpu INTEGER
                         Number of CPU per server. Use all available cpus by default.
   --mdrun_per_node INTEGER
-                        Number of simulations to run per 1 server. In case of multiple simulations per node, the available CPU cores will be split evenly across these
-                        simulations. By default, run only 1 simulation per node and use all available cpus
+                        Number of simulations to run per 1 server.In case of multiple simulations per node, the available CPU cores will be split evenly across these
+                        simulations.By default, run only 1 simulation per node and use all available cpus
   --device cpu          Calculate bonded and non-bonded interactions on: auto, cpu, gpu
   --gpu_ids GPU ID [GPU ID ...]
                         List of unique GPU device IDs available to use. Use in case of multiple GPUs usage or using exact GPU devices.
@@ -89,24 +89,25 @@ Standard Molecular Dynamics Simulation Run:
   --npt_time ps         Time of NPT equilibration in ps
   --nvt_time ps         Time of NVT equilibration in ps
   --seed int            seed
+  --no_dr               Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt if the regular AmberTools run for
+                        ligand preparation fails. Use this argument carefully and ensure that you provide valid structures
   --not_clean_backup_files
                         Not to remove all backups of md files
-  --steps [STEPS ...]   Run a particular step(s) of the StreaMD process. 
-                        Options: 1 - Run the preparation step (protein, ligand, cofactor preparation).
-                                 2 - Run the MD equilibration step (minimization, NVT, NPT). 
-                                 3 - Run the MD simulation.
-                                 4 - Run the MD analysis.
-                        Example: 3 4.
-                        If step(s) 2, 3, or 4 are used, the --wdir_to_continue argument must also be provided to specify directories containing files obtained during step 1.
-                        
-Extend Molecular Dynamics Simulation:
+  --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:1 - run preparation step (protein, ligand, cofactor preparation) 2 - run MD equilibration
+                        step (minimization, NVT, NPT) 3 - run MD simulation 4 - run MD analysis. Ex: 3 4 If 2/3/4 step(s) are used --wdir_to_continue argument should
+                        be used to provide directories with files obtained during the step 1
+  --mdp_dir Path to a directory with specific mdp files
+                        To use specific MD settings, the user can provide a path to a directory that contains any of the following .mdp files: ions.mdp, minim.mdp,
+                        nvt.mdp, npt.mdp, md.mdp. Missing .mdp files will be replaced by default StreaMD files. Provided .mdp files will be used as templates,
+                        although the system StreaMD parameters (seed, nvt_time, npt_time, md_time, and tc-grps (can not be changed by user)) will override the ones provided.
+                        Warning: The names of the files must be strictly preserved.
   --wdir_to_continue DIRNAME [DIRNAME ...]
-                        Single or multiple directories contain simulations created by the tool.
-                        Use with steps 2,3 or 4 to continue a run or use the --md_time argument to extend previously finished simulations.
-                        The directories should contain the following files: tpr, cpt, xtc and all_ligand_resid.txt files.
-                        The all_ligand_resid.txt file is optional and used to run md analysis for the ligands. 
-                        If you want to continue your own simulation not created by the tool, use the --tpr, --cpt, --xtc and --wdir arguments 
-                        (--ligand_list_file is optional and required to run MD analysis after the simulation )
+                        Single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. ' Should consist of: tpr, cpt,
+                        xtc and all_ligand_resid.txt files. File all_ligand_resid.txt is optional and used to run md analysis for the ligands. If you want to continue
+                        your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments (--ligand_list_file is optional and required to
+                        run md analysis after simulation )
+
+Continue or Extend Molecular Dynamics Simulation:
   --deffnm preffix for md files
                         Preffix for the md files. Used to run, extend or continue the simulation. If --wdir_to_continue is used files as deffnm.tpr, deffnm.cpt,
                         deffnm.xtc will be searched from --wdir_to_continue directories

@@ -143,7 +143,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     return wdir_md_cur, md_files_dict
 
 
-def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_time_ps, mdtime_ns, bash_log, seed):
+def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_ns, bash_log, seed):
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
         create_ndx(os.path.join(wdir_md_cur, 'index.ndx'))
 
@@ -155,27 +155,25 @@ def prepare_mdp_files(wdir_md_cur, all_resids, script_path, nvt_time_ps, npt_tim
     non_couple_group = f'!{couple_group}'
 
     for mdp_fname in ['nvt.mdp', 'npt.mdp', 'md.mdp']:
-        mdp_file = os.path.join(script_path, mdp_fname)
-        shutil.copy(mdp_file, wdir_md_cur)
-        md_fname = os.path.basename(mdp_file)
+        mdp_file = os.path.join(wdir_md_cur, mdp_fname)
 
-        edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+        edit_mdp(md_file=mdp_file,
                  pattern='tc-grps',
                  replace=f'tc-grps                 = {couple_group} {non_couple_group}; two coupling groups')
         steps = 0
-        if md_fname == 'nvt.mdp':
+        if mdp_fname == 'nvt.mdp':
             steps = int(nvt_time_ps * 1000 / 2)
-            edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+            edit_mdp(md_file=mdp_file,
                      pattern='gen_seed',
                      replace=f'gen_seed                = {seed}        ;')
 
-        if md_fname == 'npt.mdp':
+        if mdp_fname == 'npt.mdp':
             steps = int(npt_time_ps * 1000 / 2)
-        if md_fname == 'md.mdp':
+        if mdp_fname == 'md.mdp':
             # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
             steps = int(mdtime_ns * 1000 * 1000 / 2)
 
-        edit_mdp(md_file=os.path.join(wdir_md_cur, md_fname),
+        edit_mdp(md_file=mdp_file,
                  pattern='nsteps',
                  replace=f'nsteps                  = {steps}        ;')
 

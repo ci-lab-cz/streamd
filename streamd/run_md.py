@@ -117,7 +117,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
           seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
-          not_clean_backup_files, out_time, bash_log=None):
+          not_clean_backup_files, out_time,
+          mdp_dir=None, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -146,6 +147,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param ntmpi_per_gpu:
     :param out_time:
     :param bash_log:
+    :param mdp_dir:
     :param not_clean_backup_files:
     :return:
     '''
@@ -315,7 +317,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          protein_name=pname, wdir_protein=wdir_protein,
                                          clean_previous=clean_previous, wdir_md=wdir_md,
                                          script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
-                                         npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps, bash_log=bash_log, seed=seed, env=os.environ.copy()):
+                                         npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps,
+                                         mdp_dir=mdp_dir, bash_log=bash_log, seed=seed, env=os.environ.copy()):
                         if res:
                             var_complex_prepared_dirs.append(res)
 
@@ -405,7 +408,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                 cluster.close()
 
         logging.info(
-            f'Analysis of MD simulations of {len(var_md_analysis_dirs)} complexes were successfully finished\nFinished: {var_md_analysis_dirs}')
+            f'Analysis of MD simulations of {len(var_md_analysis_dirs)} complexes were successfully finished'
+            f'\nFinished: {",".join(var_md_analysis_dirs)}')
 
     if not not_clean_backup_files:
         if wdir_to_continue_list is None:
@@ -506,6 +510,16 @@ def main():
                              'Ex: 3 4\n'
                              'If 2/3/4 step(s) are used --wdir_to_continue argument should be used to provide\n'
                              'directories with files obtained during the step 1')
+    parser1.add_argument('--mdp_dir', metavar='Path to a directory with specific mdp files', required=False,
+                         default=None, type=partial(filepath_type, exist_type='dir'),
+                         help='To use specific MD settings, the user can provide a path to a directory '
+                              'that contains any of the following .mdp files: '
+                              'ions.mdp, minim.mdp, nvt.mdp, npt.mdp, md.mdp. '
+                              'Missing .mdp files will be replaced by default StreaMD files. '
+                              'Provided .mdp files will be used as templates, '
+                              'although the system StreaMD parameters '
+                              '(seed, nvt_time, npt_time, md_time, and tc-grps (can not be changed by user)) will override the ones provided. '
+                              'Warning: The names of the files must be strictly preserved.')
     parser1.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
                          type=partial(filepath_type, exist_type='dir'),
                          help='''Single or multiple directories contain simulations created by the tool.
@@ -614,6 +628,7 @@ def main():
               gpu_ids=args.gpu_ids, ntmpi_per_gpu=args.ntmpi_per_gpu, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
-              mcpbpy_cut_off=args.metal_cutoff, out_time=out_time, bash_log=bash_log)
+              mcpbpy_cut_off=args.metal_cutoff, out_time=out_time,
+              mdp_dir=args.mdp_dir,bash_log=bash_log)
     finally:
         logging.shutdown()
