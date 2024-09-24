@@ -90,8 +90,8 @@ Standard Molecular Dynamics Simulation Run:
   --npt_time ps         Time of NPT equilibration in ps
   --nvt_time ps         Time of NVT equilibration in ps
   --seed int            seed
-  --no_dr               Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt if the regular AmberTools run for
-                        ligand preparation fails. Use this argument carefully and ensure that you provide valid structures
+  --no_dr               Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt if the regular antechamber run for
+                        ligand preparation fails (ligand_mol2prep.sh script related issues). Use this argument carefully and ensure that you provide valid structures
   --not_clean_backup_files
                         Not to remove all backups of md files
   --steps [STEPS ...]   Run a particular step(s) of the StreaMD run. Options:1 - run preparation step (protein, ligand, cofactor preparation) 2 - run MD equilibration

@@ -496,7 +496,7 @@ def main():
                         help='seed')
     parser1.add_argument('--no_dr', action='store_true', default=False,
                          help='Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file '
-                              'in the next attempt if the regular AmberTools run for ligand preparation fails. '
+                              'in the next attempt if the regular antechamber run for ligand preparation fails (ligand_mol2prep.sh script related issues). '
                               'Use this argument carefully and ensure that you provide valid structures')
     parser1.add_argument('--not_clean_backup_files', action='store_true', default=False,
                         help='Not to remove all backups of md files')
