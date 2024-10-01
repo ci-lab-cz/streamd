@@ -12,6 +12,7 @@ import logging
 import math
 import os
 import re
+import tempfile
 import shutil
 import subprocess
 from datetime import datetime
@@ -24,17 +25,24 @@ from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import get_index, make_group_ndx, filepath_type, run_check_subprocess
 
 
-def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time,
-                  env, bash_log, clean_previous):
-    def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index, ligand_index, out_time, env, bash_log):
-        output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.dat")
-        cmd = f'cd {wdir}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
-              f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
-              f'-o {output} ' \
-              f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{out_time}.csv")}' \
-              f' >> {os.path.join(wdir, bash_log)} 2>&1'
-        if not run_check_subprocess(cmd, key=xtc, log=os.path.join(wdir, bash_log), env=env):
-            return None
+def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection,
+                  unique_id, env, bash_log, clean_previous):
+
+    def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index,
+                  ligand_index, unique_id, env, bash_log):
+        output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.dat")
+        with tempfile.TemporaryDirectory(dir=wdir) as tmpdirname:
+            logging.info(f'tmp intermediate dir: {tmpdirname}')
+            cmd = f'cd {tmpdirname}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
+                  f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
+                  f'-o {output} ' \
+                  f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")}' \
+                  f' >> {os.path.join(wdir, bash_log)} 2>&1'
+
+            if not run_check_subprocess(cmd, key=xtc, log=os.path.join(wdir, bash_log), env=env):
+                run_check_subprocess(f'ls {tmpdirname}', key=tmpdirname, log=os.path.join(wdir, bash_log), env=env)
+                return None
+
         return output
 
     if clean_previous:
@@ -75,32 +83,33 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
                        index=index, mmpbsa=mmpbsa,
                        np=np, protein_index=protein_index,
                        ligand_index=ligand_index,
-                       out_time=out_time,
+                       unique_id=unique_id,
                        env=env,
                        bash_log=bash_log)
 
     if os.path.isfile(os.path.join(wdir, 'gmx_MMPBSA.log')):
-        shutil.copy(os.path.join(wdir, 'gmx_MMPBSA.log'), os.path.join(wdir, f'gmx_MMPBSA_{out_time}.log'))
-
-    clean_temporary_gmxMMBPSA_files(wdir)
+        shutil.copy(os.path.join(wdir, 'gmx_MMPBSA.log'), os.path.join(wdir, f'gmx_MMPBSA_{unique_id}.log'))
 
     return output
 
 
-def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time,
-                       env, bash_log, clean_previous):
+def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid,
+                       append_protein_selection, unique_id, env, bash_log, clean_previous):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
     index = os.path.join(wdir, index)
-    return run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection, out_time,
-                         env, bash_log, clean_previous)
+    return run_gbsa_task(wdir=wdir, tpr=tpr, xtc=xtc,
+                         topol=topol, index=index, mmpbsa=mmpbsa,
+                         np=np, ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
+                         unique_id=unique_id,
+                         env=env, bash_log=bash_log, clean_previous=clean_previous)
 
 
-def clean_temporary_gmxMMBPSA_files(wdir):
+def clean_temporary_gmxMMBPSA_files(wdir, prefix="_GMXMMPBSA_"):
     # remove intermediate files
     try:
-        subprocess.check_output(f'cd {wdir}; gmx_MMPBSA --clean', shell=True)
+        subprocess.check_output(f'cd {wdir}; gmx_MMPBSA --clean -prefix "{prefix}" > /dev/null 2>&1 ', shell=True)
     except subprocess.CalledProcessError as e:
         logging.error(f'{wdir}\t{e}\n')
         return None
@@ -218,20 +227,21 @@ def get_mmpbsa_start_end_interval(mmpbsa):
     return startframe, endframe, interval
 
 
-def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid, append_protein_selection,
-          hostfile, out_time, bash_log,
+def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid,
+          append_protein_selection, hostfile, unique_id, bash_log,
           gmxmmpbsa_out_files=None, clean_previous=False):
     dask_client, cluster = None, None
     var_gbsa_out_files = []
     if gmxmmpbsa_out_files is None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
         if not mmpbsa:
-            mmpbsa = os.path.join(out_wdir, f'mmpbsa_{out_time}.in')
+            mmpbsa = os.path.join(out_wdir, f'mmpbsa_{unique_id}.in')
             project_dir = os.path.dirname(os.path.abspath(__file__))
             shutil.copy(os.path.join(project_dir, 'scripts', 'gbsa', 'mmpbsa.in'), mmpbsa)
             logging.warning(f'No mmpbsa.in file was set up. Template will be used. Created file: {mmpbsa}.')
 
         startframe, endframe, interval = get_mmpbsa_start_end_interval(mmpbsa)
+
         if wdir_to_run is not None:
             try:
                 dask_client, cluster = init_dask_cluster(hostfile=hostfile,
@@ -263,9 +273,10 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 var_gbsa_out_files = []
                 for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
                                      tpr=tpr, xtc=xtc, topol=topol, index=index,
-                                     mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid,
+                                     mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames),
+                                     ligand_resid=ligand_resid,
                                      append_protein_selection=append_protein_selection,
-                                     out_time=out_time, env=os.environ.copy(),
+                                     unique_id=unique_id, env=os.environ.copy(),
                                      bash_log=bash_log, clean_previous=clean_previous):
                     if res:
                         var_gbsa_out_files.append(res)
@@ -286,7 +297,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 raise ValueError
             run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
                           np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
-                          out_time=out_time, env=os.environ.copy(),
+                          unique_id=unique_id, env=os.environ.copy(),
                           bash_log=bash_log, clean_previous=clean_previous)
 
     else:
@@ -314,9 +325,9 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         pd_pbsa = pd.DataFrame(PBSA_output_res).sort_values('Name')
 
         if list(pd_gbsa.columns) != ['Name']:
-            pd_gbsa.to_csv(os.path.join(out_wdir, f'GBSA_output_{out_time}.csv'), sep='\t', index=False)
+            pd_gbsa.to_csv(os.path.join(out_wdir, f'GBSA_output_{unique_id}.csv'), sep='\t', index=False)
         if list(pd_pbsa.columns) != ['Name']:
-            pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{out_time}.csv'), sep='\t', index=False)
+            pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{unique_id}.csv'), sep='\t', index=False)
 
         logging.info(
             f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\nFinished: {var_gbsa_out_files}\n')
@@ -357,6 +368,8 @@ def main():
                              'Example: ZN MG')
     parser.add_argument('--clean_previous', action='store_true', default=False,
                         help=' Clean previous temporary gmxMMPBSA files')
+    parser.add_argument('-o','--out_suffix', default=None,
+                        help='Suffix for output files')
 
     args = parser.parse_args()
 
@@ -366,8 +379,15 @@ def main():
         wdir = args.wdir
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
-    log_file = os.path.join(wdir, f'log_mmpbsa_{out_time}.log')
-    bash_log = os.path.join(wdir, f'log_mmpbsa_bash_{out_time}.log')
+    if args.out_suffix:
+        out_suffix = args.out_suffix
+    else:
+        import secrets
+        out_suffix = secrets.token_hex(8)
+
+    unique_id = f'{out_time}_{out_suffix}'
+    log_file = os.path.join(wdir, f'log_mmpbsa_{unique_id}.log')
+    bash_log = os.path.join(wdir, f'log_mmpbsa_bash_{unique_id}.log')
 
     if args.wdir_to_run is not None:
         tpr = 'md_out.tpr'
@@ -397,8 +417,9 @@ def main():
     try:
         start(tpr=tpr, xtc=xtc, topol=topol,
               index=index, out_wdir=wdir, wdir_to_run=args.wdir_to_run,
-              mmpbsa=args.mmpbsa, ncpu=args.ncpu, out_time=out_time,
-              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id, append_protein_selection=args.append_protein_selection,
+              mmpbsa=args.mmpbsa, ncpu=args.ncpu, unique_id=unique_id,
+              gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id,
+              append_protein_selection=args.append_protein_selection,
               hostfile=args.hostfile, bash_log=bash_log, clean_previous=args.clean_previous)
     finally:
         logging.shutdown()
