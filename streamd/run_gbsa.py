@@ -144,10 +144,10 @@ def parse_gmxMMPBSA_output(fname):
     with open(fname) as inp:
         data = inp.read()
     IE_GB = re.findall(
-        'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nGB[ ]*?IE[ ]*?([0-9\. ]*)\n',
+        'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nGB[ ]*?IE[ ]*?([0-9-\. ]*)\n',
         data)
     IE_PB = re.findall(
-        'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nPB[ ]*?IE[ ]*?([0-9\. ]*)\n',
+        'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nPB[ ]*?IE[ ]*?([0-9-\. ]*)\n',
         data)
 
     delta_total_columns_GB = re.findall(
