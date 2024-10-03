@@ -17,7 +17,7 @@ import shutil
 import subprocess
 from datetime import datetime
 from functools import partial
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Pool
 
 import pandas as pd
 
@@ -230,7 +230,7 @@ def get_mmpbsa_start_end_interval(mmpbsa):
 def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid,
           append_protein_selection, hostfile, unique_id, bash_log,
           gmxmmpbsa_out_files=None, clean_previous=False):
-    dask_client, cluster = None, None
+    dask_client, cluster, pool = None, None, None
     var_gbsa_out_files = []
     if gmxmmpbsa_out_files is None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
@@ -243,28 +243,16 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         startframe, endframe, interval = get_mmpbsa_start_end_interval(mmpbsa)
 
         if wdir_to_run is not None:
-            try:
-                dask_client, cluster = init_dask_cluster(hostfile=hostfile,
-                                                         n_tasks_per_node=min(ncpu, len(wdir_to_run)),
-                                                         use_multi_servers=True if len(wdir_to_run) > ncpu else False,
-                                                         ncpu=ncpu)
-                var_number_of_frames = []
-                for res in calc_dask(run_get_frames_from_wdir, wdir_to_run, dask_client=dask_client,
-                                     xtc=xtc, env=os.environ.copy()):
+            var_number_of_frames = []
+            with Pool(ncpu) as pool:
+                for res in pool.imap_unordered(partial(run_get_frames_from_wdir,
+                                    xtc=xtc, env=os.environ.copy()), wdir_to_run):
                     if res:
                         var_number_of_frames.append(res)
-            finally:
-                if dask_client:
-                    dask_client.retire_workers(dask_client.scheduler_info()['workers'],
-                                               close_workers=True, remove=True)
-                    dask_client.shutdown()
-                if cluster:
-                    cluster.close()
 
             used_number_of_frames = math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
             n_tasks_per_node = ncpu // min(ncpu, used_number_of_frames)
-            #todo 64 2 mol 32 booked -> 34 use
-
+            logging.info(f'{used_number_of_frames} frames will be used')
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
             # run energy calculation
             try:
@@ -306,20 +294,11 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
     # collect energies
     if var_gbsa_out_files:
         GBSA_output_res, PBSA_output_res = [], []
-        try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=len(var_gbsa_out_files),
-                                                     ncpu=ncpu)
-            for res in calc_dask(parse_gmxMMPBSA_output, var_gbsa_out_files, dask_client=dask_client):
+        with Pool(ncpu) as pool:
+            for res in pool.imap_unordered(parse_gmxMMPBSA_output, var_gbsa_out_files):
                 if res:
                     GBSA_output_res.append(res['GBSA'])
                     PBSA_output_res.append(res['PBSA'])
-        finally:
-            if dask_client:
-                dask_client.retire_workers(dask_client.scheduler_info()['workers'],
-                                           close_workers=True, remove=True)
-                dask_client.shutdown()
-            if cluster:
-                cluster.close()
 
         pd_gbsa = pd.DataFrame(GBSA_output_res).sort_values('Name')
         pd_pbsa = pd.DataFrame(PBSA_output_res).sort_values('Name')
