@@ -131,7 +131,7 @@ def parse_gmxMMPBSA_output(fname):
     #['Energy Component' - skip, 'Average', 'SD(Prop.)', 'SD', 'SEM(Prop.)', 'SEM']
 
         for n, i in enumerate(delta_total_columns[1:]):
-            delta_total_res[f'ΔTOTAL_{i}'] = delta_total_values[n]
+            delta_total_res[f'ΔTOTAL{i}'] = delta_total_values[n]
         return delta_total_res
 
     def get_Gbinding_values(Gbind_parsed_out):
