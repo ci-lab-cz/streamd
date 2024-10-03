@@ -1,8 +1,6 @@
 import itertools
 import logging
 import os
-import shutil
-import re
 from glob import glob
 import re
 

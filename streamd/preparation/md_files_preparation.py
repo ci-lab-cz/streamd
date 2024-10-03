@@ -18,7 +18,7 @@ def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
     for itp, posres, resid in zip(all_itp_list, all_posres_list, all_resids):
         itp_include_list.append(f'; Include {resid} topology\n'
                                 f'#include "{itp}"\n')
-        posres_include_list.append(f'; {resid} position restraints\n#ifdef POSRES_{resid}\n'
+        posres_include_list.append(f'; {resid} position restraints\n#ifdef POSRES\n'
                                    f'#include "{posres}"\n#endif\n')
         resid_include_list.append(f'{resid}             1')
 
@@ -28,8 +28,9 @@ def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
 
     if not check_if_info_already_added_to_topol(topol, '\n'.join(posres_include_list)):
     # reverse order since add before pattern
-        edit_topology_file(topol, pattern="; Include topology for ions",
-                           add='\n'.join(posres_include_list[::-1]), how='before')
+        edit_topology_file(topol, pattern="; Include water topology",
+                           add='\n'.join(posres_include_list), how='before')
+        #[::-1]
 
     if not check_if_info_already_added_to_topol(topol, '\n'.join(resid_include_list)):
         # ligand molecule should be after protein (or all protein chains listed)

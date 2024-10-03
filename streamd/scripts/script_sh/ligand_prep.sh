@@ -11,4 +11,8 @@ sed -i '/molecules/,+2 d' $molid.itp
 sed -i '/defaults/,+2 d' $molid.itp
 
 # restraints
-gmx genrestr -f $molid.gro -o posre_$molid.itp -fc 1000 1000 1000 <<< 2 || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
+gmx make_ndx -f $molid.gro -o index.ndx << INPUT
+2 & ! a H*
+q
+INPUT
+gmx genrestr -f $molid.gro -o posre_$molid.itp -n index.ndx -fc 1000 1000 1000 <<< 3 || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }

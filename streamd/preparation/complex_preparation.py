@@ -56,7 +56,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
                                                     f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n'):
             edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"),
                                pattern="; Include forcefield parameters",
-                               add=f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n',
+                               add=f'; Include all topology\n#include "all.itp"\n',
                                how='after', n=3)
 
         # create file with molid resid for each ligand in the current system
