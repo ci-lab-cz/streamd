@@ -8,29 +8,23 @@ from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, c
 def check_if_info_already_added_to_topol(topol, string):
     with open(topol) as inp:
         data = inp.read()
-    if string in data:
-        return True
-    else:
-        return False
+    return string in data # True or False
 
 def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
-    itp_include_list, posres_include_list, resid_include_list = [], [], []
+    itp_posres_include_list, resid_include_list = [], []
     for itp, posres, resid in zip(all_itp_list, all_posres_list, all_resids):
-        itp_include_list.append(f'; Include {resid} topology\n'
-                                f'#include "{itp}"\n')
-        posres_include_list.append(f'; {resid} position restraints\n#ifdef POSRES\n'
+        itp_posres_include_list.append(f'; Include {resid} topology\n'
+                                f'#include "{itp}"\n\n'
+                                f'; {resid} position restraints\n#ifdef POSRES\n'
                                    f'#include "{posres}"\n#endif\n')
+
         resid_include_list.append(f'{resid}             1')
 
-    if not check_if_info_already_added_to_topol(topol, '\n'.join(itp_include_list)):
-        edit_topology_file(topol, pattern="; Include forcefield parameters",
-                       add='\n'.join(itp_include_list), how='after', n=3)
-
-    if not check_if_info_already_added_to_topol(topol, '\n'.join(posres_include_list)):
-    # reverse order since add before pattern
+    if not check_if_info_already_added_to_topol(topol, '\n'.join(itp_posres_include_list)):
+        # edit_topology_file(topol, pattern="; Include forcefield parameters",
+        #                add='\n'.join(itp_include_list), how='after', n=3)
         edit_topology_file(topol, pattern="; Include water topology",
-                           add='\n'.join(posres_include_list), how='before')
-        #[::-1]
+                       add='\n'.join(itp_posres_include_list), how='before')
 
     if not check_if_info_already_added_to_topol(topol, '\n'.join(resid_include_list)):
         # ligand molecule should be after protein (or all protein chains listed)

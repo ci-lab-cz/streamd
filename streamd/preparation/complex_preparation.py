@@ -53,7 +53,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         add_ligands_to_topol(md_files_dict['itp'], md_files_dict['posres'], md_files_dict['resid'],
                              topol=os.path.join(wdir_md_cur, "topol.top"))
         if not check_if_info_already_added_to_topol(os.path.join(wdir_md_cur, "topol.top"),
-                                                    f'; Include all topology\n#include "{os.path.join(wdir_md_cur, "all.itp")}"\n'):
+                                                    f'; Include all topology\n#include "all.itp"\n'):
             edit_topology_file(topol_file=os.path.join(wdir_md_cur, "topol.top"),
                                pattern="; Include forcefield parameters",
                                add=f'; Include all topology\n#include "all.itp"\n',
