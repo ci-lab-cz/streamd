@@ -15,7 +15,6 @@ sns.set_context("paper", rc={"font.size":15,"axes.titlesize":15,"axes.labelsize"
 plt.ioff()
 
 def plot_rmsd(rmsd_df, system_name, out):
-    rmsd_df['time_ns'] = rmsd_df['time(ns)']
     plot = rmsd_df.set_index('time(ns)').plot(title=f"RMSD of {system_name}")
     plt.ylabel("RMSD (Å)")
     plt.xlabel("Time (ns)")
