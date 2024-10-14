@@ -50,12 +50,13 @@ def md_rmsd_analysis(tpr, xtc, wdir, system_name,
     molid_resid_pairs = dict(molid_resid_pairs)
     ligand_name = None
     if molid_resid_pairs:
-        if 'UNL' in molid_resid_pairs.values():
-            groupselections.append(f'backbone and (around {active_site_dist} resname UNL)')
+        if ligand_resid in molid_resid_pairs.values():
             for molid, resid in molid_resid_pairs.items():
                 if resid == ligand_resid:
                     ligand_name = molid
                     break
+            groupselections.append(f'backbone and (around {active_site_dist} resname {ligand_resid})')
+
         groupselections.extend([f"resname {i} and not name H*" for i in molid_resid_pairs.values()])
 
     rmsd_df = rmsd_for_atomgroups(universe, selection1="backbone",
@@ -67,8 +68,7 @@ def md_rmsd_analysis(tpr, xtc, wdir, system_name,
 
     rmsd_df = rmsd_df.rename({f"resname {i[1]} and not name H*": f"{i[0]}" for i in molid_resid_pairs.items()}, axis='columns')
 
-    plot_rmsd(rmsd_df.drop(f'ActiveSite{active_site_dist}A', axis='columns'),
-              system_name=system_name, out=os.path.join(wdir, f'rmsd_{system_name}.png'))
+    plot_rmsd(rmsd_df=rmsd_df, system_name=system_name, out=os.path.join(wdir, f'rmsd_{system_name}.png'))
 
     rmsd_df.loc[:, 'ligand_name'] = ligand_name
     rmsd_df.loc[:, 'system'] = system_name.replace(f'_{ligand_name}', '')
