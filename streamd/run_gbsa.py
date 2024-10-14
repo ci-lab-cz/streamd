@@ -309,8 +309,13 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         if list(pd_pbsa.columns) != ['Name']:
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{unique_id}.csv'), sep='\t', index=False)
 
+        finished_complexes_file = os.path.join(out_wdir, f"finished_gbsa_files_{unique_id}.txt")
+        with open(finished_complexes_file, 'w') as output:
+            output.write("\n".join(var_gbsa_out_files))
+
         logging.info(
-            f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\nFinished: {var_gbsa_out_files}\n')
+            f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\n'
+            f'Successfully finished complexes have been saved in {finished_complexes_file} file')
 
 
 def main():

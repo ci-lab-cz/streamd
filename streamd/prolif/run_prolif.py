@@ -121,10 +121,11 @@ def collect_outputs(output_list, output):
     df_aggregated.loc[:, sorted_columns].to_csv(output, sep='\t', index=False)
 
 
-def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, ligand_resid, hostfile, ncpu,
-          occupancy, plot_width, plot_height, save_viz, out_time, pdb, verbose):
+def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
+          ligand_resid, hostfile, ncpu,
+          occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose):
     output = 'plifs.csv'
-    output_aggregated = os.path.join(wdir_output, f'prolif_output_{out_time}.csv')
+    output_aggregated = os.path.join(wdir_output, f'prolif_output_{unique_id}.csv')
 
     if append_protein_selection is None:
         protein_selection = 'protein'
@@ -164,8 +165,14 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection, li
     collect_outputs(var_prolif_out_files, output=output_aggregated)
 
     convertprolif2png(output_aggregated, occupancy=occupancy, plot_width=plot_width, plot_height=plot_height)
+    finished_complexes_file = os.path.join(wdir_output, f"finished_prolif_files_{unique_id}.txt")
+    with open(finished_complexes_file, 'w') as output:
+        output.write("\n".join(var_prolif_out_files))
+
     logging.info(
-        f'ProLIF calculation of {len(var_prolif_out_files)} were successfully finished.\nFinished: {var_prolif_out_files}\n')
+        f'ProLIF calculation of {len(var_prolif_out_files)} were successfully finished.\n'
+         f'Successfully finished complexes have been saved in {finished_complexes_file} file')
+
 
 
 def main():
@@ -210,6 +217,9 @@ def main():
     parser.add_argument('--not_save_pics', default=False, action='store_true',
                         help='not create html and png files (by frames) for each unique trajectory.'
                              ' Only overall prolif png file will be created.')
+    parser.add_argument('-o','--out_suffix',
+                        metavar='string', default=None,
+                        help='Suffix for output files')
 
     args = parser.parse_args()
 
@@ -219,7 +229,14 @@ def main():
         wdir = args.wdir
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
-    log_file = os.path.join(wdir, f'log_prolif_{out_time}.log')
+    if args.out_suffix:
+        unique_id = args.out_suffix
+    else:
+        import secrets
+        out_suffix = secrets.token_hex(8)
+        unique_id = f'{out_time}_{out_suffix}'
+
+    log_file = os.path.join(wdir, f'log_prolif_{unique_id}.log')
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
@@ -251,7 +268,7 @@ def main():
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
           ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
           occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
-          save_viz=not args.not_save_pics, out_time=out_time, pdb=pdb,
+          save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
           verbose=args.verbose)
     finally:
         logging.shutdown()
