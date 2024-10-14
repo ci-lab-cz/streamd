@@ -1,5 +1,4 @@
 import argparse
-import logging
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -42,6 +41,7 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
 
     if coords and len(coords[0]) == 2:
         d = pd.DataFrame(coords, columns=[xaxis, yaxis])
+        d.to_csv(xvg_file.replace('.xvg', '.csv'), sep='\t', index=False)
         if transform_nm_to_A and 'nm' in yaxis.lower():
             #logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
             plot1 = plt.plot(d[xaxis], d[yaxis].apply(lambda x: round(x*10,3)), marker='o', linewidth=2, markersize=5)
@@ -50,17 +50,20 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
 
     elif coords and len(coords[0]) > 2 and legend_list:
         d = pd.DataFrame(coords, columns=[xaxis]+legend_list)
+        d.to_csv(xvg_file.replace('.xvg','.csv'), sep='\t', index=False)
         plt.legend(legend_list, loc='upper right', bbox_to_anchor=(0, 0), borderaxespad=-1)
         if transform_nm_to_A and 'nm' in yaxis.lower():
             #logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
-            plot1 = plt.plot(d[xaxis], d[legend_list].apply(lambda x: round(x*10,3)), marker='o', linewidth=2, markersize=5)
+            plot1 = plt.plot(d[xaxis], d[legend_list].apply(lambda x: round(x*10,3)), marker='o', linewidth=2, markersize=3)
         else:
-            plot1 = plt.plot(d[xaxis], d[legend_list], marker='o', linewidth=2, markersize=5)
+            plot1 = plt.plot(d[xaxis], d[legend_list], marker='o', linewidth=2, markersize=3)
     if plot1:
         plot1 = plot1[0]
         plt.legend(legend_list)
         plot1 = plot1.figure.suptitle(subtitle)
         plot1.figure.savefig(xvg_file.replace('.xvg','.png'), bbox_inches="tight")
+    plt.clf()
+    plt.close('all')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Draw png plot for xvg outputs of md analysis''')
