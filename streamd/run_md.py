@@ -16,7 +16,8 @@ from functools import partial
 from glob import glob
 import json
 
-from streamd.md_analysis import run_md_analysis
+from streamd.analysis.md_system_analysis import run_md_analysis
+from streamd.analysis.run_analysis import run_rmsd_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
@@ -117,7 +118,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
           seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
-          not_clean_backup_files, out_time,
+          not_clean_backup_files, unique_id,
+          active_site_dist=5.0,
           mdp_dir=None, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
@@ -145,7 +147,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param compute_device:
     :param gpu_ids:
     :param ntmpi_per_gpu:
-    :param out_time:
+    :param unique_id:
     :param bash_log:
     :param mdp_dir:
     :param not_clean_backup_files:
@@ -362,7 +364,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          project_dir=project_dir, bash_log=bash_log,
                                          mdtime_ns=mdtime_ns,
                                          tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
-                                         deffnm=deffnm, deffnm_next=f'{deffnm}_{out_time}',
+                                         deffnm=deffnm, deffnm_next=f'{deffnm}_{unique_id}',
                                          ncpu=ncpu//mdrun_per_node, compute_device=compute_device,
                                          device_param=device_param, gpu_args=gpu_args,
                                          env=os.environ.copy()):
@@ -385,14 +387,13 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
     # Part 3. MD Analysis. Run on each cpu
     if (steps is None or 4 in steps) and var_md_dirs_deffnm:
+        logging.info('Start Analysis of the simulations')
+        var_md_analysis_dirs = []
         try:
             dask_client, cluster = init_dask_cluster(hostfile=hostfile,
                                                      n_tasks_per_node=min(ncpu, len(var_md_dirs_deffnm)),
                                                      use_multi_servers=True if len(var_md_dirs_deffnm) > ncpu else False,
                                                      ncpu=ncpu)
-            logging.info('Start Analysis of the simulations')
-            var_md_analysis_dirs = []
-            # os.path.dirname(var_lig)
             for res in calc_dask(run_md_analysis, var_md_dirs_deffnm,
                                  dask_client, mdtime_ns=mdtime_ns, project_dir=project_dir,
                                  bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev,
@@ -409,7 +410,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
         logging.info(
             f'Analysis of MD simulations of {len(var_md_analysis_dirs)} complexes were successfully finished'
-            f'\nFinished: {",".join(var_md_analysis_dirs)}')
+            f'\nSuccessfully finished complexes have been saved in {finished_complexes_file} file')
 
     if not not_clean_backup_files:
         if wdir_to_continue_list is None:
@@ -528,6 +529,8 @@ def main():
                                     File all_ligand_resid.txt is optional and used to run md analysis for the ligands.\n
                                     If you want to continue your own simulation not created by the tool use --tpr, --cpt, --xtc and --wdir or arguments 
                                     (--ligand_list_file is optional and required to run md analysis after simulation )''')
+    parser.add_argument('-o','--out_suffix', default=None,
+                        help='User unique suffix for output files')
     # continue md
     parser2 = parser.add_argument_group('Continue or Extend Molecular Dynamics Simulation')
     parser2.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
@@ -588,23 +591,27 @@ def main():
                          f' created by previous steps')
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
+
+    if args.out_suffix:
+        unique_id = args.out_suffix
+    else:
+        unique_id = out_time
+
     log_file = os.path.join(wdir,
                             f'log_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_'
-                            f'{out_time}.log')
-    bash_log = f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_{out_time}.log'
+                            f'{unique_id}.log')
+    bash_log = f'streamd_bash_{os.path.basename(str(args.protein))[:-4]}_{os.path.basename(str(args.ligand))[:-4]}_{os.path.basename(str(args.cofactor))[:-4]}_{unique_id}.log'
 
-    logging.basicConfig(format='%(asctime)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+    logging.basicConfig(format='%(asctime)s  - %(name)s - %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO,
                         handlers=[logging.FileHandler(log_file),
                                   logging.StreamHandler()])
 
     logging.getLogger('distributed').setLevel('WARNING')
     logging.getLogger('asyncssh').setLevel('WARNING')
-    logging.getLogger('distributed.worker').setLevel('WARNING')
-    logging.getLogger('distributed.core').setLevel('WARNING')
-    logging.getLogger('distributed.comm').setLevel('WARNING')
-    logging.getLogger('distributed.nanny').setLevel('CRITICAL')
+    logging.getLogger('MDAnalysis').setLevel('CRITICAL')
     logging.getLogger('bockeh').setLevel('WARNING')
+
 
     logging.info(args)
 
@@ -628,7 +635,7 @@ def main():
               gpu_ids=args.gpu_ids, ntmpi_per_gpu=args.ntmpi_per_gpu, wdir=wdir, seed=args.seed, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
-              mcpbpy_cut_off=args.metal_cutoff, out_time=out_time,
-              mdp_dir=args.mdp_dir,bash_log=bash_log)
+              mcpbpy_cut_off=args.metal_cutoff, unique_id=unique_id,
+              mdp_dir=args.mdp_dir, bash_log=bash_log)
     finally:
         logging.shutdown()
