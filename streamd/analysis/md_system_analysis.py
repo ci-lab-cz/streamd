@@ -4,15 +4,10 @@ import pandas as pd
 import numpy as np
 import MDAnalysis as mda
 from MDAnalysis.analysis import rms
-import seaborn as sns
-import matplotlib.pyplot as plt
-from streamd.scripts.xvg2png import convertxvg2png
+from streamd.analysis.xvg2png import convertxvg2png
+from streamd.analysis.plot_build import plot_rmsd
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
 
-sns.set_context("paper", rc={"font.size":15,"axes.titlesize":15,"axes.labelsize":15},
-                font_scale=1.5)
-plt.figure(figsize=(15, 12))
-plt.ioff()
 
 
 def rmsd_for_atomgroups(universe, selection1, selection2=None):
@@ -35,26 +30,22 @@ def rmsd_for_atomgroups(universe, selection1, selection2=None):
 
     universe.trajectory[0]
     ref = universe
-    rmsd_analysis = rms.RMSD(universe, ref, select=selection1, groupselections=selection2)
+    rmsd_analysis = rms.RMSD(universe, ref, select=selection1, groupselections=selection2, in_memory=False)
     rmsd_analysis.run()
     columns = [selection1, *selection2] if selection2 else [selection1]
     rmsd_df = pd.DataFrame(np.round(rmsd_analysis.results.rmsd[:, 2:], 2), columns=columns)
     rmsd_df.index.name = "frame"
     rmsd_df = rmsd_df.reset_index()
+    # transform to ns
+    rmsd_df['time(ns)'] = rmsd_df['frame'] / 100
+    rmsd_df = rmsd_df.drop('frame', axis='columns')
     return rmsd_df
 
 
-def plot_rmsd(rmsd_df, system_name, out):
-    rmsd_df['frame'] = rmsd_df['frame'] /100
-    plot = rmsd_df.set_index('frame').plot(title=f"RMSD of {system_name}")
-    plt.ylabel("RMSD (Å)")
-    plt.xlabel("Time (ns)")
-    plt.legend(loc='lower right', ncol=len(rmsd_df.columns) // 2, frameon=False)
-    plot.figure.savefig(out,  bbox_inches="tight")
-
-def md_rmsd_analysis(universe, wdir, system_name,
+def md_rmsd_analysis(tpr, xtc, wdir, system_name,
                      molid_resid_pairs, ligand_resid="UNL", active_site_dist=5.0):
     #groupselections = ['protein']
+    universe = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
     groupselections = []
     molid_resid_pairs = dict(molid_resid_pairs)
     ligand_name = None
@@ -69,9 +60,11 @@ def md_rmsd_analysis(universe, wdir, system_name,
 
     rmsd_df = rmsd_for_atomgroups(universe, selection1="backbone",
                                   selection2 = groupselections)
+    del universe
     rmsd_df = rmsd_df.rename(
         {f'backbone and (around {active_site_dist} resname {ligand_resid})': f'ActiveSite{active_site_dist}A',
          f'resname {ligand_resid} and not name H*': 'ligand'}, axis='columns')
+
     rmsd_df = rmsd_df.rename({f"resname {i[1]} and not name H*": f"{i[0]}" for i in molid_resid_pairs.items()}, axis='columns')
 
     plot_rmsd(rmsd_df.drop(f'ActiveSite{active_site_dist}A', axis='columns'),
@@ -81,11 +74,12 @@ def md_rmsd_analysis(universe, wdir, system_name,
     rmsd_df.loc[:, 'system'] = system_name.replace(f'_{ligand_name}', '')
 
     rmsd_df.to_csv(os.path.join(wdir, f'rmsd_{system_name}.csv'), sep='\t', index=False)
-    return os.path.join(wdir, f'rmsd_{system_name}.csv')
+    return None
 
 
 def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
-                    ligand_resid='UNL', ligand_list_file_prev=None, env=None):
+                    active_site_dist=5.0, ligand_resid='UNL',
+                    ligand_list_file_prev=None, env=None):
     wdir, deffnm = var_md_dirs_deffnm
     if ligand_list_file_prev is None:
         molid_resid_pairs_fname = os.path.join(wdir, 'all_ligand_resid.txt')
@@ -131,13 +125,16 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
 
     # molid resid pairs for all ligands in the MD system
     # calc rmsd
-    universe = mda.Universe(tpr, os.path.join(wdir, f'md_fit.xtc'))
-    md_rmsd_analysis(universe, wdir,
-                     system_name=os.path.split(wdir)[-1],
+    # universe = mda.Universe(tpr, os.path.join(wdir, f'md_fit.xtc'))
+    md_rmsd_analysis(
+        tpr=os.path.join(wdir, 'md_out_nowater.tpr'), xtc=os.path.join(wdir, f'md_fit_nowater.xtc'),
+        # tpr=os.path.join(wdir, 'md_out.tpr'), xtc=os.path.join(wdir, f'md_fit.xtc'),
+                     wdir=wdir, system_name=os.path.split(wdir)[-1],
                      ligand_resid=ligand_resid,
                      molid_resid_pairs=molid_resid_pairs,
-                     active_site_dist=5.0)
-
+                     active_site_dist=active_site_dist)
+    os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
+    os.remove(os.path.join(wdir, f'md_fit_nowater.xtc'))
     for xvg_file in glob(os.path.join(wdir, '*.xvg')):
         convertxvg2png(xvg_file, transform_nm_to_A=True)
     return wdir
