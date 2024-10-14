@@ -45,8 +45,8 @@ usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [
               [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
               [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--no_dr] [--not_clean_backup_files]
-              [--steps [STEPS ...]] [--mdp_dir Path to directory with specific mdp files] [--wdir_to_continue DIRNAME [DIRNAME ...]] [--deffnm preffix for md files]
-              [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL]
+              [--steps [STEPS ...]] [--mdp_dir Path to a directory with specific mdp files] [--wdir_to_continue DIRNAME [DIRNAME ...]] [-o OUT_SUFFIX]
+              [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL]
               [--activate_gaussian module load Gaussian/09-d01] [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09] [--gaussian_basis B3LYP/6-31G*]
               [--gaussian_memory 120GB] [--metal_resnames [MN ...]] [--metal_cutoff 2.8] [--metal_charges {MN:2, ZN:2, CA:2}]
 
@@ -54,6 +54,8 @@ Run or continue MD simulation. Allowed systems: Protein, Protein-Ligand, Protein
 
 options:
   -h, --help            show this help message and exit
+  -o OUT_SUFFIX, --out_suffix OUT_SUFFIX
+                        Suffix for output files
 
 Standard Molecular Dynamics Simulation Run:
   -p FILENAME, --protein FILENAME
@@ -100,8 +102,8 @@ Standard Molecular Dynamics Simulation Run:
   --mdp_dir Path to a directory with specific mdp files
                         To use specific MD settings, the user can provide a path to a directory that contains any of the following .mdp files: ions.mdp, minim.mdp,
                         nvt.mdp, npt.mdp, md.mdp. Missing .mdp files will be replaced by default StreaMD files. Provided .mdp files will be used as templates,
-                        although the system StreaMD parameters (seed, nvt_time, npt_time, md_time, and tc-grps (can not be changed by user)) will override the ones provided.
-                        Warning: The names of the files must be strictly preserved.
+                        although the system StreaMD parameters (seed, nvt_time, npt_time, md_time, and tc-grps (can not be changed by user)) will override the ones
+                        provided. Warning: The names of the files must be strictly preserved.
   --wdir_to_continue DIRNAME [DIRNAME ...]
                         Single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. ' Should consist of: tpr, cpt,
                         xtc and all_ligand_resid.txt files. File all_ligand_resid.txt is optional and used to run md analysis for the ligands. If you want to continue
@@ -421,6 +423,10 @@ options:
   -a [STRING ...], --append_protein_selection [STRING ...]
                         residue IDs whuch will be included in the protein system (cofactors).Example: ZN MG
   --clean_previous      Clean previous temporary gmxMMPBSA files
+  -o string, --out_suffix string
+                        Suffix for output files
+
+  
 ```
 
 ### **Examples**
@@ -482,6 +488,49 @@ run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run
 **Output**  
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html* file for each simulation will be created
 2) *prolif_output_start-time.csv/png* - aggregated csv/png output file for all analyzed simulations
+
+
+### Trajectory convergence analysis 
+To identify converged segments of molecular dynamics trajectories _run_analysis_ module calculates
+the average root-mean-square deviation (RMSD) of the ligand, protein, and active site residues within 5Å of the ligand, as well as the standard deviation of RMSD for the same trajectory segment.
+The average RMSD should provide an insight into the ligand movement or rotation relative to its initial pose, while the standard deviation reflects the stability of the ligand pose within the selected trajectory segment. 
+The conclusions can be valuable for subsequent MM-GBSA/PBSA calculations.
+#### **USAGE**
+````
+usage: run_analysis.py [-h] [-i FILENAME [FILENAME ...]] [--rmsd_type backbone [backbone ...]] [--time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]] [-d dirname]
+                       [--paint_by PAINT_BY] [-o OUT_SUFFIX] [--title RMSD Mean vs RMSD Std]
+
+Run rmsd analysis for StreaMD output files
+
+options:
+  -h, --help            show this help message and exit
+  -i FILENAME [FILENAME ...], --input FILENAME [FILENAME ...]
+                        input file(s) with rmsd. Supported formats: *.csv. Required columns: time(ns) ligand_name system. Sep: /\t.
+  --rmsd_type backbone [backbone ligand ActiveSite]
+                        Column names in the input file to use for the analysis 
+  --time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]
+                        Time ranges in nanoseconds. Default: Default: start-end, middle-end, end-1 (in nanoseconds)
+  -d dirname, --wdir dirname
+                        Output files directory
+  --paint_by csv file   File to paint by additional column. Required columns: system, ligand_name. Sep: /\t. The plot will be painted by any other than system and
+                        ligand_name column.
+  -o OUT_SUFFIX, --out_suffix OUT_SUFFIX
+                        Suffix for output files
+  --title RMSD Mean vs RMSD Std
+                        Title for html plot. Default: RMSD Mean vs RMSD Std
+````
+Such analysis will be performed as a part of the run_md default run or for the separate run the user can use either 
+the --wdir_to_continue _directory_path_ and --steps 4 arguments to perform full analysis of already obtained simulations or the run_analysis script itself (the rmsd file in csv format from run_md will be needed).
+### **Examples**
+preferred way:
+```
+run_md  --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --steps 4 -d md_files
+```
+by the script itself:
+```
+run_analysis.py -i rmsd_all_systems.csv --rmsd_type "backbone" "ligand" "ActiveSite5.0A" --paint_by exp_data.csv -o protein --title "Protein. RMSD Mean vs RMSD Std" --time_ranges 0-1 0-2 0-10 5-10 9-10
+
+```
 
 #### Supplementary scripts
 _run_prolif applies all this scripts automatically. Use it if you want more detailed analysis or to change the picture/fonts sizes._  

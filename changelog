@@ -4,3 +4,13 @@ version 0.2.6
 - Fixed logging
 - Added mdrun_per_node argument
 
+version 0.2.7
+- Fixed an issue with ligand restraints during NPT and NVT
+- RMSD of ligand, backbone, Active Site groups are calculated by MDanalysis and saved in 1 common output file
+- Use xtc and tpr files containing no water for RMSD analysis (to prevent memory issues)
+- Added additional trajectory convergence analysis (html interactive files requires plotly)
+- Added plotly dependency in env.yml
+- Transform xvg analysis files to csv
+- Save successfully finished names of the systems to the text output file
+- Calculate MMPBSA intermediate files in tmp directories for multiple run in one directory
+- Add unique suffix for run_md and run_gbsa output files for simultaneous runs in the same working directory

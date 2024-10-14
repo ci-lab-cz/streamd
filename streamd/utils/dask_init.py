@@ -41,8 +41,8 @@ def init_dask_cluster(n_tasks_per_node, ncpu, use_multi_servers=True, hostfile=N
 
     dask_client.forward_logging(level=logging.INFO)
     dask_client.run(lambda: logging.getLogger().setLevel(logging.INFO))
-    dask_client.run(lambda: logging.getLogger('distributed.core').setLevel(logging.ERROR))
-    dask_client.run(lambda: logging.getLogger('distributed.worker').setLevel(logging.CRITICAL))
+    dask_client.run(lambda: logging.getLogger('distributed').setLevel(logging.ERROR))
+    dask_client.run(lambda: logging.getLogger('MDAnalysis').setLevel(logging.CRITICAL))
 
     return dask_client, cluster
 

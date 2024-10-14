@@ -30,6 +30,7 @@ setuptools.setup(
                        'run_gbsa = streamd.run_gbsa:main',
                        'run_prolif = streamd.prolif.run_prolif:main',
                        'prolif_drawmap = streamd.prolif.prolif2png:main',
-                       'prolif_draw_by_frame = streamd.prolif.prolif_frame_map:main']},
+                       'prolif_draw_by_frame = streamd.prolif.prolif_frame_map:main',
+                       'run_analysis = streamd.analysis.run_analysis:main']},
     include_package_data=True
 )

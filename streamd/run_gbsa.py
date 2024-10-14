@@ -121,7 +121,7 @@ def parse_gmxMMPBSA_output(fname):
         IE_columns = [i.strip() for i in IE_parsed_out[0][0].split('  ') if i]
         IE_values = [i.strip() for i in IE_parsed_out[0][1].split('  ') if i]
         for n, i in enumerate(IE_columns):
-            IE_res[f'IE{i}'] = IE_values[n]
+            IE_res[f'IE_{i}'] = IE_values[n]
         return IE_res
 
     def get_delta_total_values(delta_total_columns_re, delta_total_values_re):
@@ -131,7 +131,7 @@ def parse_gmxMMPBSA_output(fname):
     #['Energy Component' - skip, 'Average', 'SD(Prop.)', 'SD', 'SEM(Prop.)', 'SEM']
 
         for n, i in enumerate(delta_total_columns[1:]):
-            delta_total_res[f'ΔTOTAL{i}'] = delta_total_values[n]
+            delta_total_res[f'ΔTOTAL_{i}'] = delta_total_values[n]
         return delta_total_res
 
     def get_Gbinding_values(Gbind_parsed_out):
@@ -170,10 +170,6 @@ def parse_gmxMMPBSA_output(fname):
         data)
 
     out_res = {'GBSA': {'Name': fname}, 'PBSA': {'Name': fname}}
-    if IE_GB:
-        out_res['GBSA'].update(get_IE_values(IE_GB))
-    if IE_PB:
-        out_res['PBSA'].update(get_IE_values(IE_PB))
     if G_binding_GB:
         out_res['GBSA'].update(get_Gbinding_values(G_binding_GB))
     if G_binding_PB:
@@ -187,6 +183,11 @@ def parse_gmxMMPBSA_output(fname):
         out_res['PBSA'].update(get_delta_total_values(
             delta_total_columns_re=delta_total_columns_PB,
             delta_total_values_re=delta_total_PB))
+
+    if IE_GB:
+        out_res['GBSA'].update(get_IE_values(IE_GB))
+    if IE_PB:
+        out_res['PBSA'].update(get_IE_values(IE_PB))
 
     return out_res
 
@@ -308,8 +309,13 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         if list(pd_pbsa.columns) != ['Name']:
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{unique_id}.csv'), sep='\t', index=False)
 
+        finished_complexes_file = os.path.join(out_wdir, f"finished_gbsa_files_{unique_id}.txt")
+        with open(finished_complexes_file, 'w') as output:
+            output.write("\n".join(var_gbsa_out_files))
+
         logging.info(
-            f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\nFinished: {var_gbsa_out_files}\n')
+            f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\n'
+            f'Successfully finished complexes have been saved in {finished_complexes_file} file')
 
 
 def main():
@@ -359,12 +365,12 @@ def main():
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
     if args.out_suffix:
-        out_suffix = args.out_suffix
+        unique_id = args.out_suffix
     else:
         import secrets
         out_suffix = secrets.token_hex(8)
+        unique_id = f'{out_time}_{out_suffix}'
 
-    unique_id = f'{out_time}_{out_suffix}'
     log_file = os.path.join(wdir, f'log_mmpbsa_{unique_id}.log')
     bash_log = os.path.join(wdir, f'log_mmpbsa_bash_{unique_id}.log')
 
