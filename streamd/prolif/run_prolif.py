@@ -204,8 +204,8 @@ def main():
                              'passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file '
                              'will be the address of the scheduler running on the standard port 8786. If omitted, '
                              'calculations will run on a single machine as usual.')
-    parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=cpu_count(), type=int,
-                        help='number of CPU per server. Use all cpus by default.')
+    parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=len(os.sched_getaffinity(0)), type=int,
+                        help='number of CPU per server. Use all available cpus by default.')
     parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
                         help='width of the output pictures')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
