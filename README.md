@@ -36,7 +36,7 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 - interrupted MD preparation can be restarted by invoking the same command
 - implemented tools for end-state free energy calculations (gmx_MMPBSA) and Protein-Ligand Interaction analysis (ProLIF)
 - supports customized .mdp files
-- Interactive trajectory convergence analysis for multiple complexes
+- interactive trajectory convergence analysis for multiple complexes
 - GPU support
 
 ### **USAGE**
