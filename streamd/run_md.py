@@ -119,7 +119,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           metal_resnames, metal_charges, mcpbpy_cut_off,
           seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
           not_clean_backup_files, unique_id,
-          active_site_dist=5.0,
+          active_site_dist=5.0, save_traj_without_water=False,
           mdp_dir=None, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
@@ -396,7 +396,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                                      ncpu=ncpu)
             for res in calc_dask(run_md_analysis, var_md_dirs_deffnm,
                                  dask_client, mdtime_ns=mdtime_ns, project_dir=project_dir,
-                                 bash_log=bash_log, ligand_resid=ligand_resid, ligand_list_file_prev=ligand_list_file_prev,
+                                 bash_log=bash_log, ligand_resid=ligand_resid,
+                                 ligand_list_file_prev=ligand_list_file_prev,
+                                 save_traj_without_water=save_traj_without_water,
                                  env=os.environ.copy()):
                 if res:
                     var_md_analysis_dirs.append(res)
@@ -540,6 +542,9 @@ def main():
                                     (--ligand_list_file is optional and required to run md analysis after simulation )''')
     parser.add_argument('-o','--out_suffix', default=None,
                         help='User unique suffix for output files')
+    parser.add_argument('--save_traj_without_water',  action='store_true', default=False,
+                        help='Save additional md_out_nowater.tpr and md_fit_nowater.xtc files '
+                             'for more memory efficient analysis.')
     # continue md
     parser2 = parser.add_argument_group('Continue or Extend Molecular Dynamics Simulation')
     parser2.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',
@@ -645,6 +650,7 @@ def main():
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
               mcpbpy_cut_off=args.metal_cutoff, unique_id=unique_id,
+              save_traj_without_water=args.save_traj_without_water,
               mdp_dir=args.mdp_dir, bash_log=bash_log)
     finally:
         logging.shutdown()

@@ -79,6 +79,7 @@ def md_rmsd_analysis(tpr, xtc, wdir, system_name,
 
 def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                     active_site_dist=5.0, ligand_resid='UNL',
+                    save_traj_without_water = False,
                     ligand_list_file_prev=None, env=None):
     wdir, deffnm = var_md_dirs_deffnm
     if ligand_list_file_prev is None:
@@ -133,8 +134,10 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                      ligand_resid=ligand_resid,
                      molid_resid_pairs=molid_resid_pairs,
                      active_site_dist=active_site_dist)
-    os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
-    os.remove(os.path.join(wdir, f'md_fit_nowater.xtc'))
+    if not save_traj_without_water:
+        os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
+        os.remove(os.path.join(wdir, f'md_fit_nowater.xtc'))
+
     for xvg_file in glob(os.path.join(wdir, '*.xvg')):
         convertxvg2png(xvg_file, transform_nm_to_A=True)
     return wdir
