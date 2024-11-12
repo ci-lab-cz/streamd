@@ -122,7 +122,7 @@ def collect_outputs(output_list, output):
 
 
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
-          protein_selection, ligand_resid, hostfile, ncpu, njobs,
+          protein_selection, ligand_resid, hostfile, ncpu, n_jobs,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose):
     output = 'plifs.csv'
     output_aggregated = os.path.join(wdir_output, f'prolif_output_{unique_id}.csv')
@@ -134,10 +134,11 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
 
     if wdir_to_run is not None:
         dask_client, cluster = None, None
-        #njobs_per_task = njobs if njobs <= ncpu else ncpu
-        njobs_per_task = njobs
+        #n_jobs_per_task = n_jobs if n_jobs <= ncpu else ncpu
+        n_jobs_per_task = n_jobs
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(len(wdir_to_run), ncpu//njobs_per_task),
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile,
+                                                     n_tasks_per_node=min(len(wdir_to_run), ncpu//n_jobs_per_task),
                                                      use_multi_servers=True if len(wdir_to_run) > ncpu else False,
                                                      ncpu=ncpu)
             var_prolif_out_files = []
@@ -145,7 +146,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                                  tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                                  ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
                                  plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb,
-                                 n_jobs=njobs_per_task, occupancy=occupancy):
+                                 n_jobs=n_jobs_per_task, occupancy=occupancy):
                 if res:
                     var_prolif_out_files.append(res)
         finally:
@@ -209,10 +210,10 @@ def main():
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=len(os.sched_getaffinity(0)), type=int,
                         help='number of CPU per server. Use all available cpus by default.')
-    parser.add_argument('--njobs', metavar='INTEGER', required=False,
+    parser.add_argument('--n_jobs', metavar='INTEGER', required=False,
                          default=1, type=int,
                          help='Number of processes to run per each trajectory. '
-                              'Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--njobs arg).')
+                              'Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--n_jobs arg).')
 
     parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
                         help='width of the output pictures')
@@ -275,7 +276,7 @@ def main():
         start(wdir_to_run=args.wdir_to_run, wdir_output=wdir, tpr=tpr,
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
           protein_selection=args.protein_selection, ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
-          njobs=args.njobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
+          n_jobs=args.n_jobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
           save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
           verbose=args.verbose)
     finally:
