@@ -67,7 +67,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 
     fp = plf.Fingerprint(['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
                           'PiStacking', 'MetalAcceptor'])
-    fp.run(u.trajectory[::step], ligand, protein, progress=verbose, n_jobs=n_jobs)
+    fp.run(u.trajectory[::step] if step > 1 else u.trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs)
 
     df = fp.to_dataframe()
     df.columns = ['.'.join(item.strip().lower() for item in items[1:]) for items in df.columns]
@@ -122,7 +122,7 @@ def collect_outputs(output_list, output):
 
 
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
-          ligand_resid, hostfile, ncpu,
+          ligand_resid, hostfile, ncpu, njobs,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose):
     output = 'plifs.csv'
     output_aggregated = os.path.join(wdir_output, f'prolif_output_{unique_id}.csv')
@@ -136,9 +136,10 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
 
     if wdir_to_run is not None:
         dask_client, cluster = None, None
-        njobs_per_task = 1
+        #njobs_per_task = njobs if njobs <= ncpu else ncpu
+        njobs_per_task = njobs
         try:
-            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(len(wdir_to_run), ncpu),
+            dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=min(len(wdir_to_run), ncpu//njobs_per_task),
                                                      use_multi_servers=True if len(wdir_to_run) > ncpu else False,
                                                      ncpu=ncpu)
             var_prolif_out_files = []
@@ -206,6 +207,11 @@ def main():
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=len(os.sched_getaffinity(0)), type=int,
                         help='number of CPU per server. Use all available cpus by default.')
+    parser.add_argument('--njobs', metavar='INTEGER', required=False,
+                         default=1, type=int,
+                         help='Number of processes to run per each trajectory. '
+                              'Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--njobs arg).')
+
     parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
                         help='width of the output pictures')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
@@ -267,7 +273,7 @@ def main():
         start(wdir_to_run=args.wdir_to_run, wdir_output=wdir, tpr=tpr,
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
           ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
-          occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
+          njobs=args.njobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
           save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
           verbose=args.verbose)
     finally:
