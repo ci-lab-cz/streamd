@@ -52,7 +52,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     :param plot_height: in inches
     :return: pandas dataframe
     '''
-    u = mda.Universe(tpr, xtc)
+    u = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
 
     protein = u.atoms.select_atoms(protein_selection)
     ligand = u.atoms.select_atoms(ligand_selection)
