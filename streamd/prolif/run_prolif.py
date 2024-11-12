@@ -122,15 +122,13 @@ def collect_outputs(output_list, output):
 
 
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
-          ligand_resid, hostfile, ncpu, njobs,
+          protein_selection, ligand_resid, hostfile, ncpu, njobs,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose):
     output = 'plifs.csv'
     output_aggregated = os.path.join(wdir_output, f'prolif_output_{unique_id}.csv')
 
-    if append_protein_selection is None:
-        protein_selection = 'protein'
-    else:
-        protein_selection = f'protein or {append_protein_selection}'
+    if append_protein_selection is not None:
+        protein_selection = f'({protein_selection}) or ({append_protein_selection})'
 
     ligand_selection = f'resname {ligand_resid}'
 
@@ -192,6 +190,10 @@ def main():
                         help='residue name of a ligand in the input trajectory.')
     parser.add_argument('-s', '--step', metavar='INTEGER', required=False, default=1, type=int,
                         help='step to take every n-th frame. ps')
+    parser.add_argument('--protein_selection', metavar='STRING',
+                        required=False, default='protein',
+                        help='The protein selection atoms. '
+                             'Example: "protein" or "protein and byres around 20.0 resname UNL"')
     parser.add_argument('-a', '--append_protein_selection', metavar='STRING', required=False, default=None,
                         help='the string which will be concatenated to the protein selection atoms. '
                              'Example: "resname ZN or resname MG".')
@@ -272,7 +274,7 @@ def main():
     try:
         start(wdir_to_run=args.wdir_to_run, wdir_output=wdir, tpr=tpr,
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
-          ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
+          protein_selection=args.protein_selection, ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
           njobs=args.njobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
           save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
           verbose=args.verbose)
