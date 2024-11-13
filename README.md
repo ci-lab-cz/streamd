@@ -597,5 +597,6 @@ log_prolif_start-time.log - StreaMD logging user info
 MIT
 ## Citation
 Ivanova A, Mokshyna O, Polishchuk P.  
-StreaMD: the toolkit for high-throughput molecular dynamics simulations. *ChemRxiv*. **2024**  
-https://dx.doi.org/10.26434/chemrxiv-2024-2rjqz
+StreaMD: the toolkit for high-throughput molecular dynamics simulations.  
+*J. Cheminf.* **2024**, 16 (1), 123.  
+https://doi.org/10.1186/s13321-024-00918-w
