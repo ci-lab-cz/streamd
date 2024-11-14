@@ -354,7 +354,8 @@ def main():
     parser.add_argument('--clean_previous', action='store_true', default=False,
                         help=' Clean previous temporary gmxMMPBSA files')
     parser.add_argument('-o','--out_suffix', default=None,
-                        help='Suffix for output files')
+                        help='Unique suffix for output files. By default, start-time_unique-id.'
+                             'Unique suffix is used to separate outputs from different runs.')
 
     args = parser.parse_args()
 
@@ -369,7 +370,7 @@ def main():
     else:
         import secrets
         out_suffix = secrets.token_hex(8)
-        unique_id = f'{out_time}_{out_suffix}'
+        unique_id = f'{out_time}_unique-id-{out_suffix}'
 
     log_file = os.path.join(wdir, f'log_mmpbsa_{unique_id}.log')
     bash_log = os.path.join(wdir, f'log_mmpbsa_bash_{unique_id}.log')

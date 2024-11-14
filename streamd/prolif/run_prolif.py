@@ -228,7 +228,8 @@ def main():
                              ' Only overall prolif png file will be created.')
     parser.add_argument('-o','--out_suffix',
                         metavar='string', default=None,
-                        help='Suffix for output files')
+                        help='Unique suffix for output files. By default, start-time_unique-id.'
+                             'Unique suffix is used to separate outputs from different runs.')
 
     args = parser.parse_args()
 
@@ -243,7 +244,7 @@ def main():
     else:
         import secrets
         out_suffix = secrets.token_hex(8)
-        unique_id = f'{out_time}_{out_suffix}'
+        unique_id = f'{out_time}_unique-id-{out_suffix}'
 
     log_file = os.path.join(wdir, f'log_prolif_{unique_id}.log')
 
