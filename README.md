@@ -19,6 +19,13 @@
     - [Continue the interrupted simulations](#continue-the-interrupted-simulations-) 
     - [Extend the simulation](#extend-the-simulation-)
     - [GPU usage](#gpu-usage)
+      - [Single GPU](#run-using-single-gpu)
+      - [Multiple GPUs](#run-each-simulation-using-multiple-gpus-)
+      - [The number of thread-MPI ranks per GPU](#increase-the-number-of-thread-mpi-ranks-per-gpu-)
+      - [Multiple runs per node](#multiple-runs-per-node)
+      - [Multiple tasks on the same node while using multiple GPUs](#run-multiple-tasks-on-the-same-node-while-using-multiple-gpus)
+      - [Use CPUs only](#run-simulations-only-using-cpus-on-a-server-where-gpus-are-available)
+      - [Automatically distribute calculations between the CPU and GPU](#automatically-offload-calculations-across-cpu-and-gpu)
     - [StreaMD output files](#output-)
       - [Simulations output](#--md-output-files)
       - [Analysis files](#--analysis-output-files-)
@@ -306,14 +313,14 @@ More details on: https://manual.gromacs.org/documentation/current/user-guide/mdr
 The performance and gpu usage strongly depend on the type of hardware and size of the system.  
 It is always good to check the GPU usage (for example, by `nvidia-smi` command).
 
-##### **Run using 1 GPU:**
+##### Run using single GPU
 ```
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu
 ```
 
 To improve the performance one can use multiple GPUs or start multiple ranks per GPU.
 
-##### **Run each simulation using multiple GPUs**  
+##### Run each simulation using multiple GPUs 
 > [!WARNING]
 > Increasing the number of GPUs does not always improve performance.
 The each single simulation will use all provided GPUs. 
@@ -323,7 +330,7 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --gpu_ids 0 1 2
 > [!WARNING]
 > If you want to split the simulations across multiple GPUs but still run the task on the same node use the --mdrun_per_node argument (see below).
 
-##### **Increase the number of thread-MPI ranks per GPU**  
+##### Increase the number of thread-MPI ranks per GPU  
 ```-ntmpi_per_gpu_``` argument is used to calculate _total number of thread-MPI ranks_ (```gmx mdrun -ntmpi_ X```, where **X**=ntmpi_per_gpu*number of GPUs to use). By default, ```ntmpi_per_gpu``` equals 1, although usage of 2 thread-MPI ranks per GPU may return better performance.
 ```
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu -ntmpi_per_gpu 2
@@ -334,18 +341,18 @@ Sometimes for more full GPU usage user can start multiple simulations on a singl
 ```
 run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2
 ```
-##### Run multiple tasks on the same node while using multiple GPUs:
+##### Run multiple tasks on the same node while using multiple GPUs
 > [!WARNING]
 > All simulations will still be utilizing all provided GPUs which can lead to suboptimal GPU load. This feature is still under development.
 ```
 run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2 --gpu_ids 0 1
 ```
-##### To run simulations only using CPUs on a server where GPUs are available:
+##### Run simulations only using CPUs on a server where GPUs are available
 ```
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device cpu
 ```
-##### Automatically offload calculations on CPU/GPU
-To let GROMACS automatically offload calculations on CPU/GPU may be optimal on hardware where the CPUs are relatively powerful compared to the GPUs.
+##### Automatically offload calculations across CPU and GPU
+To let GROMACS automatically offload calculations between CPU and GPU may be optimal on hardware where the CPUs are relatively powerful compared to the GPUs.
 ```
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
 ```
