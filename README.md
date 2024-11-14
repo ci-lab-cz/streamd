@@ -41,7 +41,8 @@
 - [Trajectory convergence analysis](#trajectory-convergence-analysis-)
   - [Usage](#usage-3)
   - [Examples](#examples-2)
-- [Logging](#logging)
+  - [Output](#output)
+- [Logging](#logging-)
 - [License](#license)
 - [Citation](#citation)
     
@@ -498,7 +499,8 @@ options:
                         residue IDs whuch will be included in the protein system (cofactors).Example: ZN MG
   --clean_previous      Clean previous temporary gmxMMPBSA files
   -o string, --out_suffix string
-                        Suffix for output files
+                        Unique suffix for output files. By default, start-time_unique-id.
+                        Unique suffix is used to separate outputs from different runs.
 
   
 ```
@@ -509,16 +511,17 @@ run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/p
 ```
 #### **Output**   
 *each run creates in the working directory (or in the current directory if wdir argument was not set up):*
+Unique suffix is used to separate outputs from different runs.
  1) a unique streaMD log file  
- log_mmpbsa_*start-time*.log 
+ log_mmpbsa_*unique-suffix*.log 
  Contains important information/warnings/errors about the main run_gbsa program run.
  2) a unique bash log file. 
- log_mmpbsa_bash_*start-time*.log   
+ log_mmpbsa_bash_*unique-suffix*.log   
  Contains stdout from gmx_MMPBSA 
- 3) GBSA_output_*start-time*.csv with summary csv if MMGBSA method was run
- 4) PBSA_output_*start-time*.csv with summary csv if MMPBSA method was run
+ 3) GBSA_output_*unique-suffix*.csv with summary csv if MMGBSA method was run
+ 4) PBSA_output_*unique-suffix*.csv with summary csv if MMPBSA method was run
  
- each wdir_to_run has FINAL_RESULTS_MMPBSA_*start-time*.csv with GBSA/PBSA output. 
+ each wdir_to_run has FINAL_RESULTS_MMPBSA_*unique-suffix*.csv with GBSA/PBSA output. 
  
 [Return to the Table Of Contents](#table-of-contents)  
 
@@ -526,7 +529,6 @@ run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/p
 ### ProLIF Protein-Ligand Interaction Fingerprints
 #### **Usage**
 ```
-run_prolif -h
 usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [--protein_selection STRING] [-a STRING] [-d WDIR] [-v]
                   [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--occupancy float] [--not_save_pics] [-o string]
 
@@ -544,20 +546,21 @@ options:
   -s INTEGER, --step INTEGER
                         step to take every n-th frame. ps (default: 1)
   --protein_selection STRING
-                        The protein selection atoms. Example: "protein" or "protein and byres around 20.0 resname UNL" (default: protein)                     
+                        The protein selection atoms. Example: "protein" or "protein and byres around 20.0 resname UNL" (default: protein)
   -a STRING, --append_protein_selection STRING
                         the string which will be concatenated to the protein selection atoms. Example: "resname ZN or resname MG". (default: None)
   -d WDIR, --wdir WDIR  Working directory for program output. If not set the current directory will be used. (default: None)
   -v, --verbose         print progress. (default: False)
   --hostfile FILENAME   text file with addresses of nodes of dask SSH cluster. The most typical, it can be passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file will be the address of the scheduler running on the standard port 8786. If omitted, calculations will run on a single machine as usual. (default: None)
   -c INTEGER, --ncpu INTEGER
-                        number of CPU per server. Use all cpus by default.
+                        number of CPU per server. Use all available cpus by default.
   --n_jobs INTEGER      Number of processes to run per each trajectory. Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--n_jobs arg). (default: 1)
   --width FILENAME      width of the output pictures (default: 15)
   --height FILENAME     height of the output pictures (default: 10)
-  -o FILENAME, --occupancy FILENAME
-                        occupancy of the unique contacts to show (default: 0.6)
+  --occupancy float     occupancy of the unique contacts to show. Applied for plifs_occupancyX.html (for each complex) and prolif_output_occupancyX.png (all systems aggregated plot) (default: 0.6)
   --not_save_pics       not create html and png files (by frames) for each unique trajectory. Only overall prolif png file will be created. (default: False)
+  -o string, --out_suffix string
+                        Unique suffix for output files. By default, start-time_unique-id.Unique suffix is used to separate outputs from different runs.
 
 ```
 
@@ -567,18 +570,7 @@ run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run
 ```
 #### **Output**  
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html* file for each simulation will be created
-2) *prolif_output_start-time.csv/png* - aggregated csv/png output file for all analyzed simulations
-
-#### **Examples**
-preferred way:
-```
-run_md  --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --steps 4 -d md_files
-```
-by the script itself:
-```
-run_analysis.py -i rmsd_all_systems.csv --rmsd_type "backbone" "ligand" "ActiveSite5.0A" --paint_by exp_data.csv -o protein --title "Protein. RMSD Mean vs RMSD Std" --time_ranges 0-1 0-2 0-10 5-10 9-10
-
-```
+2) *prolif_output_*unique-suffix*.csv/png* - aggregated csv/png output file for all analyzed simulations. Unique suffix is used to separate outputs from different runs.
 
 #### Supplementary run_prolif scripts
 _run_prolif applies all this scripts automatically. Use it if you want more detailed analysis or to change the picture/fonts sizes._  
@@ -660,27 +652,41 @@ options:
   --title RMSD Mean vs RMSD Std
                         Title for html plot. Default: RMSD Mean vs RMSD Std
 ````
+#### **Examples**
+preferred way:
+```
+run_md  --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --steps 4 -d md_files
+```
+by the script itself:
+```
+run_rmsd_analysis -i rmsd_all_systems.csv --rmsd_type "backbone" "ligand" "ActiveSite5.0A" --paint_by exp_data.csv -o protein --title "Protein. RMSD Mean vs RMSD Std" --time_ranges 0-1 0-2 0-10 5-10 9-10
+
+```
+#### **Output**
+1) csv output file containing output data 
+rmsd_mean_std_time-ranges_*start-time*.csv
+2) html file with interactive visualization
+rmsd_mean_std_time-ranges_*start-time*.html
 
 [Return to the Table Of Contents](#table-of-contents)  
-
 
 ## Logging  
 All system information or errors are saved into logging files which would be placed into your main working directory (the current working directory or the path which was passed through --wdir argument):  
 **run_md:**
 ```
-log_protein-fname_ligand-fname_cofactor-fname_current-date.log - StreaMD logging user info (status of the )
-streamd_bash_protein-fname_ligand-fname_cofactor-fname_start-time.log - StreaMD bash system logging info
+log_protein-fname_ligand-fname_cofactor-fname_*start-time*.log - StreaMD logging user info (status of the )
+streamd_bash_protein-fname_ligand-fname_cofactor-fname_*start-time*.log - StreaMD bash system logging info
 ```
 
 **run_gbsa:**
 ```
-log_mmpbsa_start-time.log - StreaMD logging user info
-log_mmpbsa_bash_start-time.log - StreaMD bash system logging info
+log_mmpbsa_*unique-suffix*.log - StreaMD logging user info
+log_mmpbsa_bash_*unique-suffix*.log - StreaMD bash system logging info
 ```
 
 **run_prolif:**
 ```
-log_prolif_start-time.log - StreaMD logging user info
+log_prolif_*unique-suffix*.log - StreaMD logging user info
 ```
 
 [Return to the Table Of Contents](#table-of-contents)   
