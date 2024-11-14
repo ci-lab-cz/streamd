@@ -41,7 +41,7 @@
 - [Trajectory convergence analysis](#trajectory-convergence-analysis-)
   - [Usage](#usage-3)
   - [Examples](#examples-2)
-  - [Output](#output--3)
+  - [Output](#output-3)
 - [Logging](#logging-)
 - [License](#license)
 - [Citation](#citation)
