@@ -113,9 +113,9 @@ setattr r type HIE :HIS@HE2
 
 #### 2) Docking procedure
 Required to obtain relevant poses of the ligand(s) if needed
-* **Perform docking procedure by [EasyDock - automate molecular docking tool](https://github.com/ci-lab-cz/easydock)**<br><br> 
+* **Perform docking procedure by [EasyDock - automate molecular docking tool](https://github.com/ci-lab-cz/easydock)**<br> 
 
-[Return to the Table Of Contents](#table-of-contents)<br><br>   
+[Return to the Table Of Contents](#table-of-contents)
 
 ### Run molecular dynamics simulations   
 ``` source activate md ```  
@@ -290,7 +290,7 @@ in case you don't want to check/run all preparation steps with using non-StreaMD
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 0.3 --steps 3 4
 ```
 
-[Return to the Table Of Contents](#table-of-contents)<br><br>  
+[Return to the Table Of Contents](#table-of-contents)<br>  
 
 
 #### GPU usage
@@ -345,7 +345,7 @@ To let GROMACS automatically offload calculations on CPU/GPU may be optimal on h
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
 ```
    
-[Return to the Table Of Contents](#table-of-contents)<br><br>  
+[Return to the Table Of Contents](#table-of-contents)<br>  
 
 
 #### **Output**   
