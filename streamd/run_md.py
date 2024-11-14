@@ -532,6 +532,9 @@ def main():
                               'although the system StreaMD parameters '
                               '(seed, nvt_time, npt_time, md_time, and tc-grps (can not be changed by user)) will override the ones provided. '
                               'Warning: The names of the files must be strictly preserved.')
+    parser1.add_argument('--save_traj_without_water', action='store_true', default=False,
+                         help='Save additional md_out_nowater.tpr and md_fit_nowater.xtc files '
+                              'for more memory efficient analysis.')
     parser1.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
                          type=partial(filepath_type, exist_type='dir'),
                          help='''Single or multiple directories contain simulations created by the tool.
@@ -542,9 +545,6 @@ def main():
                                     (--ligand_list_file is optional and required to run md analysis after simulation )''')
     parser.add_argument('-o','--out_suffix', default=None,
                         help='User unique suffix for output files')
-    parser.add_argument('--save_traj_without_water',  action='store_true', default=False,
-                        help='Save additional md_out_nowater.tpr and md_fit_nowater.xtc files '
-                             'for more memory efficient analysis.')
     # continue md
     parser2 = parser.add_argument_group('Continue or Extend Molecular Dynamics Simulation')
     parser2.add_argument('--deffnm', metavar='preffix for md files', required=False, default='md_out',

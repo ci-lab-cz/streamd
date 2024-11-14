@@ -127,9 +127,9 @@ usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
               [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--no_dr] [--not_clean_backup_files]
               [--steps [STEPS ...]] [--mdp_dir Path to a directory with specific mdp files] [--wdir_to_continue DIRNAME [DIRNAME ...]] [-o OUT_SUFFIX]
-              [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL]
-              [--activate_gaussian module load Gaussian/09-d01] [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09] [--gaussian_basis B3LYP/6-31G*]
-              [--gaussian_memory 120GB] [--metal_resnames [MN ...]] [--metal_cutoff 2.8] [--metal_charges {MN:2, ZN:2, CA:2}]
+              [--save_traj_without_water] [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--ligand_list_file all_ligand_resid.txt]
+              [--ligand_id UNL] [--activate_gaussian module load Gaussian/09-d01] [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09]
+              [--gaussian_basis B3LYP/6-31G*] [--gaussian_memory 120GB] [--metal_resnames [MN ...]] [--metal_cutoff 2.8] [--metal_charges {MN:2, ZN:2, CA:2}]
 
 Run or continue MD simulation. Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple)
 
@@ -185,6 +185,8 @@ Standard Molecular Dynamics Simulation Run:
                         nvt.mdp, npt.mdp, md.mdp. Missing .mdp files will be replaced by default StreaMD files. Provided .mdp files will be used as templates,
                         although the system StreaMD parameters (seed, nvt_time, npt_time, md_time, and tc-grps (can not be changed by user)) will override the ones
                         provided. Warning: The names of the files must be strictly preserved.
+  --save_traj_without_water
+                        Save additional md_out_nowater.tpr and md_fit_nowater.xtc files for more memory efficient analysis.
   --wdir_to_continue DIRNAME [DIRNAME ...]
                         Single or multiple directories contain simulations created by the tool. Use with steps 2,3,4 to continue run. ' Should consist of: tpr, cpt,
                         xtc and all_ligand_resid.txt files. File all_ligand_resid.txt is optional and used to run md analysis for the ligands. If you want to continue
@@ -513,8 +515,8 @@ run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/p
 #### **Usage**
 ```
 run_prolif -h
-usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [-a STRING] [-d WDIR] [-v] [--hostfile FILENAME]
-                  [-c INTEGER] [--width FILENAME] [--height FILENAME] [-o FILENAME] [--not_save_pics]
+usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [--protein_selection STRING] [-a STRING] [-d WDIR] [-v]
+                  [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--occupancy float] [--not_save_pics] [-o string]
 
 Get protein-ligand interactions from MD trajectories using ProLIF module.
 
@@ -529,13 +531,16 @@ options:
                         residue name of a ligand in the input trajectory. (default: UNL)
   -s INTEGER, --step INTEGER
                         step to take every n-th frame. ps (default: 1)
+  --protein_selection STRING
+                        The protein selection atoms. Example: "protein" or "protein and byres around 20.0 resname UNL" (default: protein)                     
   -a STRING, --append_protein_selection STRING
                         the string which will be concatenated to the protein selection atoms. Example: "resname ZN or resname MG". (default: None)
   -d WDIR, --wdir WDIR  Working directory for program output. If not set the current directory will be used. (default: None)
   -v, --verbose         print progress. (default: False)
   --hostfile FILENAME   text file with addresses of nodes of dask SSH cluster. The most typical, it can be passed as $PBS_NODEFILE variable from inside a PBS script. The first line in this file will be the address of the scheduler running on the standard port 8786. If omitted, calculations will run on a single machine as usual. (default: None)
   -c INTEGER, --ncpu INTEGER
-                        number of CPU per server. Use all cpus by default. (default: 32)
+                        number of CPU per server. Use all cpus by default.
+  --n_jobs INTEGER      Number of processes to run per each trajectory. Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--n_jobs arg). (default: 1)
   --width FILENAME      width of the output pictures (default: 15)
   --height FILENAME     height of the output pictures (default: 10)
   -o FILENAME, --occupancy FILENAME
