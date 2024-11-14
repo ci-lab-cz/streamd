@@ -260,6 +260,8 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
 
 ```
+[Return to the Table Of Contents](#table-of-contents)<br>  
+
 #### **Simulations using multiple servers**
 ```
 PBS:
@@ -270,10 +272,13 @@ srun hostname | sort | uniq > hostfile
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile hostfile --ncpu 128
 
 ```
+[Return to the Table Of Contents](#table-of-contents)<br>  
 
 
 #### **Continue the interrupted simulations**  
-You can continue the interrupted run by re-executing the previous command. The tool will recognize the checkpoint files and continue the run from the unfinished step.
+You can continue the interrupted run by re-executing the previous command. The tool will recognize the checkpoint files and continue the run from the unfinished step.  
+
+[Return to the Table Of Contents](#table-of-contents)<br>  
 
 
 #### **Extend the simulation**  
