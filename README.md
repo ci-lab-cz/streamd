@@ -663,9 +663,9 @@ run_rmsd_analysis -i rmsd_all_systems.csv --rmsd_type "backbone" "ligand" "Activ
 
 ```
 #### **Output**
-1) csv output file containing output data 
+1) csv output file containing output data  
 rmsd_mean_std_time-ranges_*start-time*.csv
-2) html file with interactive visualization
+2) html file with interactive visualization  
 rmsd_mean_std_time-ranges_*start-time*.html
 
 [Return to the Table Of Contents](#table-of-contents)  
