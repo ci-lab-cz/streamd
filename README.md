@@ -1,8 +1,46 @@
 # StreaMD: a tool to perform high-throughput automated molecular dynamics simulations
 
-## installation
+## Table Of Contents
+- [Installation](#installation)
+- [Description](#description)
+- [Features](#features-)
+- [Molecular Dynamics](#run-molecular-dynamics-simulations-)
+  - [Data Preparation](#data-preparation)
+    - [Target preparation](#1-target-preparation-)
+    - [Docking](#2-docking-procedure)
+  - [MD simulations run](#usage)
+    - [Different systems](#run-simulation-for-different-systems)
+      - [Protein in water](#protein-in-water)
+      - [Protein-Ligand](#protein---ligand)
+      - [Protein-cofactors](#protein---cofactors)
+      - [Boron-containing compounds](#simulations-with-boron-containing-compounds-)
+      - [Ligand Binding Metalloprotein with MCPB.py](#simulations-of-ligand-binding-metalloprotein-with-mcpbpy-)
+    - [Multiple servers](#simulations-using-multiple-servers)
+    - [Continue the interrupted simulations](#continue-the-interrupted-simulations-) 
+    - [Extend the simulation](#extend-the-simulation-)
+    - [GPU usage](#gpu-usage)
+    - [StreaMD output files](#output-)
+      - [Simulations output](#--md-output-files)
+      - [Analysis files](#--analysis-output-files-)
+- [MM-PBSA/MM-GBSA energy calculation](#mm-pbsamm-gbsa-energy-calculation)
+  - [Usage](#usage-1) 
+  - [Examples](#examples)
+  - [Output](#output--1)
+- [ProLIF Protein-Ligand Interaction Fingerprints](#prolif-protein-ligand-interaction-fingerprints)
+  - [Usage](#usage-2)
+  - [Examples](#examples-1)
+  - [Output](#output--2)
+  - [Supplementary run_prolif analysis scripts](#supplementary-run_prolif-scripts)
+- [Trajectory convergence analysis](#trajectory-convergence-analysis-)
+  - [Usage](#usage-3)
+  - [Examples](#examples-2)
+- [Logging](#logging)
+- [License](#license)
+- [Citation](#citation)
+    
 
-Choose the yaml file for cpu only (**env.yml**) or gpu/cpu (**env_gpu.yml**) usage.  
+## installation
+Please choose the yaml file for cpu only (**env.yml**) or gpu/cpu (**env_gpu.yml**) usage.  
 
 The **env_gpu.yml** file can only be installed on a machine with an available GPU.
 ```
@@ -16,10 +54,13 @@ or the latest version from github
 ```
 pip install git+https://github.com/ci-lab-cz/streamd.git
 ```
+
+[Return to the Table Of Contents](#table-of-contents)  
+
 ## **Description**
 #### **Fully automated pipeline for molecular dynamics**
 
-#### Features:  
+## Features:  
 - supports run of multiple simultaneous molecular dynamics simulations
 - supports simulation for different systems:  
     - Protein in Water;  
@@ -39,7 +80,46 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 - interactive trajectory convergence analysis for multiple complexes
 - GPU support
 
-### **USAGE**
+[Return to the Table Of Contents](#table-of-contents)  
+
+## **Data preparation**
+Before run MD simulation it is important to prepare protein by yourself to make sure you simulate correct system.
+> [!CAUTION]  
+> To prevent problems with recognition of different atom names by Gromacs, we use the `-ignh` argument, which re-adds the hydrogen atoms, ignoring the original one,
+> while converting the protein to a gro file (`gmx pdb2gmx -water tip3p -ignh`). Make sure to rename residues (CYS-CYX, HIS-HIE-HIP) by proper protonation states (_more details in Target Preparation section_).  
+> As an option, the user can use the `--noignh` argument when running StreaMD, although there may be problems with atom name recognition that users must resolve themselves or, as another option, provide to Streamd the already prepared protein.gro, topol.top and posre.itp files.   
+#### Example of preparation steps before MD: 
+#### 1) Target Preparation:  
+*Manual preparation:*
+- **Fill missing residues and loops**  
+
+*Using Chimera:*   
+
+``Tools -> Sequence -> Structure -> Modeller (loops/refinement)``  
+``Tools -> Structure Editing -> Dock Prep ``
+* **Explicit water molecules as well as cofactors from a crystal structure can be removed, or if necessarily retained manually;**
+
+* **Remove co-crystallizated ligands;**
+
+* **Add hydrogens based on protonation states.**
+  * Check states of histidines and put proper aliases HIE, HID or HIP instead of HIS (otherwise protonation can be distorted during MD preparation stage)  
+
+*type into Chimera cmd:*
+```
+setattr r type HID :HIS@HD1,DD1,TD1,HND
+setattr r type HIP :HID@HE2,DE2,TE2
+setattr r type HIE :HIS@HE2
+```
+
+#### 2) Docking procedure
+Required to obtain relevant poses of the ligand(s) if needed
+* **Perform docking procedure by [EasyDock - automate molecular docking tool](https://github.com/ci-lab-cz/easydock)**<br><br> 
+
+[Return to the Table Of Contents](#table-of-contents)<br><br>   
+
+### Run molecular dynamics simulations   
+``` source activate md ```  
+### **Usage**
 ```
 run_md -h
 usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--mdrun_per_node INTEGER]
@@ -142,63 +222,27 @@ MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and B
                         Metal residue charges in dictionary formatStart MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are
                         set up, otherwise standard gmx2pdb procedure will be run
 
-```
-## **Data preparation**
-Before run MD simulation it is important to prepare protein by yourself to make sure you simulate correct system.
-> [!CAUTION]  
-> To prevent problems with recognition of different atom names by Gromacs, we use the `-ignh` argument, which re-adds the hydrogen atoms, ignoring the original one,
-> while converting the protein to a gro file (`gmx pdb2gmx -water tip3p -ignh`). Make sure to rename residues (CYS-CYX, HIS-HIE-HIP) by proper protonation states (_more details in Target Preparation section_).  
-> As an option, the user can use the `--noignh` argument when running StreaMD, although there may be problems with atom name recognition that users must resolve themselves or, as another option, provide to Streamd the already prepared protein.gro, topol.top and posre.itp files.   
-#### Example of preparation steps before MD: 
-#### 1) Target Preparation:  
-*Manual preparation:*
-- **Fill missing residues and loops**  
+``` 
 
-*Using Chimera:*   
-
-``Tools -> Sequence -> Structure -> Modeller (loops/refinement)``  
-``Tools -> Structure Editing -> Dock Prep ``
-* **Explicit water molecules as well as cofactors from a crystal structure can be removed, or if necessarily retained manually;**
-
-* **Remove co-crystallizated ligands;**
-
-* **Add hydrogens based on protonation states.**
-  * Check states of histidines and put proper aliases HIE, HID or HIP instead of HIS (otherwise protonation can be distorted during MD preparation stage)  
-
-*type into Chimera cmd:*
-```
-setattr r type HID :HIS@HD1,DD1,TD1,HND
-setattr r type HIP :HID@HE2,DE2,TE2
-setattr r type HIE :HIS@HE2
-```
-
-#### 2) Docking procedure
-Required to obtain relevant poses of the ligand(s) if needed
-* **Perform docking procedure**  
-https://github.com/ci-lab-cz/easydock
-
-## Run molecular dynamics simulation
-``` source activate md ```  
- 
-**Run simulation for different sytems:**
-- Protein in Water
+#### **Run simulation for different systems:**
+##### Protein in Water
 ```
 run_md -p protein_H_HIS.pdb --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
 ```
 
-- Protein - Ligand
+##### Protein - Ligand
 ```
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
 ```
 
-- Protein - Cofactor
+##### Protein - Cofactors
 All molecules should present in simulated system, so any problem with preparation of cofactors will interrupt the program. 
 ```
 run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
 
 ```
 
-**To run simulations with boron-containing compounds**  
+##### **Simulations with boron-containing compounds**  
 *Gaussian Software* should be available.  
 Gaussian optimization and charge calculation will be run only for molecules with boron atoms, other molecules will be processed by regular procedure by Antechamber.
 If Gaussian cannot be load boron-containing molecules will be skipped.  
@@ -208,13 +252,13 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 
 ```
 
-**To run simulations of Ligand Binding Metalloprotein with MCPB.py**  
+##### **Simulations of Ligand Binding Metalloprotein with MCPB.py**  
 *Gaussian Software* should be available.
 ```
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
 
 ```
-**To run simulations using multiple servers**
+#### **Simulations using multiple servers**
 ```
 PBS:
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile $PBS_NODEFILE --ncpu 128
@@ -224,10 +268,13 @@ srun hostname | sort | uniq > hostfile
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile hostfile --ncpu 128
 
 ```
-**To continue the interrupted simulations**  
-You can continue the interrupted run by re-executing the previous command. The tool will recognize the checkpoint files and continue the run from the unfinished step. 
 
-**To extend the simulation**  
+
+#### **Continue the interrupted simulations**  
+You can continue the interrupted run by re-executing the previous command. The tool will recognize the checkpoint files and continue the run from the unfinished step.
+
+
+#### **Extend the simulation**  
 you can continue your simulation unlimited times. As the `--md_time` argument user should set up the overall time of the simulation
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 0.2
@@ -240,8 +287,66 @@ in case you don't want to check/run all preparation steps with using non-StreaMD
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 0.3 --steps 3 4
 ```
-  
-**Output**   
+
+[Return to the Table Of Contents](#table-of-contents)<br><br>  
+
+
+#### GPU usage
+The StreaMD tool supports running of energy minimization, NVT, and NPT equilibration steps, as well as production simulations on GPU(s).   
+When run with `--device gpu` argument the StreaMD offloads nb, update, pme, bonded, pmefft (all which can be run on GPU) computations to GPU.  
+More details on: https://manual.gromacs.org/documentation/current/user-guide/mdrun-performance.html
+
+The performance and gpu usage strongly depend on the type of hardware and size of the system.  
+It is always good to check the GPU usage (for example, by `nvidia-smi` command).
+
+##### **Run using 1 GPU:**
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu
+```
+
+To improve the performance one can use multiple GPUs or start multiple ranks per GPU.
+
+##### **Run each simulation using multiple GPUs**  
+> [!WARNING]
+> Increasing the number of GPUs does not always improve performance.
+The each single simulation will use all provided GPUs. 
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --gpu_ids 0 1 2 3
+```
+> [!WARNING]
+> If you want to split the simulations across multiple GPUs but still run the task on the same node use the --mdrun_per_node argument (see below).
+
+##### **Increase the number of thread-MPI ranks per GPU**  
+```-ntmpi_per_gpu_``` argument is used to calculate _total number of thread-MPI ranks_ (```gmx mdrun -ntmpi_ X```, where **X**=ntmpi_per_gpu*number of GPUs to use). By default, ```ntmpi_per_gpu``` equals 1, although usage of 2 thread-MPI ranks per GPU may return better performance.
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu -ntmpi_per_gpu 2
+```
+
+##### Multiple runs per node
+Sometimes for more full GPU usage user can start multiple simulations on a single/multiple nodes and the tool automatically splits the available CPU cores across these simulations:
+```
+run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2
+```
+##### Run multiple tasks on the same node while using multiple GPUs:
+> [!WARNING]
+> All simulations will still be utilizing all provided GPUs which can lead to suboptimal GPU load. This feature is still under development.
+```
+run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2 --gpu_ids 0 1
+```
+##### To run simulations only using CPUs on a server where GPUs are available:
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device cpu
+```
+##### Automatically offload calculations on CPU/GPU
+To let GROMACS automatically offload calculations on CPU/GPU may be optimal on hardware where the CPUs are relatively powerful compared to the GPUs.
+```
+run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
+```
+   
+[Return to the Table Of Contents](#table-of-contents)<br><br>  
+
+
+#### **Output**   
 *each run creates in the working directory (or in the current directory if wdir argument was not set up):*
  1) a unique streaMD log file which name contains name of the protein, ligand file, cofactor file and time of run.  
  log_*protein-fname*\_*ligand-fname*\_*cofactor-fname*\_*start-time*.log  
@@ -314,14 +419,14 @@ complex.gro           em.tpr       ions.mdp    md_out.cpt              md_out_no
 
 protein_H_HIS_ligand_2/
 ```
-- **MD output files**
+##### - **MD output files**
 ```
 md_fit.xtc - MD trajectory with removed PBC and fitted into Protein or Protein-Ligand group
 md_short_forcheck.xtc - short trajectory to check if simulation was valid
 frame.pdb - a frame for topology
 
 ```
-- **Analysis data**  
+##### - **Analysis output files**  
 ```
 potential.png 
 temperature.png
@@ -337,64 +442,18 @@ rmsf.png - root mean square fluctuation (RMSF, i.e. standard deviation) of atomi
 gyrate.png - radius of gyration
 ```
 
-### GPU usage
-When run with `--device gpu` argument the StreaMD offloads nb, update, pme, bonded, pmefft (all which can be run on GPU) computations to GPU.  
-More details on: https://manual.gromacs.org/documentation/current/user-guide/mdrun-performance.html
+[Return to the Table Of Contents](#table-of-contents)  
 
-The performance and gpu usage strongly depend on the type of hardware and size of the system.  
-It is always good to check the GPU usage (for example, by `nvidia-smi` command).
-
-**Run on 1 GPU:**
-```
-run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu
-```
-
-To improve the performance one can use multiple GPUs or start multiple ranks per GPU.
-
-**Run each simulation on multiple GPUs**  
-> [!WARNING]
-> Increasing the number of GPUs does not always improve performance.
-The each single simulation will use all provided GPUs. 
-```
-run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --gpu_ids 0 1 2 3
-```
-> [!WARNING]
-> If you want to split the simulations across multiple GPUs but still run the task on the same node use the --mdrun_per_node argument (see below).
-
-**Increase the number of thread-MPI ranks per GPU**  
-```-ntmpi_per_gpu_``` argument is used to calculate _total number of thread-MPI ranks_ (```gmx mdrun -ntmpi_ X```, where **X**=ntmpi_per_gpu*number of GPUs to use). By default, ```ntmpi_per_gpu``` equals 1, although usage of 2 thread-MPI ranks per GPU may return better performance.
-```
-run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu -ntmpi_per_gpu 2
-```
-
-**Sometimes for more full GPU usage user can start multiple runs on a single/multiple GPU(s) and the tool automatically splits the available CPU cores across these simulations:**
-```
-run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2
-```
-To split the simulations across multiple GPUs but still run the task on the same node:
-> [!WARNING]
-> Although all simulations will still be utilizing all provided GPUs which can lead to suboptimal GPU load. This feature is still under development.
-```
-run_md -p protein_HIS.pdb -l ligands.sdf --md_time 1 --device gpu --mdrun_per_node 2 --gpu_ids 0 1
-```
-**To run mdrun only on CPUs on server where GPUs are available:**
-```
-run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device cpu
-```
-**To let GROMACS automatically offload calculations on CPU/GPU may be optimal on hardware where the CPUs are relatively powerful compared to the GPUs.**
-```
-run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
-```
 
 ## Supplementary tools
 ### MM-PBSA/MM-GBSA energy calculation
-#### The tool is based on [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/)
-Calculation arguments can be changed/added by customized [mmpbsa.in](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/input_file/) file 
+*The tool is based on [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/) tool.*  
+Calculation parameters can be changed/added by customized [mmpbsa.in](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/input_file/) file 
 > [!NOTE] 
 > The user can control the length of the trajectory for analysis by editing 
 > the startframe, endframe, and interval arguments (in mmpbsa.in file), where every 100 frames equals 1 ns.
 
-#### **USAGE**
+#### **Usage**
 ```
 run_gbsa -h
 usage: run_gbsa [-h] [-i DIRNAME [DIRNAME ...]] [--topol topol.top] [--tpr md_out.tpr] [--xtc md_fit.xtc] [--index index.ndx] [-m mmpbsa.in] [-d WDIR]
@@ -430,11 +489,11 @@ options:
   
 ```
 
-### **Examples**
+#### **Examples**
 ```
 run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -m mmpbsa.in
 ```
-**Output**   
+#### **Output**   
 *each run creates in the working directory (or in the current directory if wdir argument was not set up):*
  1) a unique streaMD log file  
  log_mmpbsa_*start-time*.log 
@@ -447,8 +506,11 @@ run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/p
  
  each wdir_to_run has FINAL_RESULTS_MMPBSA_*start-time*.csv with GBSA/PBSA output. 
  
+[Return to the Table Of Contents](#table-of-contents)  
+
+
 ### ProLIF Protein-Ligand Interaction Fingerprints
-#### **USAGE**
+#### **Usage**
 ```
 run_prolif -h
 usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [-a STRING] [-d WDIR] [-v] [--hostfile FILENAME]
@@ -482,47 +544,15 @@ options:
 
 ```
 
-### **Examples**
+#### **Examples**
 ```
 run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -v -s 5
 ```
-**Output**  
+#### **Output**  
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html* file for each simulation will be created
 2) *prolif_output_start-time.csv/png* - aggregated csv/png output file for all analyzed simulations
 
-
-### Trajectory convergence analysis 
-To identify converged segments of molecular dynamics trajectories _run_analysis_ module calculates
-the average root-mean-square deviation (RMSD) of the ligand, protein, and active site residues within 5Å of the ligand, as well as the standard deviation of RMSD for the same trajectory segment.
-The average RMSD should provide an insight into the ligand movement or rotation relative to its initial pose, while the standard deviation reflects the stability of the ligand pose within the selected trajectory segment. 
-The conclusions can be valuable for subsequent MM-GBSA/PBSA calculations.
-#### **USAGE**
-````
-usage: run_analysis.py [-h] [-i FILENAME [FILENAME ...]] [--rmsd_type backbone [backbone ...]] [--time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]] [-d dirname]
-                       [--paint_by PAINT_BY] [-o OUT_SUFFIX] [--title RMSD Mean vs RMSD Std]
-
-Run rmsd analysis for StreaMD output files
-
-options:
-  -h, --help            show this help message and exit
-  -i FILENAME [FILENAME ...], --input FILENAME [FILENAME ...]
-                        input file(s) with rmsd. Supported formats: *.csv. Required columns: time(ns) ligand_name system. Sep: /\t.
-  --rmsd_type backbone [backbone ligand ActiveSite]
-                        Column names in the input file to use for the analysis 
-  --time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]
-                        Time ranges in nanoseconds. Default: Default: start-end, middle-end, end-1 (in nanoseconds)
-  -d dirname, --wdir dirname
-                        Output files directory
-  --paint_by csv file   File to paint by additional column. Required columns: system, ligand_name. Sep: /\t. The plot will be painted by any other than system and
-                        ligand_name column.
-  -o OUT_SUFFIX, --out_suffix OUT_SUFFIX
-                        Suffix for output files
-  --title RMSD Mean vs RMSD Std
-                        Title for html plot. Default: RMSD Mean vs RMSD Std
-````
-Such analysis will be performed as a part of the run_md default run or for the separate run the user can use either 
-the --wdir_to_continue _directory_path_ and --steps 4 arguments to perform full analysis of already obtained simulations or the run_analysis script itself (the rmsd file in csv format from run_md will be needed).
-### **Examples**
+#### **Examples**
 preferred way:
 ```
 run_md  --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --steps 4 -d md_files
@@ -533,7 +563,7 @@ run_analysis.py -i rmsd_all_systems.csv --rmsd_type "backbone" "ligand" "ActiveS
 
 ```
 
-#### Supplementary scripts
+#### Supplementary run_prolif scripts
 _run_prolif applies all this scripts automatically. Use it if you want more detailed analysis or to change the picture/fonts sizes._  
 **prolif_drawmap**  
 Draw prolif plot for analysis binding mode of multiple ligands
@@ -575,8 +605,50 @@ options:
   --base_size int  base size of the output picture
 ```
 
-### Logging
-all system info or errors are saved into logging files which would be placed into your main working directory (the current working directory or the path which was passed through --wdir argument):  
+[Return to the Table Of Contents](#table-of-contents)  
+
+
+### Trajectory convergence analysis 
+
+To identify converged segments of molecular dynamics trajectories _run_analysis_ module calculates
+the average root-mean-square deviation (RMSD) of the ligand, protein, and active site residues within 5Å of the ligand, as well as the standard deviation of RMSD for the same trajectory segment.
+The average RMSD should provide an insight into the ligand movement or rotation relative to its initial pose, while the standard deviation reflects the stability of the ligand pose within the selected trajectory segment. 
+The conclusions can be valuable for subsequent MM-GBSA/PBSA calculations.
+
+> [!NOTE]
+> Such analysis is automatically performed as a part of the run_md default run. 
+> For the separate analysis the user can use either run_module with the --wdir_to_continue _directory_path_ and --steps 4 arguments to perform full analysis of already obtained simulations or the run_analysis script itself (the rmsd file in csv format from run_md will be still needed).
+
+#### **USAGE**
+````
+usage: run_analysis.py [-h] [-i FILENAME [FILENAME ...]] [--rmsd_type backbone [backbone ...]] [--time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]] [-d dirname]
+                       [--paint_by PAINT_BY] [-o OUT_SUFFIX] [--title RMSD Mean vs RMSD Std]
+
+Run rmsd analysis for StreaMD output files
+
+options:
+  -h, --help            show this help message and exit
+  -i FILENAME [FILENAME ...], --input FILENAME [FILENAME ...]
+                        input file(s) with rmsd. Supported formats: *.csv. Required columns: time(ns) ligand_name system. Sep: /\t.
+  --rmsd_type backbone [backbone ligand ActiveSite]
+                        Column names in the input file to use for the analysis 
+  --time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]
+                        Time ranges in nanoseconds. Default: Default: start-end, middle-end, end-1 (in nanoseconds)
+  -d dirname, --wdir dirname
+                        Output files directory
+  --paint_by csv file   File to paint by additional column. Required columns: system, ligand_name. Sep: /\t. The plot will be painted by any other than system and
+                        ligand_name column.
+  -o OUT_SUFFIX, --out_suffix OUT_SUFFIX
+                        Suffix for output files
+  --title RMSD Mean vs RMSD Std
+                        Title for html plot. Default: RMSD Mean vs RMSD Std
+````
+
+[Return to the Table Of Contents](#table-of-contents)  
+
+
+## Logging  
+All system information or errors are saved into logging files which would be placed into your main working directory (the current working directory or the path which was passed through --wdir argument):  
 **run_md:**
 ```
 log_protein-fname_ligand-fname_cofactor-fname_current-date.log - StreaMD logging user info (status of the )
@@ -593,10 +665,16 @@ log_mmpbsa_bash_start-time.log - StreaMD bash system logging info
 ```
 log_prolif_start-time.log - StreaMD logging user info
 ```
-## Licence
+
+[Return to the Table Of Contents](#table-of-contents)   
+
+
+## License
 MIT
 ## Citation
 Ivanova A, Mokshyna O, Polishchuk P.  
 StreaMD: the toolkit for high-throughput molecular dynamics simulations.  
 *J. Cheminf.* **2024**, 16 (1), 123.  
 https://doi.org/10.1186/s13321-024-00918-w
+
+[Return to the Table Of Contents](#table-of-contents)  
