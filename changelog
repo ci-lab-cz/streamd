@@ -14,3 +14,7 @@ version 0.2.7
 - Save successfully finished names of the systems to the text output file
 - Calculate MMPBSA intermediate files in tmp directories for multiple run in one directory
 - Add unique suffix for run_md and run_gbsa output files for simultaneous runs in the same working directory
+
+version 0.2.8
+- Added n_jobs and protein_selection arguments to run_prolif
+- Added save_traj_without_water argument to run_md
