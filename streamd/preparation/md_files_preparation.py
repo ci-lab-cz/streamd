@@ -138,11 +138,11 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     return wdir_md_cur, md_files_dict
 
 
-def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_ns, bash_log, seed):
+def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_ns, bash_log, seed, env=None):
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
-        create_ndx(os.path.join(wdir_md_cur, 'index.ndx'))
+        create_ndx(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
 
-    index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
+    index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
     # make couple_index_group
     couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
     couple_group = '_'.join(['Protein'] + all_resids)
@@ -173,12 +173,12 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_
                  replace=f'nsteps                  = {steps}        ;')
 
     if couple_group not in index_list:
-        if not make_group_ndx(couple_group_ind, wdir_md_cur, bash_log=bash_log):
+        if not make_group_ndx(couple_group_ind, wdir_md_cur, bash_log=bash_log, env=env):
             return None
     if non_couple_group not in index_list:
-        index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'))
+        index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
         non_couple_group_ind = f'!{index_list.index(couple_group)}'
-        if not make_group_ndx(non_couple_group_ind, wdir_md_cur,  bash_log=bash_log):
+        if not make_group_ndx(non_couple_group_ind, wdir_md_cur,  bash_log=bash_log, env=env):
             return None
 
     return wdir_md_cur

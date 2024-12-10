@@ -269,14 +269,14 @@ def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
     parm.save(solv_ions_gro)
 
 def create_posre(all_resids, wdir, bash_log, env):
-    index_list = get_index(os.path.join(wdir, 'index.ndx'))
+    index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
     couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein-H'] + all_resids])
     couple_group = '_'.join(['Protein-H'] + all_resids)
 
     if couple_group not in index_list:
-        if not make_group_ndx(couple_group_ind, wdir, bash_log=bash_log):
+        if not make_group_ndx(couple_group_ind, wdir, bash_log=bash_log, env=env):
             return None
-        index_list = get_index(os.path.join(wdir, 'index.ndx'))
+        index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
 
     cmd = (f'cd {wdir}; gmx genrestr -f solv_ions.gro -o posre.itp -fc 1000 1000 1000 -n index.ndx <<< {index_list.index(couple_group)}')
 

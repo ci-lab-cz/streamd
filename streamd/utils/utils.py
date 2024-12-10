@@ -20,12 +20,12 @@ def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=F
     return value
 
 
-def get_index(index_file):
+def get_index(index_file, env=None):
     with open(index_file) as input:
         data = input.read()
 
     if not data:
-        create_ndx(index_file)
+        create_ndx(index_file, env=env)
         with open(index_file) as input:
             data = input.read()
 
@@ -33,7 +33,7 @@ def get_index(index_file):
     return groups
 
 
-def make_group_ndx(query, wdir, bash_log):
+def make_group_ndx(query, wdir, bash_log, env=None):
     cmd = f'''
         cd {wdir}
         gmx make_ndx -f solv_ions.gro -n index.ndx << INPUT  >> {os.path.join(wdir,bash_log)} 2>&1
@@ -41,12 +41,12 @@ def make_group_ndx(query, wdir, bash_log):
         q
         INPUT
         '''
-    if not run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir,bash_log)):
+    if not run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir,bash_log), env=env):
        return False
 
     return True
 
-def create_ndx(index_file):
+def create_ndx(index_file, env=None):
     wdir = os.path.dirname(index_file)
     cmd = f'''
         cd {wdir}
@@ -54,7 +54,7 @@ def create_ndx(index_file):
         q
         INPUT
         '''
-    run_check_subprocess(cmd, key=wdir, log=None)
+    run_check_subprocess(cmd, key=wdir, log=None, env=env)
 
 def get_mol_resid_pair(fname):
     with open(fname) as inp:

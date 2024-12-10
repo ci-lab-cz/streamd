@@ -17,12 +17,13 @@ import shutil
 import subprocess
 from datetime import datetime
 from functools import partial
-from multiprocessing import cpu_count, Pool
+from multiprocessing import Pool
 
 import pandas as pd
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import get_index, make_group_ndx, filepath_type, run_check_subprocess
+from streamd.utils.utils import (get_index, make_group_ndx, filepath_type, run_check_subprocess,
+                                 get_number_of_frames)
 
 
 def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection,
@@ -52,7 +53,7 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
         logging.warning(f'{wdir} cannot run gbsa. Check if there are missing files: {tpr} {xtc} {topol} {index}')
         return None
 
-    index_list = get_index(index)
+    index_list = get_index(index, env=env)
     if append_protein_selection is None:
         protein_index = index_list.index('Protein')
     else:
@@ -66,9 +67,9 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
             query = f"{index_list.index('Protein')}|{'|'.join(add_group_ids.keys())}"
             name_query = f"Protein_{'_'.join(add_group_ids.values())}"
             if name_query not in index_list:
-                if not make_group_ndx(query, wdir, bash_log=bash_log):
+                if not make_group_ndx(query, wdir, bash_log=bash_log, env=env):
                     return None
-                index_list = get_index(index)
+                index_list = get_index(index, env=env)
 
             protein_index = index_list.index(name_query)
             logging.info(f'{name_query} selection will be used as a protein system')
@@ -191,15 +192,6 @@ def parse_gmxMMPBSA_output(fname):
 
     return out_res
 
-
-def get_number_of_frames(xtc, env):
-    res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
-    frames = re.findall('Step[ ]*([0-9]*)[ ]*[0-9]*\n', res.stderr.decode("utf-8"))
-    if frames:
-        logging.info(f'{xtc} has {frames[0]} frames')
-        return int(frames[0])
-
-
 def run_get_frames_from_wdir(wdir, xtc, env):
     return get_number_of_frames(os.path.join(wdir, xtc), env=env)
 
@@ -278,7 +270,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                     cluster.close()
 
         elif tpr is not None and xtc is not None and topol is not None and index is not None:
-            number_of_frames = get_number_of_frames(xtc, env=None)
+            number_of_frames, _ = get_number_of_frames(xtc, env=os.environ.copy())
             used_number_of_frames = math.ceil((min(number_of_frames, endframe) - (startframe - 1)) / interval)
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
             if used_number_of_frames <= 0:
