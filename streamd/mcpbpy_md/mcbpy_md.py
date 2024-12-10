@@ -137,9 +137,9 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
 
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur,
                              all_resids=list(molids_pairs_dict.values())+list(set(metal_atomid_dict.values())),
-                             script_path=os.path.join(script_path, 'mdp'), nvt_time_ps=nvt_time_ps,
+                             nvt_time_ps=nvt_time_ps,
                              npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
-                             bash_log=bash_log, seed=seed):
+                             bash_log=bash_log, seed=seed, env=env):
         return None
     #add Position restraints
     # if not os.path.isfile(os.path.join(wdir_md_cur, 'posre.itp')):
