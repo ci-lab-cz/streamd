@@ -80,3 +80,32 @@ def get_protein_resid_set(protein_fname):
     protein = mda.Universe(protein_fname)
     protein_resid_set = set(protein.residues.resnames.tolist())
     return protein_resid_set
+
+def get_number_of_frames(xtc, env):
+    res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
+    res_parsed = re.findall('Step[ ]*([0-9]*)[ ]*([0-9]*)\n', res.stderr.decode("utf-8"))
+    if res_parsed:
+        frames, timestep = res_parsed[0]
+        # starts with 0
+        logging.info(f'{xtc} has {int(frames)} frames')
+        return int(frames), int(timestep)
+    else:
+        logging.warning(f'Failed to read number of frames of {xtc} trajectory')
+
+def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
+    current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
+    if current_number_of_frames and timestep:
+        time_ns = (current_number_of_frames*timestep-timestep)/1000
+        logging.info(f'The length of the found trajectory is {time_ns} ns. Should be continued until {new_mdtime_ps/1000} ns.')
+        if current_number_of_frames * timestep >= new_mdtime_ps:
+            logging.warning(f'The desired length of the found simulation trajectory {xtc} has been already reached. '
+                            f'Calculations will be interrupted.')
+            return False
+    return True
+
+def merge_parts_of_simulation(start_xtc, part_xtc, new_xtc, wdir, bash_log, env=None):
+    cmd =f'''
+cd {wdir}
+gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,bash_log)} 2>&1
+    '''
+    run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)

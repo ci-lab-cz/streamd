@@ -15,13 +15,16 @@ from datetime import datetime
 from functools import partial
 from glob import glob
 import json
+import re
 
 from streamd.analysis.md_system_analysis import run_md_analysis
 from streamd.analysis.run_analysis import run_rmsd_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import filepath_type, run_check_subprocess, get_protein_resid_set
+from streamd.utils.utils import (filepath_type, run_check_subprocess,
+                                 get_protein_resid_set, check_to_continue_simulation_time,
+                                 merge_parts_of_simulation)
 from streamd.mcpbpy_md import mcbpy_md
 
 
@@ -67,7 +70,8 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
 
 
 def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
-                         mdtime_ns, project_dir, bash_log, ncpu, compute_device, device_param, gpu_args, env=None):
+                         mdtime_ns, project_dir, bash_log, ncpu, compute_device,
+                         device_param, gpu_args, env=None):
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log, compute_device, env):
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
               f'deffnm_next={deffnm_next} ncpu={ncpu} compute_device={compute_device} device_param={device_param} gpu_args={gpu_args} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
@@ -76,10 +80,13 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
             return wdir
         return None
 
-    def backup_prev_files(file_to_backup, wdir):
+    def backup_prev_files(file_to_backup, wdir, copy=False):
         n = len(glob(os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.*#'))) + 1
         new_f = os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.{n}#')
-        shutil.move(file_to_backup, new_f)
+        if not copy:
+            shutil.move(file_to_backup, new_f)
+        else:
+            shutil.copy(file_to_backup, new_f)
         logging.warning(f'Backup previous file {file_to_backup} to {new_f}')
 
     if tpr is None:
@@ -92,20 +99,84 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
     for i in [tpr, cpt, xtc]:
         if not os.path.isfile(i):
             logging.exception(
-                f'No {i} file was found. Cannot continue the simulation. Calculations will be interrupted ',
+                f'No {i} file was found. Cannot continue the simulation. '
+                f'Calculations will be interrupted.',
                 stack_info=True)
             return None
 
     new_mdtime_ps = int(mdtime_ns * 1000)
 
+    # check calculated time
+    if not check_to_continue_simulation_time(xtc=xtc, new_mdtime_ps=new_mdtime_ps, env=env):
+        return wdir_to_continue
+
+    # check if can find unfinished or not merged continued trajectories {deffnm}_cont_
+    found_already_continued_parts_simulations = glob(os.path.join(wdir_to_continue, f'{deffnm}_cont_*.xtc'))
+    if found_already_continued_parts_simulations:
+        if len(found_already_continued_parts_simulations) > 1:
+            logging.warning(
+                f'Found more than 1 continued part of the simulations: {found_already_continued_parts_simulations}.'
+                f'They will be merged by the sorted order. Try to merge')
+            found_not_merged_continued_simulations = sorted(found_already_continued_parts_simulations)
+        else:
+            logging.warning(
+                f'Found a continued part of the simulation: {found_already_continued_parts_simulations[0]}.'
+                f' Try to merge')
+
+        for part_xtc in found_already_continued_parts_simulations:
+            # md_out_cont.part0002.xtc and md_out_cont.tpr
+            deffnm_part = os.path.basename(part_xtc).split('.part')[0]
+            logging.info(deffnm_part)
+            if re.findall('\.part[0-9]*\.xtc', part_xtc):
+                # not merged part
+                new_xtc = os.path.join(wdir_to_continue, f'{deffnm_part}.xtc')
+                merge_parts_of_simulation(start_xtc=xtc,
+                                           part_xtc=part_xtc,
+                                           new_xtc=new_xtc,
+                                           wdir=wdir_to_continue,
+                                           bash_log=bash_log,
+                                           env=env)
+                backup_prev_files(file_to_backup=part_xtc, wdir=wdir_to_continue)
+            # backup old part files - xtc, log, tpr, cpt, edr
+            for cont_sim_file in glob(os.path.join(wdir_to_continue, f'{deffnm_part}*')):
+                ext = os.path.splitext(cont_sim_file)[1]
+                # simulation start files
+                if ext == '.xtc':
+                    user_file_to_replace = xtc
+                elif ext == '.cpt':
+                    user_file_to_replace = cpt
+                elif ext == '.tpr':
+                    user_file_to_replace = tpr
+                else:
+                    user_file_to_replace = os.path.join(wdir_to_continue, f'{deffnm}{ext}')
+
+                if os.path.isfile(user_file_to_replace):
+                    backup_prev_files(file_to_backup=user_file_to_replace, wdir=wdir_to_continue)
+                    # replace start simulation file with new merged one
+                    backup_prev_files(file_to_backup=cont_sim_file, wdir=wdir_to_continue, copy=True)
+                    shutil.move(cont_sim_file, user_file_to_replace)
+
+        # check new merged trajectory time
+        logging.warning(f'{xtc} and {found_already_continued_parts_simulations} were merged successfully.')
+        if not check_to_continue_simulation_time(xtc=xtc, new_mdtime_ps=new_mdtime_ps, env=env):
+            return wdir_to_continue
+
     if continue_md(tpr=tpr, cpt=cpt, xtc=xtc, wdir=wdir_to_continue,
                    new_mdtime_ps=new_mdtime_ps, deffnm_next=deffnm_next, project_dir=project_dir,
                    compute_device=compute_device, env=env, bash_log=bash_log):
+        logging.warning('Simulation extension completed successfully')
+        # backup cont part files
+        for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}.part*.*')):
+            backup_prev_files(file_to_backup=f, wdir=wdir_to_continue)
+        #
         for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}.*')):
             # check previous existing files with the same name
-            backup_prev_files(file_to_backup=os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)),
+            if os.path.isfile(os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm))):
+                backup_prev_files(file_to_backup=os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)),
                               wdir=wdir_to_continue)
-            shutil.move(f, os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)))
+                backup_prev_files(file_to_backup=f, wdir=wdir_to_continue, copy=True)
+            # replace old file with continued one
+                shutil.move(f, os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)))
 
         return wdir_to_continue
 
@@ -364,7 +435,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          project_dir=project_dir, bash_log=bash_log,
                                          mdtime_ns=mdtime_ns,
                                          tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev,
-                                         deffnm=deffnm, deffnm_next=f'{deffnm}_{unique_id}',
+                                         deffnm=deffnm, deffnm_next=f'{deffnm}_cont_{unique_id}',
                                          ncpu=ncpu//mdrun_per_node, compute_device=compute_device,
                                          device_param=device_param, gpu_args=gpu_args,
                                          env=os.environ.copy()):
