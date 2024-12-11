@@ -38,8 +38,9 @@ def plot_rmsd_mean_std(data, paint_by_col, show_legend, out_name, title=None):
     #              xycoords=plt.gca().get_yaxis_transform(), ha="right")
     # g.tight_layout()
     # g.savefig(out+'.png', dpi=350)
-    hover_data = {'ligand_name': True, 'system': True,
-                  'time_range': False, 'rmsd_system': False}
+    hover_data = {'system': True, 'time_range': False, 'rmsd_system': False}
+    if 'ligand_name' in data:
+        hover_data['ligand_name'] = True
     fig = px.scatter(
         data,
         x='RMSD_mean',

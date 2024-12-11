@@ -20,17 +20,16 @@ def merge_rmsd_csv(csv_files, out):
     return merged_data
 
 
-def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone'):
+def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone', system_cols=['ligand_name','system']):
     res_list = []
     for start, end in time_ranges:
         key = f'{start}-{end}ns'
-        mean = rmsd_data.loc[(start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), ['ligand_name','system', rmsd_system]].groupby(
-            ['ligand_name','system']).mean().reset_index().rename({rmsd_system: f'RMSD_mean'}, axis='columns').round(2)
+        mean = rmsd_data.loc[(start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), system_cols+[rmsd_system]].groupby(
+            system_cols).mean().reset_index().rename({rmsd_system: f'RMSD_mean'}, axis='columns').round(2)
         std = rmsd_data.loc[
-            (start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), ['ligand_name', 'system', rmsd_system]].groupby(
-            ['ligand_name', 'system']).std().reset_index().rename({rmsd_system: f'RMSD_std'}, axis='columns').round(2)
-
-        res_tmp = pd.merge(mean, std, on=['ligand_name','system'])
+            (start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), system_cols+ [rmsd_system]].groupby(
+            system_cols).std().reset_index().rename({rmsd_system: f'RMSD_std'}, axis='columns').round(2)
+        res_tmp = pd.merge(mean, std, on=system_cols)
         res_tmp.loc[:, 'rmsd_system'] = rmsd_system
         res_tmp.loc[:, 'time_range'] = key
         res_list.append(res_tmp)
@@ -51,7 +50,8 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     else:
         rmsd_merged_data = pd.read_csv(rmsd_files[0], sep='\t')
 
-    rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=['system','ligand_name'])
+    system_cols = ['system'] if all(rmsd_merged_data['ligand_name'].isna()) else ['system', 'ligand_name']
+    rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=system_cols)
 
     if time_ranges is None:
         start = rmsd_merged_data['time(ns)'].min()
@@ -69,18 +69,24 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     for rmsd_system in rmsd_type_list:
         mean_std_data = calc_mean_std_by_ranges_time(rmsd_data=rmsd_merged_data,
                                                      time_ranges=time_ranges,
-                                                     rmsd_system=rmsd_system)
+                                                     rmsd_system=rmsd_system,
+                                                     system_cols=system_cols)
         mean_std_list.append(mean_std_data)
 
     df_mean_std = pd.concat(mean_std_list)
     df_mean_std.to_csv(os.path.join(wdir, f'rmsd_mean_std_time-ranges_{unique_id}.csv'), index=False, sep='\t')
     if paint_by_fname:
         paint_by_data = pd.read_csv(paint_by_fname, sep='\t')
-        paint_by_data = make_lower_case(paint_by_data, cols=['system', 'ligand_name'])
-        paint_by_col = [i for i in paint_by_data.columns if i not in ['system', 'ligand_name']][0]
-        df_mean_std = pd.merge(df_mean_std, paint_by_data.loc[:, ['ligand_name', 'system',
-                                                                     paint_by_col]], on=['ligand_name', 'system'])
-        show_legend = True
+        if not all([i in paint_by_data.columns for i in system_cols]):
+            logging.warning(f'Cannot paint by custom column in html rmsd analysis. Missing columns: {system_cols} in {paint_by_fname}')
+            paint_by_col = 'rmsd_system'
+            show_legend = False
+        else:
+            paint_by_data = make_lower_case(paint_by_data, cols=system_cols)
+            paint_by_col = [i for i in paint_by_data.columns if i not in system_cols][0]
+            df_mean_std = pd.merge(df_mean_std, paint_by_data.loc[:,
+                                                system_cols+[paint_by_col]], on=system_cols)
+            show_legend = True
     else:
         paint_by_col = 'rmsd_system'
         show_legend = False
@@ -109,7 +115,10 @@ def main():
                         help='Output files directory', default=None)
     parser.add_argument('--paint_by', default='',
                         help='File to paint by additional column. '
-                             'Required columns: system, ligand_name. Sep: /\t. '
+                             'Required columns: '
+                             '- Protein-ligand simulations: system, ligand_name.'
+                             '- Protein only in water simulations: system'
+                             ' Sep: /\t. '
                              'The plot will be painted by any other than system and ligand_name column.')
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Suffix for output files')

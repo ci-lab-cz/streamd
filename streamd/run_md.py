@@ -411,9 +411,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                 cluster.close()
 
         rmsd_files = [os.path.join(i, f'rmsd_{os.path.split(i)[-1]}.csv') for i in var_md_analysis_dirs]
+        rmsd_type_list = ['backbone', 'ligand', f'ActiveSite{active_site_dist}A'] if lfile else ['backbone']
         run_rmsd_analysis(rmsd_files=rmsd_files, wdir=wdir, unique_id=unique_id,
                           time_ranges=None,
-                          rmsd_type_list=['backbone', 'ligand', f'ActiveSite{active_site_dist}A'])
+                          rmsd_type_list=rmsd_type_list)
 
         finished_complexes_file = os.path.join(wdir, f"finished_complexes_{unique_id}.txt")
         with open(finished_complexes_file, 'w') as output:

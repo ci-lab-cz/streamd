@@ -71,7 +71,7 @@ def md_rmsd_analysis(tpr, xtc, wdir, system_name,
     plot_rmsd(rmsd_df=rmsd_df, system_name=system_name, out=os.path.join(wdir, f'rmsd_{system_name}.png'))
 
     rmsd_df.loc[:, 'ligand_name'] = ligand_name
-    rmsd_df.loc[:, 'system'] = system_name.replace(f'_{ligand_name}', '')
+    rmsd_df.loc[:, 'system'] = system_name.replace(f'_{ligand_name}', '') if ligand_name else system_name
 
     rmsd_df.to_csv(os.path.join(wdir, f'rmsd_{system_name}.csv'), sep='\t', index=False)
     return None
