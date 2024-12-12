@@ -523,12 +523,10 @@ in this scenario. The system residue names of both the ligand and cofactors can 
 To calculate the affinity between a protein-cofactor system and a ligand, use `--ligand_id 'UNL'` and `--append_protein_selection 'CFR'`. 
 By default, StreaMD uses 'UNL' as the ligand system residue name, but it is recommended to verify the exact residue name in the _all_ligand_resid.txt_ file.
 Additionally, specify `--append_protein_selection 'CFR'` to include cofactor into the protein system for the calculations (you can find the exact cofactor residue name also in the _all_ligand_resid.txt_ file).
-To calculate binding energy for the protein system and the cofactor, use `--ligand_id 'CFR'` instead.
-
 ```
 run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --append_protein_selection ZN GDP
 ```
-
+To calculate binding free energy for the protein system and the cofactor, use `--ligand_id 'CFR'` instead.
 ```
 run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --append_protein_selection ZN --ligand_id GDP
 ```
@@ -601,11 +599,10 @@ The system residue names of both the ligand and cofactors can be found in the _m
 To obtain interaction fingerprints between a protein-cofactor system and a ligand, use `--ligand_id 'UNL'` and `--append_protein_selection 'CFR'` arguments. 
 By default, StreaMD uses 'UNL' as the ligand system residue name, but it is recommended to verify the exact residue name in the _all_ligand_resid.txt_ file.
 Additionally, specify `--append_protein_selection 'CFR'` to include cofactor into the protein system for the calculations (you can find the exact cofactor residue name also in the _all_ligand_resid.txt_ file).
-To calculate interaction fingerprints between protein system and cofactor, use `--ligand_id 'CFR'` instead.
 ```
 run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 --append_protein_selection 'ZN'
 ```
-
+To calculate interaction fingerprints between protein system and cofactor, use `--ligand_id 'CFR'` instead.
 ```
 run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --ligand_id 'CFR'
 ```
