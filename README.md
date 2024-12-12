@@ -32,10 +32,14 @@
 - [MM-PBSA/MM-GBSA energy calculation](#mm-pbsamm-gbsa-energy-calculation)
   - [Usage](#usage-1) 
   - [Examples](#examples)
+    - [Protein-ligand system](#protein-ligand-system)
+    - [Protein-ligand-cofactors system](#protein-ligand-cofactors-system)
   - [Output](#output-1)
 - [ProLIF Protein-Ligand Interaction Fingerprints](#prolif-protein-ligand-interaction-fingerprints)
   - [Usage](#usage-2)
   - [Examples](#examples-1)
+    - [Protein-ligand system](#protein-ligand-system-1)
+    - [Protein-ligand-cofactors system](#protein-ligand-cofactors-system-1)
   - [Output](#output-2)
   - [Supplementary run_prolif analysis scripts](#supplementary-run_prolif-scripts)
 - [Trajectory convergence analysis](#trajectory-convergence-analysis)
@@ -506,9 +510,30 @@ options:
 ```
 
 #### **Examples**
+#### Protein-ligand system
 ```
 run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -m mmpbsa.in
 ```
+
+#### Protein-ligand-cofactors system
+
+In case, you have a cofactor-protein system, the ```--ligand_id``` and ```--append_protein_selection``` arguments can be used
+in this scenario. The system residue names of both the ligand and cofactors can be found in the _md_files/md_run/protein-ligand/all_ligand_resid.txt_ file. 
+
+To calculate the affinity between a protein-cofactor system and a ligand, use `--ligand_id 'UNL'` and `--append_protein_selection 'CFR'`. 
+By default, StreaMD uses 'UNL' as the ligand system residue name, but it is recommended to verify the exact residue name in the _all_ligand_resid.txt_ file.
+Additionally, specify `--append_protein_selection 'CFR'` to include cofactor into the protein system for the calculations (you can find the exact cofactor residue name also in the _all_ligand_resid.txt_ file).
+To calculate binding energy for the protein system and the cofactor, use `--ligand_id 'CFR'` instead.
+
+```
+run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --append_protein_selection ZN GDP
+```
+
+```
+run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --append_protein_selection ZN --ligand_id GDP
+```
+
+
 #### **Output**   
 *each run creates in the working directory (or in the current directory if wdir argument was not set up):*
 Unique suffix is used to separate outputs from different runs.
@@ -565,15 +590,25 @@ options:
 ```
 
 #### **Examples**
+##### Protein-ligand system
 ```
 run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -v -s 5
 ```
-In case, you have a cofactor-protein system, the --ligand_id and --append_protein_selection arguments can be used
-in this scenario. The system residue names of both the ligand and cofactors can be found in the md_files/md_run/protein-ligand/all_ligand_resid.txt file. 
-To calculate the affinity between a protein-cofactor system and a ligand, use --ligand_id 'UNL'. 
-By default, StreaMD uses 'UNL' as the ligand system residue name, but it is recommended to verify the exact residue name in the all_ligand_resid.txt file.
-Additionally, specify --append_protein_selection 'CFR' to include cofactor into the protein system for the calculations (you can find the exact cofactor residue name also in the all_ligand_resid.txt file).
-To calculate binding energy for the protein system and the cofactor, use --ligand_id 'CFR' instead.
+##### Protein-ligand-cofactors system
+In case, you have a cofactor-protein system, the ```--ligand_id``` and ```--append_protein_selection``` arguments can be used in this scenario. 
+The system residue names of both the ligand and cofactors can be found in the _md_files/md_run/protein-ligand/all_ligand_resid.txt_ file. 
+
+To obtain interaction fingerprints between a protein-cofactor system and a ligand, use `--ligand_id 'UNL'` and `--append_protein_selection 'CFR'` arguments. 
+By default, StreaMD uses 'UNL' as the ligand system residue name, but it is recommended to verify the exact residue name in the _all_ligand_resid.txt_ file.
+Additionally, specify `--append_protein_selection 'CFR'` to include cofactor into the protein system for the calculations (you can find the exact cofactor residue name also in the _all_ligand_resid.txt_ file).
+To calculate interaction fingerprints between protein system and cofactor, use `--ligand_id 'CFR'` instead.
+```
+run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 --append_protein_selection 'ZN'
+```
+
+```
+run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  --ligand_id 'CFR'
+```
 
 #### **Output**  
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html* file for each simulation will be created
