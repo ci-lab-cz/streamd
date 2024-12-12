@@ -568,6 +568,13 @@ options:
 ```
 run_prolif  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2  -c 128 -v -s 5
 ```
+In case, you have a cofactor-protein system, the --ligand_id and --append_protein_selection arguments can be used
+in this scenario. The system residue names of both the ligand and cofactors can be found in the md_files/md_run/protein-ligand/all_ligand_resid.txt file. 
+To calculate the affinity between a protein-cofactor system and a ligand, use --ligand_id 'UNL'. 
+By default, StreaMD uses 'UNL' as the ligand system residue name, but it is recommended to verify the exact residue name in the all_ligand_resid.txt file.
+Additionally, specify --append_protein_selection 'CFR' to include cofactor into the protein system for the calculations (you can find the exact cofactor residue name also in the all_ligand_resid.txt file).
+To calculate binding energy for the protein system and the cofactor, use --ligand_id 'CFR' instead.
+
 #### **Output**  
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html* file for each simulation will be created
 2) *prolif_output_*unique-suffix*.csv/png* - aggregated csv/png output file for all analyzed simulations. Unique suffix is used to separate outputs from different runs.
@@ -645,7 +652,7 @@ options:
                         Time ranges in nanoseconds. Default: Default: start-end, middle-end, end-1 (in nanoseconds)
   -d dirname, --wdir dirname
                         Output files directory
-  --paint_by csv file   File to paint by additional column. Required columns: system, ligand_name. Sep: /\t. The plot will be painted by any other than system and
+  --paint_by csv_file   File to paint by additional column. Required columns: - Protein-ligand simulations: system\tligand_name. - Protein only in water simulations: system. Sep: /\t. The plot will be painted by any other than system and
                         ligand_name column.
   -o OUT_SUFFIX, --out_suffix OUT_SUFFIX
                         Suffix for output files
