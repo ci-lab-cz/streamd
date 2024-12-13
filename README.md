@@ -614,7 +614,7 @@ The overall maximum number of cores available for usage. By default, StreaMD uti
 2) `--n_jobs`
 Number of processes to run per each interaction analysis tasks. Equivalent of n_jobs for parallel processing in ProLIF.
 By default, StreaMD distributes the specified number of cores (`--ncpu`) evenly
-between the available CPUs and the number of tasks to execute (e.g., multiple directories provided via --wdir_to_run).
+between the available CPUs and the number of tasks to execute (e.g., multiple directories provided via `--wdir_to_run`).
 However, by default, the `--n_jobs` value is limited to 12 to avoid the [bottleneck issue](https://github.com/chemosim-lab/ProLIF/issues/110) described by the ProLIF authors. 
 Users can override this limitation by explicitly specifying the --n_jobs argument value.
 

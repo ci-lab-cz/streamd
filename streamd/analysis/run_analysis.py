@@ -116,7 +116,7 @@ def main():
     parser.add_argument('--paint_by', default='',
                         help='File to paint by additional column. '
                              'Required columns: '
-                             '- Protein-ligand simulations: system, ligand_name.'
+                             '- Protein-ligand simulations: system\tligand_name.'
                              '- Protein only in water simulations: system'
                              ' Sep: /\t. '
                              'The plot will be painted by any other than system and ligand_name column.')
