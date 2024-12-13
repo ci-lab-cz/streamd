@@ -361,7 +361,7 @@ def main():
         unique_id = args.out_suffix
     else:
         import secrets
-        out_suffix = secrets.token_hex(8)
+        out_suffix = secrets.token_hex(3)
         unique_id = f'{out_time}_unique-id-{out_suffix}'
 
     log_file = os.path.join(wdir, f'log_mmpbsa_{unique_id}.log')
