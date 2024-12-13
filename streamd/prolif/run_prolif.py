@@ -6,7 +6,6 @@ import os
 import shutil
 from functools import partial
 from glob import glob
-from multiprocessing import cpu_count
 import logging
 import pathlib
 
@@ -135,7 +134,14 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     if wdir_to_run is not None:
         dask_client, cluster = None, None
         #n_jobs_per_task = n_jobs if n_jobs <= ncpu else ncpu
-        n_jobs_per_task = n_jobs
+        if n_jobs is None:
+            # limit to 12 https://github.com/chemosim-lab/ProLIF/issues/110
+            n_jobs_per_task = min(12, ncpu // len(wdir_to_run))
+        else:
+            n_jobs_per_task = n_jobs
+
+        logging.info(f'Allocating {n_jobs_per_task} n_jobs per each task.')
+
         try:
             dask_client, cluster = init_dask_cluster(hostfile=hostfile,
                                                      n_tasks_per_node=min(len(wdir_to_run), ncpu//n_jobs_per_task),
@@ -209,12 +215,14 @@ def main():
                              'will be the address of the scheduler running on the standard port 8786. If omitted, '
                              'calculations will run on a single machine as usual.')
     parser.add_argument('-c', '--ncpu', metavar='INTEGER', required=False, default=len(os.sched_getaffinity(0)), type=int,
-                        help='number of CPU per server. Use all available cpus by default.')
+                        help='number of CPU per server. By default, StreaMD utilizes all available cpus.')
     parser.add_argument('--n_jobs', metavar='INTEGER', required=False,
-                         default=1, type=int,
-                         help='Number of processes to run per each trajectory. '
-                              'Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--n_jobs arg).')
-
+                         default=None, type=int,
+                         help='Number of processes to run per each interaction analysis tasks. '
+                              'By default, StreaMD distributes the specified number of cores (--ncpu) evenly '
+                              'between the available CPUs and the number of tasks to execute (e.g., multiple directories provided via --wdir_to_run). '
+                              'However, by default, the --n_jobs value is limited to 12 to avoid the bottleneck issue (https://github.com/chemosim-lab/ProLIF/issues/110) described by the ProLIF authors .'
+                              'Users can override this limitation by explicitly specifying the --n_jobs argument value.')
     parser.add_argument('--width', metavar='FILENAME', default=15, type=int,
                         help='width of the output pictures')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
