@@ -51,6 +51,9 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
         rmsd_merged_data = pd.read_csv(rmsd_files[0], sep='\t')
 
     system_cols = ['system'] if all(rmsd_merged_data['ligand_name'].isna()) else ['system', 'ligand_name']
+    if 'directory' in rmsd_merged_data.columns and  len(rmsd_merged_data['directory'].unique()) > 1:
+        system_cols.append('directory')
+
     rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=system_cols)
 
     if time_ranges is None:

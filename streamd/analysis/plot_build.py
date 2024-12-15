@@ -41,6 +41,9 @@ def plot_rmsd_mean_std(data, paint_by_col, show_legend, out_name, title=None):
     hover_data = {'system': True, 'time_range': False, 'rmsd_system': False}
     if 'ligand_name' in data:
         hover_data['ligand_name'] = True
+    if 'directory' in data:
+        hover_data['directory'] = True
+
     fig = px.scatter(
         data,
         x='RMSD_mean',
