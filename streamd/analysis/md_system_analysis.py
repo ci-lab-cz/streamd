@@ -1,5 +1,6 @@
 from glob import glob
 import os
+import shutil
 import pandas as pd
 import numpy as np
 import MDAnalysis as mda
@@ -136,18 +137,24 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     # molid resid pairs for all ligands in the MD system
     # calc rmsd
     # universe = mda.Universe(tpr, os.path.join(wdir, f'md_fit.xtc'))
+    system_name = os.path.split(wdir)[-1]
     rmsd_out_file = md_rmsd_analysis(
         tpr=os.path.join(wdir, 'md_out_nowater.tpr'),
         xtc=os.path.join(wdir, f'md_fit_nowater.xtc'),
         # tpr=os.path.join(wdir, 'md_out.tpr'), xtc=os.path.join(wdir, f'md_fit.xtc'),
                      wdir_out_analysis=wdir_out_analysis,
-                     system_name=os.path.split(wdir)[-1],
+                     system_name=system_name,
                      ligand_resid=ligand_resid,
                      molid_resid_pairs=molid_resid_pairs,
                      active_site_dist=active_site_dist)
     if not save_traj_without_water:
         os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
         os.remove(os.path.join(wdir, f'md_fit_nowater.xtc'))
+
+    for analysis_file in glob(os.path.join(wdir_out_analysis, '*.xvg'))+glob(os.path.join(wdir_out_analysis, '*.pdb')):
+        ext = os.path.splitext(analysis_file)[1]
+        new_name = f"{os.path.splitext(analysis_file)[0]}_{system_name}{ext}"
+        shutil.move(analysis_file, new_name)
 
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, transform_nm_to_A=True)
