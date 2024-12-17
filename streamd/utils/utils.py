@@ -15,8 +15,8 @@ def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=F
             raise FileExistsError(f'{value} does not exist')
         if exist_type == 'dir' and not os.path.isdir(value):
             raise NotADirectoryError(f'{value} directory does not exist')
-    if ext and os.path.splitext(value)[1].lstrip('.') not in ext:
-        raise FileExistsError(f'File {value} has a wronh extension. Allowed are {", ".join(ext)}')
+    if ext and os.path.splitext(value)[1].replace('.', '') not in ext:
+        raise FileExistsError(f'File {value} has a wrong extension. Allowed are {", ".join(ext)}')
     return value
 
 
