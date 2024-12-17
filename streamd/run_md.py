@@ -230,6 +230,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     script_mdp_path = os.path.join(script_path, 'mdp')
 
     wdir_md = os.path.join(wdir, 'md_files', 'md_run')
+    analysis_dirname = 'md_analysis'
 
     dask_client, cluster = None, None
 
@@ -459,7 +460,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     # Part 3. MD Analysis. Run on each cpu
     if (steps is None or 4 in steps) and var_md_dirs_deffnm:
         logging.info('Start Analysis of the simulations')
-        var_md_analysis_dirs = []
+        var_md_analysis_res = []
         try:
             dask_client, cluster = init_dask_cluster(hostfile=hostfile,
                                                      n_tasks_per_node=min(ncpu, len(var_md_dirs_deffnm)),
@@ -470,9 +471,11 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                  bash_log=bash_log, ligand_resid=ligand_resid,
                                  ligand_list_file_prev=ligand_list_file_prev,
                                  save_traj_without_water=save_traj_without_water,
+                                 analysis_dirname=analysis_dirname,
                                  env=os.environ.copy()):
                 if res:
-                    var_md_analysis_dirs.append(res)
+                    # (rmsd_out_file, md_analysis_dir)
+                    var_md_analysis_res.append(res)
         finally:
             if dask_client:
                 dask_client.retire_workers(dask_client.scheduler_info()['workers'],
@@ -481,7 +484,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
             if cluster:
                 cluster.close()
 
-        rmsd_files = [os.path.join(i, f'rmsd_{os.path.split(i)[-1]}.csv') for i in var_md_analysis_dirs]
+        rmsd_files = [i[0] for i in var_md_analysis_res]
+        var_md_analysis_dirs = [i[1] for i in var_md_analysis_res]
+
         rmsd_type_list = ['backbone', 'ligand', f'ActiveSite{active_site_dist}A'] if lfile else ['backbone']
         run_rmsd_analysis(rmsd_files=rmsd_files, wdir=wdir, unique_id=unique_id,
                           time_ranges=None,
@@ -506,12 +511,11 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
         else:
             for wdir_md in wdir_to_continue_list:
                 for f in glob(os.path.join(wdir_md, '#*#')):
-                    # if '.tpr.' not in f and '.xtc.' not in f:
-                    #     os.remove(f)
                     os.remove(f)
-                for f in glob(os.path.join(wdir_md, '*', '*.trr')):
+                for f in glob(os.path.join(wdir_md, analysis_dirname, '#*#')):
                     os.remove(f)
-
+                #for f in glob(os.path.join(wdir_md, '*.trr')):
+                #    os.remove(f)
 
 def main():
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n

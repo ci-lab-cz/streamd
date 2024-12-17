@@ -1,5 +1,5 @@
 #!/bin/bash
-#  args: wdir index_protein_ligand dtstep
+#  args: wdir index_protein_ligand dtstep wdir_out_analysis
 cd $wdir
 
 echo 'Script running:***************************** Analysis of MD simulation *********************************'
@@ -15,8 +15,8 @@ gmx convert-tpr -s $tpr -o  md_out_nowater.tpr  <<< "non-Water"
 
 gmx trjconv -s $tpr -f md_fit.xtc -dt $dtstep -o md_short_forcheck.xtc <<< "System" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 
-gmx gyrate -s $tpr -f md_fit.xtc -n index.ndx -o gyrate.xvg <<< "Protein" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
-gmx rmsf -s $tpr -f md_fit.xtc -n index.ndx -o rmsf.xvg -oq rmsf.pdb -res <<< "Protein" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
+gmx gyrate -s $tpr -f md_fit.xtc -n index.ndx -o $wdir_out_analysis/gyrate.xvg <<< "Protein" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
+gmx rmsf -s $tpr -f md_fit.xtc -n index.ndx -o $wdir_out_analysis/rmsf.xvg -oq $wdir_out_analysis/rmsf.pdb -res <<< "Protein" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
 
 gmx trjconv -s $tpr -f md_fit.xtc -o frame.pdb -b 10 -e 11  -n index.ndx <<< "System" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
 

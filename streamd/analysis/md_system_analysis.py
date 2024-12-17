@@ -42,9 +42,11 @@ def rmsd_for_atomgroups(universe, selection1, selection2=None):
     return rmsd_df
 
 
-def md_rmsd_analysis(tpr, xtc, wdir, system_name,
-                     molid_resid_pairs, ligand_resid="UNL", active_site_dist=5.0):
+def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
+                     molid_resid_pairs,
+                     ligand_resid="UNL", active_site_dist=5.0):
     #groupselections = ['protein']
+    rmsd_out_file = os.path.join(wdir_out_analysis, f'rmsd_{system_name}.csv')
     universe = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
     groupselections = []
     molid_resid_pairs = dict(molid_resid_pairs)
@@ -68,21 +70,27 @@ def md_rmsd_analysis(tpr, xtc, wdir, system_name,
 
     rmsd_df = rmsd_df.rename({f"resname {i[1]} and not name H*": f"{i[0]}" for i in molid_resid_pairs.items()}, axis='columns')
 
-    plot_rmsd(rmsd_df=rmsd_df, system_name=system_name, out=os.path.join(wdir, f'rmsd_{system_name}.png'))
+    plot_rmsd(rmsd_df=rmsd_df, system_name=system_name, out=os.path.join(wdir_out_analysis, f'rmsd_{system_name}.png'))
 
     rmsd_df.loc[:, 'ligand_name'] = ligand_name
     rmsd_df.loc[:, 'system'] = system_name.replace(f'_{ligand_name}', '') if ligand_name else system_name
-    rmsd_df.loc[:, 'directory'] = wdir
+    rmsd_df.loc[:, 'directory'] = wdir_out_analysis
 
-    rmsd_df.to_csv(os.path.join(wdir, f'rmsd_{system_name}.csv'), sep='\t', index=False)
-    return None
+    rmsd_df.to_csv(rmsd_out_file, sep='\t', index=False)
+    return rmsd_out_file
 
 
 def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                     active_site_dist=5.0, ligand_resid='UNL',
                     save_traj_without_water = False,
+                    analysis_dirname = 'md_analysis',
                     ligand_list_file_prev=None, env=None):
     wdir, deffnm = var_md_dirs_deffnm
+
+    # create subdir for analysis files only
+    wdir_out_analysis = os.path.join(wdir, analysis_dirname)
+    os.makedirs(wdir_out_analysis, exist_ok=True)
+
     if ligand_list_file_prev is None:
         molid_resid_pairs_fname = os.path.join(wdir, 'all_ligand_resid.txt')
     else:
@@ -119,7 +127,7 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     tpr = os.path.join(wdir, f'{deffnm}.tpr')
     xtc = os.path.join(wdir, f'{deffnm}.xtc')
 
-    cmd = f'wdir={wdir} index_group={index_group} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} ' \
+    cmd = f'wdir={wdir} index_group={index_group} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} wdir_out_analysis={wdir_out_analysis} ' \
            f'bash {os.path.join(project_dir, "scripts/script_sh/md_analysis.sh")} >> {os.path.join(wdir, bash_log)} 2>&1'
 
     if not run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir, bash_log), env=env):
@@ -128,10 +136,12 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     # molid resid pairs for all ligands in the MD system
     # calc rmsd
     # universe = mda.Universe(tpr, os.path.join(wdir, f'md_fit.xtc'))
-    md_rmsd_analysis(
-        tpr=os.path.join(wdir, 'md_out_nowater.tpr'), xtc=os.path.join(wdir, f'md_fit_nowater.xtc'),
+    rmsd_out_file = md_rmsd_analysis(
+        tpr=os.path.join(wdir, 'md_out_nowater.tpr'),
+        xtc=os.path.join(wdir, f'md_fit_nowater.xtc'),
         # tpr=os.path.join(wdir, 'md_out.tpr'), xtc=os.path.join(wdir, f'md_fit.xtc'),
-                     wdir=wdir, system_name=os.path.split(wdir)[-1],
+                     wdir_out_analysis=wdir_out_analysis,
+                     system_name=os.path.split(wdir)[-1],
                      ligand_resid=ligand_resid,
                      molid_resid_pairs=molid_resid_pairs,
                      active_site_dist=active_site_dist)
@@ -139,6 +149,6 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
         os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
         os.remove(os.path.join(wdir, f'md_fit_nowater.xtc'))
 
-    for xvg_file in glob(os.path.join(wdir, '*.xvg')):
+    for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, transform_nm_to_A=True)
-    return wdir
+    return (rmsd_out_file, wdir_out_analysis)
