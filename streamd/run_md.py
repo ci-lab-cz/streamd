@@ -481,7 +481,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                  analysis_dirname=analysis_dirname,
                                  env=os.environ.copy()):
                 if res:
-                    # (rmsd_out_file, md_analysis_dir)
+                    # (rmsd_out_file, md_analysis_dir, md_cur_wdir)
                     var_md_analysis_res.append(res)
         finally:
             if dask_client:
@@ -492,7 +492,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                 cluster.close()
 
         rmsd_files = [i[0] for i in var_md_analysis_res]
-        var_md_analysis_dirs = [i[1] for i in var_md_analysis_res]
+        md_dirs_analyzed = [i[2] for i in var_md_analysis_res]
 
         rmsd_type_list = ['backbone', 'ligand', f'ActiveSite{active_site_dist}A'] if lfile else ['backbone']
         run_rmsd_analysis(rmsd_files=rmsd_files, wdir=wdir, unique_id=unique_id,
@@ -501,10 +501,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
         finished_complexes_file = os.path.join(wdir, f"finished_complexes_{unique_id}.txt")
         with open(finished_complexes_file, 'w') as output:
-            output.write("\n".join(var_md_analysis_dirs))
+            output.write("\n".join([i for i in md_dirs_analyzed]))
 
         logging.info(
-            f'Analysis of MD simulations of {len(var_md_analysis_dirs)} complexes were successfully finished'
+            f'Analysis of MD simulations of {len(md_dirs_analyzed)} complexes were successfully finished'
             f'\nSuccessfully finished complexes have been saved in {finished_complexes_file} file')
 
     if not not_clean_backup_files:
@@ -512,6 +512,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
                 # if '.tpr.' not in f and '.xtc.' not in f:
                 #     os.remove(f)
+                os.remove(f)
+            for f in glob(os.path.join(wdir_md, '*', analysis_dirname, '#*#')):
                 os.remove(f)
             for f in glob(os.path.join(wdir_md, '*', '*.trr')):
                 os.remove(f)
@@ -521,8 +523,6 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                     os.remove(f)
                 for f in glob(os.path.join(wdir_md, analysis_dirname, '#*#')):
                     os.remove(f)
-                #for f in glob(os.path.join(wdir_md, '*.trr')):
-                #    os.remove(f)
 
 def main():
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n

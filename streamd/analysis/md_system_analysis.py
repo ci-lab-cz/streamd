@@ -158,4 +158,4 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
 
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, transform_nm_to_A=True)
-    return (rmsd_out_file, wdir_out_analysis)
+    return rmsd_out_file, wdir_out_analysis, wdir
