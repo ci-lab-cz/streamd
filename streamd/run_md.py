@@ -32,12 +32,18 @@ class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argpar
     pass
 
 
-def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device, device_param, gpu_args, env=None):
+def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device,
+                      device_param, gpu_args, analysis_dirname='md_analysis', env=None):
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration step exist. '
                         f'Equilibration step will be skipped ')
         return wdir
-    cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} device_param={device_param} gpu_args={gpu_args} '
+
+    wdir_out_analysis = os.path.join(wdir, analysis_dirname)
+    os.makedirs(wdir_out_analysis, exist_ok=True)
+
+    cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} device_param={device_param} '
+           f'gpu_args={gpu_args} wdir_out_analysis={wdir_out_analysis} '
            f'bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")} '
            f'>> {os.path.join(wdir, bash_log)} 2>&1'),
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
@@ -423,6 +429,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          project_dir=project_dir, bash_log=bash_log,
                                          ncpu=ncpu//mdrun_per_node, compute_device=compute_device,
                                          device_param=device_param, gpu_args=gpu_args,
+                                         analysis_dirname=analysis_dirname,
                                          env=os.environ.copy()):
                         if res:
                             var_eq_dirs.append(res)
