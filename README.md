@@ -612,11 +612,11 @@ There are 2 arguments which users can control to achieve more effective parallel
 1) `--ncpu`
 The overall maximum number of cores available for usage. By default, StreaMD utilizes all available CPUs.
 2) `--n_jobs`
-Number of processes to run per each interaction analysis tasks. Equivalent of n_jobs for parallel processing in ProLIF.
+Number of processes to run per each interaction analysis tasks. Equivalent of _n_jobs_ for parallel processing in ProLIF.
 By default, StreaMD distributes the specified number of cores (`--ncpu`) evenly
 between the available CPUs and the number of tasks to execute (e.g., multiple directories provided via `--wdir_to_run`).
 However, by default, the `--n_jobs` value is limited to 12 to avoid the [bottleneck issue](https://github.com/chemosim-lab/ProLIF/issues/110) described by the ProLIF authors. 
-Users can override this limitation by explicitly specifying the --n_jobs argument value.
+Users can override this limitation by explicitly specifying the `--n_jobs` argument value.
 
 #### **Output**  
 1) in each directory where xtc file is located  *plifs.csv*, *plifs.png*,*plifs_map.png*, *plifs.html* file for each simulation will be created
