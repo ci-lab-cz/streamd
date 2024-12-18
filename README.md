@@ -384,6 +384,7 @@ md_files/
  -- cofactors/
 - md_run/
  -- protein-id_ligand-id
+ --- md_analysis
 ```
 
 ```
@@ -428,16 +429,25 @@ cofactor_2/
 ```
 
 ```
-md_files/md_run/
+md_files/md_run/protein_H_HIS_ligand_1/
+ligand_1.itp          em.trr       ions.tpr    md_out.edr         md_out.tpr             npt.cpt   npt.tpr  nvt.log    
+cofactor_1.itp        em.edr       frame.pdb   md_out.gro         md_out.xtc             npt.edr   npt.trr  nvt.mdp  topol.top
+all.itp               em.gro       md_fit.xtc  md_out.log         md_short_forcheck.xtc  npt.gro   nvt.cpt  nvt.tpr    
+all_ligand_resid.txt  em.log       index.ndx   md.mdp             mdout.mdp              minim.mdp npt.log  nvt.edr  solv.gro
+complex.gro           em.tpr       ions.mdp    md_out.cpt         newbox.gro             npt.mdp   nvt.gro  posre.itp solv_ions.gro
 
-protein_H_HIS_ligand_1/
-ligand_1.itp          density.xvg  em.trr      ions.tpr                md_out.edr         md_out.tpr             npt.cpt  npt.tpr  nvt.log    potential.xvg         rmsd.xvg       temperature.xvg
-cofactor_1.itp        em.edr       frame.pdb   md_centermolsnoPBC.xtc  md_out.gro         md_out.xtc             npt.edr  npt.trr  nvt.mdp    pressure.xvg          rmsf.pdb       topol.top
-all.itp               em.gro       gyrate.xvg  md_fit.xtc              md_out.log         md_short_forcheck.xtc  npt.gro  nvt.cpt  nvt.tpr    rmsd_cofactor_1.xvg   rmsf.xvg
-all_ligand_resid.txt  em.log       index.ndx   md.mdp                  mdout.mdp          minim.mdp              npt.log  nvt.edr  nvt.trr    rmsd_ligand_1.xvg     solv.gro
-complex.gro           em.tpr       ions.mdp    md_out.cpt              md_out_noj_noPBC.xtc  newbox.gro          npt.mdp  nvt.gro  posre.itp  rmsd_xtal.xvg         solv_ions.gro
+```
+##### - **Analysis output files**
+```
+md_files/md_run/protein_H_HIS_ligand_1/md_analysis
 
-protein_H_HIS_ligand_2/
+potential_protein_HIS_ligand_1.{csv, png, xtc} - potential energy of Energy Minimization step calculated by gmx energy 
+temperature_protein_HIS_ligand_1.{csv, png, xtc} - system temperature of NVT simulation calculated by gmx energy
+density_protein_HIS_ligand_1.{csv, png, xtc}  - total density of NPT simulations calculated by gmx energy
+pressure_protein_HIS_ligand_1.{csv, png, xtc} - system pressure of NPT simulations calculated by gmx energy
+rmsd_protein_HIS_ligand_1.{csv, png} - Root mean square deviation of atomic positions for backbone and ligand and Active Site (default 5A) if Protein-Ligand simulation was performed
+rmsf_protein_HIS_ligand_1.{csv, png, xtc, pdb} - root mean square fluctuation (RMSF, i.e. standard deviation) of atomic positions in the trajectory
+gyrate_protein_HIS_ligand_1.{csv, png, xtc} - radius of gyration
 ```
 ##### - **MD output files**
 ```
@@ -445,21 +455,6 @@ md_fit.xtc - MD trajectory with removed PBC and fitted into Protein or Protein-L
 md_short_forcheck.xtc - short trajectory to check if simulation was valid
 frame.pdb - a frame for topology
 
-```
-##### - **Analysis output files**  
-```
-potential.png 
-temperature.png
-pressure.png
-density.png
-rmsd.png - rmsd of the protein against minimized structure
-rmsd_xtal.png - rmsd of the protein against crystal structure
-rmsd_cofactor_1.png - rmsd of cofactor against minimized structure
-rmsd_cofactor_1_xtal.png - rmsd of the ligand against crystal structure
-rmsd_ligand_1.png - rmsd of the ligand against minimized structure
-rmsd_ligand_1_xtal.png - rmsd of the ligand against crystal structure
-rmsf.png - root mean square fluctuation (RMSF, i.e. standard deviation) of atomic positions in the trajectory
-gyrate.png - radius of gyration
 ```
 
 [Return to the Table Of Contents](#table-of-contents)  
