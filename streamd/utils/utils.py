@@ -1,6 +1,8 @@
+from glob import glob
 import logging
 import os
 import re
+import shutil
 import subprocess
 
 import MDAnalysis as mda
@@ -91,6 +93,17 @@ def get_number_of_frames(xtc, env):
         return int(frames), int(timestep)
     else:
         logging.warning(f'Failed to read number of frames of {xtc} trajectory')
+
+def backup_prev_files(file_to_backup, wdir=None, copy=False):
+    if wdir is None:
+        wdir = os.path.dirname(file_to_backup)
+    n = len(glob(os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.*#'))) + 1
+    new_f = os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.{n}#')
+    if not copy:
+        shutil.move(file_to_backup, new_f)
+    else:
+        shutil.copy(file_to_backup, new_f)
+    logging.warning(f'Backup previous file {file_to_backup} to {new_f}')
 
 def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
     current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)

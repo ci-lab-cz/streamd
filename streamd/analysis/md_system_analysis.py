@@ -7,7 +7,7 @@ import MDAnalysis as mda
 from MDAnalysis.analysis import rms
 from streamd.analysis.xvg2png import convertxvg2png
 from streamd.analysis.plot_build import plot_rmsd
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, backup_prev_files
 
 
 
@@ -128,7 +128,9 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     tpr = os.path.join(wdir, f'{deffnm}.tpr')
     xtc = os.path.join(wdir, f'{deffnm}.xtc')
 
-    cmd = f'wdir={wdir} index_group={index_group} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} wdir_out_analysis={wdir_out_analysis} ' \
+    system_name = os.path.split(wdir)[-1]
+
+    cmd = f'wdir={wdir} index_group={index_group} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} wdir_out_analysis={wdir_out_analysis} system_name={system_name} ' \
            f'bash {os.path.join(project_dir, "scripts/script_sh/md_analysis.sh")} >> {os.path.join(wdir, bash_log)} 2>&1'
 
     if not run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir, bash_log), env=env):
@@ -137,7 +139,7 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     # molid resid pairs for all ligands in the MD system
     # calc rmsd
     # universe = mda.Universe(tpr, os.path.join(wdir, f'md_fit.xtc'))
-    system_name = os.path.split(wdir)[-1]
+
     rmsd_out_file = md_rmsd_analysis(
         tpr=os.path.join(wdir, 'md_out_nowater.tpr'),
         xtc=os.path.join(wdir, f'md_fit_nowater.xtc'),
@@ -151,11 +153,6 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
         os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
         os.remove(os.path.join(wdir, f'md_fit_nowater.xtc'))
 
-    for analysis_file in glob(os.path.join(wdir_out_analysis, '*.xvg'))+glob(os.path.join(wdir_out_analysis, '*.pdb')):
-        ext = os.path.splitext(analysis_file)[1]
-        new_name = f"{os.path.splitext(analysis_file)[0]}_{system_name}{ext}"
-        shutil.move(analysis_file, new_name)
-
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
-        convertxvg2png(xvg_file, transform_nm_to_A=True)
+        convertxvg2png(xvg_file, system_name=system_name, transform_nm_to_A=True)
     return rmsd_out_file, wdir_out_analysis, wdir

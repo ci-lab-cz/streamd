@@ -1,23 +1,36 @@
 import argparse
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from streamd.utils.utils import backup_prev_files
 
-def convertxvg2png(xvg_file, transform_nm_to_A=False):
+
+def convertxvg2png(xvg_file, system_name=None, transform_nm_to_A=False):
     def check_if_value_found(value):
         if value:
             return value[0]
         else:
             return ''
 
+    csv_file = xvg_file.replace('.xvg', '.csv')
+    png_file = xvg_file.replace('.xvg', '.png')
+
+    if os.path.isfile(csv_file):
+        backup_prev_files(file_to_backup=csv_file)
+    if os.path.isfile(png_file):
+        backup_prev_files(file_to_backup=png_file)
 
     with open(xvg_file) as inp:
         data = inp.readlines()
 
     data_coord = [i for i in data if not (i.startswith('#') or i.startswith('@'))]
     title = check_if_value_found([i for i in data if ('@' in i and 'title' in i)]).replace('@    title ','').replace('"','')
-    subtitle = check_if_value_found([i for i in data if ('@' in i and 'subtitle' in i)]).replace('@ subtitle ','').replace('"','')
-    legend_list = [i.replace('@ s', '') for i in data if ('@ s' in i and 'legend' in i)]
+    if system_name is not None:
+        title = f'{title} {system_name} complex'
+    subtitle = (check_if_value_found([i for i in data if ('@' in i and 'subtitle' in i)]).
+                replace('@ subtitle ','').replace('"',''))
+    legend_list = [i.replace(r'\s','').replace(r'\N','').split('legend')[1] for i in data if ('@ s' in i and 'legend' in i)]
 
     xaxis = [i for i in data if (i.startswith('@') and 'xaxis' in i)]
     yaxis = [i for i in data if (i.startswith('@') and 'yaxis' in i)]
@@ -34,14 +47,14 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
     plt.title(title)
     plt.xlabel(xaxis)
     if transform_nm_to_A:
-        yaxis_A = yaxis.replace('nm', 'Angstrom')
+        yaxis_A = yaxis.replace('nm', 'Å')
         plt.ylabel(yaxis_A)
     else:
         plt.ylabel(yaxis)
 
     if coords and len(coords[0]) == 2:
         d = pd.DataFrame(coords, columns=[xaxis, yaxis])
-        d.to_csv(xvg_file.replace('.xvg', '.csv'), sep='\t', index=False)
+        d.to_csv(csv_file, sep='\t', index=False)
         if transform_nm_to_A and 'nm' in yaxis.lower():
             #logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
             plot1 = plt.plot(d[xaxis], d[yaxis].apply(lambda x: round(x*10,3)), marker='o', linewidth=2, markersize=5)
@@ -50,7 +63,7 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
 
     elif coords and len(coords[0]) > 2 and legend_list:
         d = pd.DataFrame(coords, columns=[xaxis]+legend_list)
-        d.to_csv(xvg_file.replace('.xvg','.csv'), sep='\t', index=False)
+        d.to_csv(csv_file, sep='\t', index=False)
         plt.legend(legend_list, loc='upper right', bbox_to_anchor=(0, 0), borderaxespad=-1)
         if transform_nm_to_A and 'nm' in yaxis.lower():
             #logging.warning(f'INFO: {xvg_file} nm ({yaxis}) values are converted in Angstrom ({yaxis_A})')
@@ -61,7 +74,7 @@ def convertxvg2png(xvg_file, transform_nm_to_A=False):
         plot1 = plot1[0]
         plt.legend(legend_list)
         plot1 = plot1.figure.suptitle(subtitle)
-        plot1.figure.savefig(xvg_file.replace('.xvg','.png'), bbox_inches="tight")
+        plot1.figure.savefig(png_file, bbox_inches="tight")
     plt.clf()
     plt.close('all')
 

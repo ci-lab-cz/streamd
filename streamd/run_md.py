@@ -23,7 +23,9 @@ from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import (filepath_type, run_check_subprocess,
-                                 get_protein_resid_set, check_to_continue_simulation_time,
+                                 get_protein_resid_set,
+                                 backup_prev_files,
+                                 check_to_continue_simulation_time,
                                  merge_parts_of_simulation)
 from streamd.mcpbpy_md import mcbpy_md
 
@@ -41,9 +43,10 @@ def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device,
 
     wdir_out_analysis = os.path.join(wdir, analysis_dirname)
     os.makedirs(wdir_out_analysis, exist_ok=True)
+    system_name = os.path.split(wdir)[-1]
 
     cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} device_param={device_param} '
-           f'gpu_args={gpu_args} wdir_out_analysis={wdir_out_analysis} '
+           f'gpu_args={gpu_args} wdir_out_analysis={wdir_out_analysis} system_name={system_name} '
            f'bash {os.path.join(project_dir, "scripts/script_sh/equlibration.sh")} '
            f'>> {os.path.join(wdir, bash_log)} 2>&1'),
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
@@ -85,15 +88,6 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
         if run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
             return wdir
         return None
-
-    def backup_prev_files(file_to_backup, wdir, copy=False):
-        n = len(glob(os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.*#'))) + 1
-        new_f = os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.{n}#')
-        if not copy:
-            shutil.move(file_to_backup, new_f)
-        else:
-            shutil.copy(file_to_backup, new_f)
-        logging.warning(f'Backup previous file {file_to_backup} to {new_f}')
 
     if tpr is None:
         tpr = os.path.join(wdir_to_continue, f'{deffnm}.tpr')
