@@ -241,7 +241,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 for res in pool.imap_unordered(partial(run_get_frames_from_wdir,
                                     xtc=xtc, env=os.environ.copy()), wdir_to_run):
                     if res:
-                        var_number_of_frames.append(res)
+                        var_number_of_frames.append(res[0])
 
             used_number_of_frames = math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
             n_tasks_per_node = ncpu // min(ncpu, used_number_of_frames)

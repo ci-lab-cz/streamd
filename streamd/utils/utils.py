@@ -93,6 +93,7 @@ def get_number_of_frames(xtc, env):
         return int(frames), int(timestep)
     else:
         logging.warning(f'Failed to read number of frames of {xtc} trajectory')
+        return None
 
 def backup_prev_files(file_to_backup, wdir=None, copy=False):
     if wdir is None:
