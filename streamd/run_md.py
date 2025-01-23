@@ -114,10 +114,12 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
     found_already_continued_parts_simulations = glob(os.path.join(wdir_to_continue, f'{deffnm}_cont_*.xtc'))
     if found_already_continued_parts_simulations:
         if len(found_already_continued_parts_simulations) > 1:
+            found_already_continued_parts_simulations = sorted(found_already_continued_parts_simulations,
+                                                key=lambda f: datetime.strptime(os.path.basename(f).replace(f'{deffnm}_cont_', '').split('.')[0], "%d-%m-%Y-%H-%M-%S"))
             logging.warning(
                 f'Found more than 1 continued part of the simulations: {found_already_continued_parts_simulations}.'
-                f'They will be merged by the sorted order. Try to merge')
-            found_not_merged_continued_simulations = sorted(found_already_continued_parts_simulations)
+                f'They will be merged by the date sorted order. Trying to merge')
+
         else:
             logging.warning(
                 f'Found a continued part of the simulation: {found_already_continued_parts_simulations[0]}.'
