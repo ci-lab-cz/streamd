@@ -1,0 +1,7 @@
+backbone	ActiveSite5.0A	ligand	time(ns)	ligand_name	system	directory
+0.0		0.0	0.0	1BJU_ligand	protein_HIS	protein_HIS_1BJU_ligand/md_analysis
+0.95		5.5	0.01	1BJU_ligand	protein_HIS	protein_HIS_1BJU_ligand/md_analysis
+1.04		5.75	0.02	1BJU_ligand	protein_HIS	protein_HIS_1BJU_ligand/md_analysis
+1.11		5.91	0.03	1BJU_ligand	protein_HIS	protein_HIS_1BJU_ligand/md_analysis
+1.08		7.02	0.04	1BJU_ligand	protein_HIS	protein_HIS_1BJU_ligand/md_analysis
+1.13		6.57	0.05	1BJU_ligand	protein_HIS	protein_HIS_1BJU_ligand/md_analysis

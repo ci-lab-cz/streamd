@@ -1,0 +1,7 @@
+backbone	ActiveSite5.0A	ligand	time(ns)	ligand_name	system	directory
+0.0		0.0	0.0	1C5Q_ligand	protein_HIS	protein_HIS_1C5Q_ligand/md_analysis
+0.77		5.14	0.01	1C5Q_ligand	protein_HIS	protein_HIS_1C5Q_ligand/md_analysis
+0.96		6.03	0.02	1C5Q_ligand	protein_HIS	protein_HIS_1C5Q_ligand/md_analysis
+1.1		7.06	0.03	1C5Q_ligand	protein_HIS	protein_HIS_1C5Q_ligand/md_analysis
+1.01		8.52	0.04	1C5Q_ligand	protein_HIS	protein_HIS_1C5Q_ligand/md_analysis
+1.02		10.16	0.05	1C5Q_ligand	protein_HIS	protein_HIS_1C5Q_ligand/md_analysis
