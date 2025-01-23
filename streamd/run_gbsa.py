@@ -25,6 +25,14 @@ from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import (get_index, make_group_ndx, filepath_type, run_check_subprocess,
                                  get_number_of_frames)
 
+logging.getLogger('distributed').setLevel('CRITICAL')
+logging.getLogger('asyncssh').setLevel('CRITICAL')
+logging.getLogger('distributed.worker').setLevel('CRITICAL')
+logging.getLogger('distributed.core').setLevel('CRITICAL')
+logging.getLogger('distributed.comm').setLevel('CRITICAL')
+logging.getLogger('distributed.nanny').setLevel('CRITICAL')
+logging.getLogger('bockeh').setLevel('CRITICAL')
+
 
 def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection,
                   unique_id, env, bash_log, clean_previous):
@@ -145,29 +153,29 @@ def parse_gmxMMPBSA_output(fname):
     with open(fname) as inp:
         data = inp.read()
     IE_GB = re.findall(
-        'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nGB[ ]*?IE[ ]*?([0-9-\. ]*)\n',
+        r'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nGB[ ]*?IE[ ]*?([0-9-\. ]*)\n',
         data)
     IE_PB = re.findall(
-        'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nPB[ ]*?IE[ ]*?([0-9-\. ]*)\n',
+        r'Energy Method[ ]*?Entropy[ ]*?(σ\(Int. Energy\)[ ]*?Average[ ]*?SD[ ]*?SEM)\n[-]*?\nPB[ ]*?IE[ ]*?([0-9-\. ]*)\n',
         data)
 
     delta_total_columns_GB = re.findall(
-    'GENERALIZED BORN:[A-Z0-9\w\W\n]+?Delta \(Complex - Receptor - Ligand\):\n([A-Za-z \(\).]+)\n',
+    r'GENERALIZED BORN:[A-Z0-9\w\W\n]+?Delta \(Complex - Receptor - Ligand\):\n([A-Za-z \(\).]+)\n',
     data)
     delta_total_columns_PB = re.findall(
-    'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Delta \(Complex - Receptor - Ligand\):\n([A-Za-z \(\).]+)\n',
+    r'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Delta \(Complex - Receptor - Ligand\):\n([A-Za-z \(\).]+)\n',
     data)
 
     # delta_total_GB = re.findall('GENERALIZED BORN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9]+)[ ]+([-.0-9]+)[ ]+([-.0-9]+)[ ]+([-.0-9]+)[ ]+', data)
-    delta_total_GB = re.findall('GENERALIZED BORN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9 ]+)\n', data)
-    delta_total_PB = re.findall('POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9 ]+)\n', data)
+    delta_total_GB = re.findall(r'GENERALIZED BORN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9 ]+)\n', data)
+    delta_total_PB = re.findall(r'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?ΔTOTAL[ ]+([-.0-9 ]+)\n', data)
 
     # G_binding_GB = re.findall('GENERALIZED BORN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9-.]+)[ +/\-]+?([0-9-.]+)\n', data)
     G_binding_GB = re.findall(
-        'GENERALIZED BORN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9+\-\./ ]+)\n',
+        r'GENERALIZED BORN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9+\-\./ ]+)\n',
         data)
     G_binding_PB = re.findall(
-        'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9+\-\./ ]+)\n',
+        r'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9+\-\./ ]+)\n',
         data)
 
     out_res = {'GBSA': {'Name': fname}, 'PBSA': {'Name': fname}}
@@ -219,10 +227,31 @@ def get_mmpbsa_start_end_interval(mmpbsa):
 
     return startframe, endframe, interval
 
+def get_used_number_of_frames(var_number_of_frames, startframe, endframe, interval):
+    return math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
 
 def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid,
           append_protein_selection, hostfile, unique_id, bash_log,
           gmxmmpbsa_out_files=None, clean_previous=False):
+    '''
+
+    :param wdir_to_run: list
+    :param tpr: path to file
+    :param xtc: path to file
+    :param topol: path to file
+    :param index: path to file
+    :param out_wdir: dir path
+    :param mmpbsa: path to file
+    :param ncpu: iny
+    :param ligand_resid: str
+    :param append_protein_selection: None or str
+    :param hostfile: None or path to file
+    :param unique_id: str (unique id for output files)
+    :param bash_log: file name
+    :param gmxmmpbsa_out_files: pathes to files
+    :param clean_previous: bool
+    :return:
+    '''
     dask_client, cluster, pool = None, None, None
     var_gbsa_out_files = []
     if gmxmmpbsa_out_files is None:
@@ -243,7 +272,15 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                     if res:
                         var_number_of_frames.append(res[0])
 
-            used_number_of_frames = math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
+            if not var_number_of_frames:
+                logging.error(f'Could not parse number of frames from all xtc files: {wdir_to_run}. '
+                              f'Calculations will be interrupted')
+                return None
+
+            used_number_of_frames = get_used_number_of_frames(var_number_of_frames=var_number_of_frames,
+                                                              startframe=startframe,
+                                                              endframe=endframe,
+                                                              interval=interval)
             n_tasks_per_node = ncpu // min(ncpu, used_number_of_frames)
             logging.info(f'{used_number_of_frames} frames will be used')
             logging.info(f'{min(ncpu, used_number_of_frames)} NP will be used')
@@ -276,10 +313,11 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             if used_number_of_frames <= 0:
                 logging.error('Used number of frames are less or equal than 0. Run will be interrupted')
                 raise ValueError
-            run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
+            res = run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
                           np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
                           unique_id=unique_id, env=os.environ.copy(),
                           bash_log=bash_log, clean_previous=clean_previous)
+            var_gbsa_out_files.append(res)
 
     else:
         var_gbsa_out_files = gmxmmpbsa_out_files
@@ -383,13 +421,6 @@ def main():
                         handlers=[logging.FileHandler(log_file),
                                   logging.StreamHandler()])
 
-    logging.getLogger('distributed').setLevel('CRITICAL')
-    logging.getLogger('asyncssh').setLevel('CRITICAL')
-    logging.getLogger('distributed.worker').setLevel('CRITICAL')
-    logging.getLogger('distributed.core').setLevel('CRITICAL')
-    logging.getLogger('distributed.comm').setLevel('CRITICAL')
-    logging.getLogger('distributed.nanny').setLevel('CRITICAL')
-    logging.getLogger('bockeh').setLevel('CRITICAL')
 
     logging.info(args)
     try:

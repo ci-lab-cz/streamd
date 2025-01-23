@@ -127,7 +127,7 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
             # md_out_cont.part0002.xtc and md_out_cont.tpr
             deffnm_part = os.path.basename(part_xtc).split('.part')[0]
             logging.info(deffnm_part)
-            if re.findall('\.part[0-9]*\.xtc', part_xtc):
+            if re.findall(f'\.part[0-9]*\.xtc', part_xtc):
                 # not merged part
                 new_xtc = os.path.join(wdir_to_continue, f'{deffnm_part}.xtc')
                 merge_parts_of_simulation(start_xtc=xtc,
@@ -221,7 +221,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param unique_id:
     :param bash_log:
     :param mdp_dir:
-    :param not_clean_backup_files:
+    :param not_clean_backup_files: bool
     :return:
     '''
 
