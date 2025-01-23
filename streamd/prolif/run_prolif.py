@@ -123,6 +123,28 @@ def collect_outputs(output_list, output):
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
           protein_selection, ligand_resid, hostfile, ncpu, n_jobs,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose):
+    '''
+
+    :param wdir_to_run: list
+    :param wdir_output: path to dirn
+    :param tpr: path to file
+    :param xtc: path to file
+    :param step: int
+    :param append_protein_selection: str
+    :param protein_selection: str
+    :param ligand_resid: str
+    :param hostfile: Nonen or path to file
+    :param ncpu: int
+    :param n_jobs: int
+    :param occupancy: float
+    :param plot_width: float
+    :param plot_height: float
+    :param save_viz: bool
+    :param unique_id: str
+    :param pdb: None or path to file (protein.pdb for renumbering)
+    :param verbose: bool
+    :return:
+    '''
     output = 'plifs.csv'
     output_aggregated = os.path.join(wdir_output, f'prolif_output_{unique_id}.csv')
 
@@ -164,7 +186,13 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                 cluster.close()
     else:
         output = os.path.join(os.path.dirname(xtc), output)
-        run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, pdb=pdb, n_jobs=ncpu, occupancy=occupancy)
+        backup_output(output)
+
+        run_prolif_task(tpr=tpr, xtc=xtc, protein_selection=protein_selection,
+                        ligand_selection=ligand_selection,
+                        step=step, verbose=verbose, output=output,
+                        plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
+                        pdb=pdb, n_jobs= min(12, ncpu), occupancy=occupancy)
         var_prolif_out_files = [output]
 
     backup_output(output_aggregated)
