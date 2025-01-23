@@ -67,8 +67,8 @@ def test_run_prolif_full_pipline(dir_with_streamd_output_for_prolif):
 
 
 
-@pytest.mark.filterwarnings('ignore::DeprecationWarning')
 @prolif_detailed_test
+@pytest.mark.filterwarnings('ignore::DeprecationWarning')
 def test_run_prolif_full_pipline_from_files(dir_with_streamd_output_for_prolif):
     wdir = dir_with_streamd_output_for_prolif
 
