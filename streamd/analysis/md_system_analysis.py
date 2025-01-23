@@ -85,7 +85,7 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                     active_site_dist=5.0, ligand_resid='UNL',
                     save_traj_without_water = False,
                     analysis_dirname = 'md_analysis',
-                    ligand_list_file_prev=None, env=None):
+                    ligand_list_file_prev=None, env=None, system_name=None):
     wdir, deffnm = var_md_dirs_deffnm
 
     # create subdir for analysis files only
@@ -128,7 +128,8 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     tpr = os.path.join(wdir, f'{deffnm}.tpr')
     xtc = os.path.join(wdir, f'{deffnm}.xtc')
 
-    system_name = os.path.split(wdir)[-1]
+    if not system_name:
+        system_name = os.path.split(wdir)[-1]
 
     cmd = f'wdir={wdir} index_group={index_group} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} wdir_out_analysis={wdir_out_analysis} system_name={system_name} ' \
            f'bash {os.path.join(project_dir, "scripts/script_sh/md_analysis.sh")} >> {os.path.join(wdir, bash_log)} 2>&1'

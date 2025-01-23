@@ -31,7 +31,7 @@ def get_index(index_file, env=None):
         with open(index_file) as input:
             data = input.read()
 
-    groups = [i.strip() for i in re.findall('\[(.*)\]', data)]
+    groups = [i.strip() for i in re.findall(r'\[(.*)\]', data)]
     return groups
 
 
@@ -67,7 +67,7 @@ def get_mol_resid_pair(fname):
             molid, resid = pair
             yield molid, resid
 
-def run_check_subprocess(cmd, key, log, env=None, ignore_error=False):
+def run_check_subprocess(cmd, key=None, log=None, env=None, ignore_error=False):
     try:
         subprocess.check_output(cmd, shell=True, env=env, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
@@ -92,7 +92,7 @@ def get_number_of_frames(xtc, env):
         logging.info(f'{xtc} has {int(frames)} frames')
         return int(frames), int(timestep)
     else:
-        logging.warning(f'Failed to read number of frames of {xtc} trajectory')
+        logging.warning(f'Failed to read number of frames of {xtc} trajectory. {res}')
         return None
 
 def backup_prev_files(file_to_backup, wdir=None, copy=False):
