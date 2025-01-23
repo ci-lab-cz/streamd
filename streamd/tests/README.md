@@ -42,7 +42,7 @@ pytest  Miniconda3/envs/md/lib/python3.10/site-packages/streamd/tests/ --run-pro
 ##### Test all
 All the provided arguments above can be used together to run all tests in 1 pytest run:
 ````
-pytest  Miniconda3/envs/md_test/lib/python3.10/site-packages/streamd/tests/  --run-preparation --run-analysis --run-gbsa-full --run-prolif-full --run-md
+pytest  Miniconda3/envs/md/lib/python3.10/site-packages/streamd/tests/  --run-preparation --run-analysis --run-gbsa-full --run-prolif-full --run-md
 ````
 
 
