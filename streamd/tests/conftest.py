@@ -1,3 +1,5 @@
+import logging
+# import subprocess
 from contextlib import contextmanager
 from glob import glob
 import os
@@ -9,6 +11,7 @@ import pytest
 
 import streamd
 
+logging.basicConfig(level=logging.ERROR)
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -78,7 +81,12 @@ def temporary_directory_debug(remove=True, suffix=None):
         yield path
     finally:
         if remove:
-            shutil.rmtree(path)
+            try:
+                shutil.rmtree(path)
+            except OSError as e:
+                logging.error(f'\nCould not remove the tmp directory: {path}. Error: {e}\n')
+                # subprocess.call(f'rm -r {path}', shell=True)
+                shutil.rmtree(path, ignore_errors=True)
 
 
 # @pytest.fixture(scope="session")
@@ -133,7 +141,7 @@ def dir_with_control_files_for_preparation() -> str:
 @pytest.fixture
 def dir_with_streamd_output_for_analysis() -> str:
     with temporary_directory_debug(remove=pytest.cleanup, suffix='_analysis') as dirname:
-        for file_name in ['md_out.xtc', 'md_out.tpr', 'index.ndx']:
+        for file_name in ['md_out.xtc', 'md_out.tpr', 'index.ndx', 'solv_ions.gro']:
             shutil.copyfile(os.path.join(pytest.data_directory, 'mdrun_test',
                                          'md_run', pytest.system_name, file_name),
                             os.path.join(dirname, file_name))
@@ -159,7 +167,7 @@ def tmp_experimental_file_for_html_paintby(dir_and_rmsd_files) -> (str, str):
     paint_file = os.path.join(pytest.data_directory, 'paint_by_file_exp.csv')
     tmp_paint_file = os.path.join(dirname, 'paint_by_file_exp.csv')
     shutil.copyfile(paint_file, tmp_paint_file)
-    yield tmp_paint_file
+    return tmp_paint_file
 
 
 @pytest.fixture
