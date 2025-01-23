@@ -51,8 +51,15 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
         rmsd_merged_data = pd.read_csv(rmsd_files[0], sep='\t')
 
     system_cols = ['system'] if all(rmsd_merged_data['ligand_name'].isna()) else ['system', 'ligand_name']
-    if 'directory' in rmsd_merged_data.columns and  len(rmsd_merged_data['directory'].unique()) > 1:
-        system_cols.append('directory')
+
+    #Use directory column as system column in case of replicate runs where ligand_name and system columns are the same,
+    # but working_directories are different
+    # important for paint_by file where all system columns should be presented and used
+    if 'directory' in rmsd_merged_data.columns:
+        max_num_unique_dirs = rmsd_merged_data.groupby(system_cols).apply(
+            lambda x: len(x['directory'].unique()), include_groups=False).reset_index(drop=True).max()
+        if max_num_unique_dirs > 1:
+            system_cols.append('directory')
 
     rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=system_cols)
 
@@ -79,17 +86,21 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     df_mean_std = pd.concat(mean_std_list)
     df_mean_std.to_csv(os.path.join(wdir, f'rmsd_mean_std_time-ranges_{unique_id}.csv'), index=False, sep='\t')
     if paint_by_fname:
-        paint_by_data = pd.read_csv(paint_by_fname, sep='\t')
-        if not all([i in paint_by_data.columns for i in system_cols]):
-            logging.warning(f'Cannot paint by custom column in html rmsd analysis. Missing columns: {system_cols} in {paint_by_fname}')
-            paint_by_col = 'rmsd_system'
-            show_legend = False
+        if os.path.isfile(paint_by_fname):
+            paint_by_data = pd.read_csv(paint_by_fname, sep='\t')
+            if not all([i in paint_by_data.columns for i in system_cols]):
+                logging.warning(f'Cannot paint by custom column in html rmsd analysis. Missing columns: {system_cols} in {paint_by_fname}')
+                paint_by_col = 'rmsd_system'
+                show_legend = False
+            else:
+                paint_by_data = make_lower_case(paint_by_data, cols=system_cols)
+                paint_by_col = [i for i in paint_by_data.columns if i not in system_cols][0]
+                df_mean_std = pd.merge(df_mean_std, paint_by_data.loc[:,
+                                                    system_cols+[paint_by_col]], on=system_cols)
+                show_legend = True
+
         else:
-            paint_by_data = make_lower_case(paint_by_data, cols=system_cols)
-            paint_by_col = [i for i in paint_by_data.columns if i not in system_cols][0]
-            df_mean_std = pd.merge(df_mean_std, paint_by_data.loc[:,
-                                                system_cols+[paint_by_col]], on=system_cols)
-            show_legend = True
+            raise FileNotFoundError(f'Cannot find file {paint_by_fname} for html painting')
     else:
         paint_by_col = 'rmsd_system'
         show_legend = False
