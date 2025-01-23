@@ -28,11 +28,11 @@ def reorder_hydrogens(mol):
     return mol
 
 def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
-    def generate_resid(protein_resid_list):
+    def generate_resid(protein_resid_set):
         ascii_uppercase_digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         for i in itertools.product(ascii_uppercase_digits, repeat=3):
             resid = ''.join(i)
-            if resid != 'UNL' and resid not in protein_resid_list:
+            if resid != 'UNL' and (protein_resid_set is None or resid not in protein_resid_set):
                 yield resid
 
     def add_ids(mol, n, input_fname, resid):
@@ -41,7 +41,7 @@ def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
             mol.SetProp('_Name', f'{input_fname}_{n}')
         return mol
 
-    resid_generator = generate_resid(protein_resid_list=protein_resid_set)
+    resid_generator = generate_resid(protein_resid_set=protein_resid_set)
 
     if fname.endswith('.sdf'):
         for n, mol in enumerate(Chem.SDMolSupplier(fname, removeHs=False), 1):
@@ -137,11 +137,11 @@ def prepare_tleap(tleap_template, tleap, molid, conda_env_path):
         output.write(new_data)
 
 
-def prepare_gaussian_files(file_template, file_out, ncpu, opt_restart=False, gaussian_basis='B3LYP/6-31G*',
+def prepare_gaussian_files(file_template, file_out, ncpu, opt_restart=False, gaussian_basis=r'B3LYP/6-31G*',
                            gaussian_memory='60GB'):
     with open(file_template) as inp:
         data = inp.read()
-    standard_basis = 'B3LYP/6-31G\*'
+    standard_basis = r'B3LYP/6-31G\*'
     new_data = re.sub('%NProcShared=[0-9]*', f'%NProcShared={ncpu}', data)
     new_data = re.sub('%Mem=[0-9a-zA-Z]*', f'%Mem={gaussian_memory}', new_data)
     if 'SCF=' not in new_data:
@@ -161,7 +161,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
                 mol2_file=None, env=None):
     mol, molid, resid = mol_tuple
 
-    wdir_ligand_cur = os.path.join(wdir_ligand, molid)
+    wdir_ligand_cur = os.path.abspath(os.path.join(wdir_ligand, molid))
     os.makedirs(wdir_ligand_cur, exist_ok=True)
 
     if os.path.isfile(os.path.join(wdir_ligand_cur, f'{molid}.itp')) and os.path.isfile(
@@ -200,7 +200,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
                     cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
                           f'resid={resid} molid={molid} charge={charge} gaussian_version={gaussian_exe} ' \
                           f'activate_gaussian="{activate_gaussian if activate_gaussian else ""}" ' \
-                          f'bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep_by_gaussian.sh")} ' \
+                          f'bash {os.path.join(script_path, "script_sh", "ligand_mol2prep_by_gaussian.sh")} ' \
                           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
                     if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
                         return None
@@ -208,7 +208,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
                     return None
             else:
                 cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
-                      f'resid={resid} molid={molid} charge={charge} dr=yes bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
+                      f'resid={resid} molid={molid} charge={charge} dr=yes bash {os.path.join(script_path, "script_sh", "ligand_mol2prep.sh")} ' \
                       f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
                 if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env,
                                             ignore_error=True if no_dr else False):
@@ -218,7 +218,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
                         logging.warning(f'Ambertools structure checking returned an error for the {mol_file} file.'
                                         f'Check the input structure carefully. Continue with -dr no mode.')
                         cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
-                          f'resid={resid} molid={molid} charge={charge} dr=no bash {os.path.join(project_dir, "scripts/script_sh/ligand_mol2prep.sh")} ' \
+                          f'resid={resid} molid={molid} charge={charge} dr=no bash {os.path.join(script_path, "script_sh","ligand_mol2prep.sh")} ' \
                           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
                         if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
                             return None
@@ -231,7 +231,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
     prepare_tleap(os.path.join(script_path, 'tleap.in'), tleap=os.path.join(wdir_ligand_cur, 'tleap.in'),
                   molid=molid, conda_env_path=conda_env_path)
     cmd = f'script_path={script_path} input_dirname={wdir_ligand_cur} ' \
-          f'molid={molid} bash {os.path.join(project_dir, "scripts/script_sh/ligand_prep.sh")} ' \
+          f'molid={molid} bash {os.path.join(script_path, "script_sh","ligand_prep.sh")} ' \
           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
     if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
         return None
