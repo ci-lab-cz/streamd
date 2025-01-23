@@ -7,9 +7,9 @@ pip install -U pytest
 
 #### Run tests:  
 Add the ``--not-cleanup`` argument to ensure that test directories and test files are not removed and can be used for debugging purposes.
-Add the ``-v`` or `-vs` arguments for verbose information.
+Add the ``-v`` or `-vs` arguments for printing verbose information.
 
-##### Test full _md_run_ pipline
+##### Test full _md_run_ pipeline
 ````
 pytest  Miniconda3/envs/md/lib/python3.10/site-packages/streamd/tests/ --run-md  
 ````
