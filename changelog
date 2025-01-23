@@ -25,3 +25,4 @@ version 0.2.9
 - Fixed bug with protein only in water simulations analysis
 - Add directory information into rmsd output files for replicate runs
 - Separate analysis output subdirectory
+- Tests added
