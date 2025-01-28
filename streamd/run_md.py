@@ -579,9 +579,9 @@ def main():
                               " although there may be problems with recognition of atom names by GROMACS.")
     parser1.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
                         help='Time of MD simulation in ns')
-    parser1.add_argument('--npt_time', metavar='ps', required=False, default=100, type=int,
+    parser1.add_argument('--npt_time', metavar='ps', required=False, default=1000, type=int,
                         help='Time of NPT equilibration in ps')
-    parser1.add_argument('--nvt_time', metavar='ps', required=False, default=100, type=int,
+    parser1.add_argument('--nvt_time', metavar='ps', required=False, default=1000, type=int,
                         help='Time of NVT equilibration in ps')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')

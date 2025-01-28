@@ -242,18 +242,18 @@ MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and B
 #### **Run simulation for different systems:**
 ##### Protein in Water
 ```
-run_md -p protein_H_HIS.pdb --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
+run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000 --ncpu 128 
 ```
 
 ##### Protein - Ligand
 ```
-run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --ncpu 128 
 ```
 
 ##### Protein - Cofactors
 All molecules should present in simulated system, so any problem with preparation of cofactors will interrupt the program. 
 ```
-run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 0.1 --nvt_time 100 --npt_time 100 --ncpu 128 
+run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 1 --ncpu 128 
 
 ```
 
@@ -263,14 +263,14 @@ Gaussian optimization and charge calculation will be run only for molecules with
 If Gaussian cannot be load boron-containing molecules will be skipped.  
 Any `--ligand` or `--cofactor` files can consist of boron-containing compounds
 ```
-run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 1 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128
 
 ```
 
 ##### **Simulations of Ligand Binding Metalloprotein with MCPB.py**  
 *Gaussian Software* should be available.
 ```
-run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 1 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
 
 ```
 [Return to the Table Of Contents](#table-of-contents)<br>  
@@ -278,11 +278,11 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 #### **Simulations using multiple servers**
 ```
 PBS:
-run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile $PBS_NODEFILE --ncpu 128
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 1 --hostfile $PBS_NODEFILE --ncpu 128
 
 SLURM:
 srun hostname | sort | uniq > hostfile  
-run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 0.1 --npt_time 10 --nvt_time 10 --hostfile hostfile --ncpu 128
+run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 1 --hostfile hostfile --ncpu 128
 
 ```
 [Return to the Table Of Contents](#table-of-contents)<br>  
@@ -297,15 +297,15 @@ You can continue the interrupted run by re-executing the previous command. The t
 #### **Extend the simulation**  
 you can continue your simulation unlimited times. As the `--md_time` argument user should set up the overall time of the simulation
 ```
-run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 0.2
+run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 2
 ```
 or use explicit `--tpr`, `--cpt` and `--xtc` arguments to continue a non-StreaMD simulation
 ```
-run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/  --md_time 0.3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc
+run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/  --md_time 3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc
 ```
 in case you don't want to check/run all preparation steps with using non-StreaMD simulations you can use `--steps` argument 
 ```
-run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 0.3 --steps 3 4
+run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 3 --steps 3 4
 ```
 
 [Return to the Table Of Contents](#table-of-contents)<br>  
