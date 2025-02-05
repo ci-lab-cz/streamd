@@ -117,8 +117,12 @@ Before run MD simulation it is important to prepare protein by yourself to make 
 * **Remove co-crystallizated ligands;**
 
 * **Add hydrogens based on protonation states.**
-  * Check states of histidines and put proper aliases HIE, HID or HIP instead of HIS (otherwise protonation can be distorted during MD preparation stage)  
+  * Check states of histidines and put proper aliases HIE, HID or HIP instead of HIS (otherwise protonation can be distorted during MD preparation stage)
 
+> [!Note]  
+> Can be done by _Chimera_ or _pdb4amber_
+
+By Chimera:
 *type into Chimera cmd:*
 ```
 setattr r type HID :HIS@HD1,DD1,TD1,HND
