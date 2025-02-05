@@ -102,7 +102,9 @@ Before run MD simulation it is important to prepare protein by yourself to make 
 > while converting the protein to a gro file (`gmx pdb2gmx -water tip3p -ignh`). Make sure to rename residues (CYS-CYX, HIS-HIE-HIP) by proper protonation states (_more details in Target Preparation section_).  
 > As an option, the user can use the `--noignh` argument when running StreaMD, although there may be problems with atom name recognition that users must resolve themselves or, as another option, provide to Streamd the already prepared protein.gro, topol.top and posre.itp files.   
 #### Example of preparation steps before MD: 
-#### 1) Target Preparation:  
+#### 1) Target Preparation:
+[In-house scripts and already prepared structures](https://github.com/ci-lab-cz/docking-files)
+
 *Manual preparation:*
 - **Fill missing residues and loops**  
 
