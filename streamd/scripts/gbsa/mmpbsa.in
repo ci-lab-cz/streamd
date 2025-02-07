@@ -5,7 +5,7 @@ Sample input file for PB/GB calculation
 &general
 sys_name="PB_GB_IE",
 startframe=1, interval=1, endframe=100, verbose=2, PBRadii=3,
-interaction_entropy=1, ie_segment=100, temperature=310
+interaction_entropy=1, ie_segment=100, temperature=300
 /
 &gb
 igb=5, saltcon=0.150, intdiel=4
