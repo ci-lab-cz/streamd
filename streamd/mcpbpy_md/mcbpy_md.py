@@ -142,12 +142,12 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
                              bash_log=bash_log, seed=seed, env=env):
         return None
     #add Position restraints
-    # if not os.path.isfile(os.path.join(wdir_md_cur, 'posre.itp')):
-    #     if not mcpbpy_preparation.create_posre(all_resids=list(molids_pairs_dict.values())+list(set(metal_atomid_dict.values())),
-    #                                     wdir=wdir_md_cur,
-    #                                     bash_log=bash_log_curr):
-    #         return None
-    # mcpbpy_preparation.add_restraints_to_topol(topol=os.path.join(wdir_md_cur, 'topol.top'))
+    if not os.path.isfile(os.path.join(wdir_md_cur, 'posre.itp')):
+        if not mcpbpy_preparation.create_posre(all_resids=list(molids_pairs_dict.values())+list(set(metal_atomid_dict.values())),
+                                        wdir=wdir_md_cur,
+                                        bash_log=bash_log_curr):
+            return None
+    mcpbpy_preparation.add_restraints_to_topol(topol=os.path.join(wdir_md_cur, 'topol.top'))
 
     return wdir_md_cur
 
