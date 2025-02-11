@@ -26,3 +26,8 @@ version 0.2.9
 - Add directory information into rmsd output files for replicate runs
 - Separate analysis output subdirectory
 - Tests added
+
+Will be added in version 0.3 (latest github version)
+- Set default temperature to 300K
+- Add Position Restraints for MCPB.py pipline
+- Logo
