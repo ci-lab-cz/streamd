@@ -1,3 +1,4 @@
+![StreaMD Logo](./streamd_logo.png)
 # StreaMD: a tool to perform high-throughput automated molecular dynamics simulations
 
 ## Table Of Contents
