@@ -78,7 +78,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
         # Net
         LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit'), threshold=occupancy).save(f'{output.rstrip(".csv")}_occupancy{occupancy}.html')
-        convertplifbyframe2png(plif_out_file=output, plot_width=plot_width, plot_height=plot_height)
+        convertplifbyframe2png(plif_out_file=output, plot_width=plot_width, plot_height=plot_height, point_size=5)
 
     return df
 
@@ -198,7 +198,9 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     backup_output(output_aggregated)
     collect_outputs(var_prolif_out_files, output=output_aggregated)
 
-    convertprolif2png(output_aggregated, occupancy=occupancy, plot_width=plot_width, plot_height=plot_height)
+    convertprolif2png(output_aggregated, occupancy=occupancy,
+                      plot_width=plot_width, plot_height=plot_height,
+                      base_size=12, point_size=3)
     finished_complexes_file = os.path.join(wdir_output, f"finished_prolif_files_{unique_id}.txt")
     with open(finished_complexes_file, 'w') as output:
         output.write("\n".join(var_prolif_out_files))

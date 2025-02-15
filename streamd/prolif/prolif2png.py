@@ -29,7 +29,18 @@ plt.ioff()
 #     # return f'{resid_chain} {contact}'
 #     return f'{split_row[0]}{chain} {split_row[-1]}'
 
-def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height=None, base_size=12):
+def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height=None,
+                      point_size=3, base_size=12):
+    '''
+
+    :param plif_out_file:
+    :param occupancy:
+    :param plot_width:
+    :param plot_height:
+    :param point_size:
+    :param base_size:
+    :return:
+    '''
 
     new_names = {"HBACCEPTOR": "A", "ANIONIC": "N", "HYDROPHOBIC": "H", 'METALACCEPTOR':'MeA',
                  "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONPI": "+pi", "CATIONIC": "P"}
@@ -55,7 +66,9 @@ def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height
     subdf = subdf.sort_values(by=['chain','resi', 'interaction']).reset_index(drop=True)
     subdf['variable'] = pd.Categorical(subdf.variable, categories=pd.unique(subdf.variable))
 
-    plot = (ggplot(subdf)+ geom_point(aes( x="variable", y="Name", color = "interaction"))
+    plot = (ggplot(subdf)+ geom_point(aes( x="variable", y="Name",
+                                           color = "interaction",
+                                          ), size=point_size)
         + theme_bw(base_size=base_size) + scale_color_manual(values = label_colors)+
             theme(axis_text_x=element_text(rotation=90, hjust=0.5),
                 axis_text_y=element_text(vjust=0.5),
@@ -89,13 +102,15 @@ def main():
                         help='height of the output picture')
     parser.add_argument('--base_size', metavar='int', default=12, type=int,
                         help='base size of the output picture')
+    parser.add_argument('--point_size', metavar='int', default=3, type=int,
+                        help='dot size of the output picture')
 
     args = parser.parse_args()
 
     for input_file in args.input:
         convertprolif2png(input_file, occupancy=args.occupancy,
                           plot_width=args.width, plot_height=args.height,
-                          base_size=args.base_size)
+                          point_size=args.point_size, base_size=args.base_size)
 
 
 if __name__ == '__main__':

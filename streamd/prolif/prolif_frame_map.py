@@ -7,7 +7,9 @@ from plotnine import (ggplot, geom_point, aes, theme, element_text, element_blan
                       theme_bw, scale_color_manual, element_rect, facet_wrap, labs, scale_x_continuous, element_line,facet_grid )
 plt.ioff()
 
-def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10, occupancy=0, filter_only_hydrophobic=False, base_size=12):
+def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10,
+                           occupancy=0, filter_only_hydrophobic=False,
+                           base_size=12, point_size=5):
 
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
                     "hydrophobic": "orange", "pication": "black", "cationpi": "darkblue",
@@ -36,9 +38,8 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10, occupan
 
     subdf_occupancy = subdf_occupancy.sort_values(by=['chain', 'resi', 'interaction']).reset_index(drop=True)
     subdf_occupancy['residue'] = pd.Categorical(subdf_occupancy.residue, categories=pd.unique(subdf_occupancy.residue))
-
     plot = (ggplot(subdf_occupancy, aes(y="interaction",x="Time, ns", color="interaction"))+ theme_bw(base_size)+
-            geom_point(alpha=0.9, shape='|', size=5) +
+            geom_point(alpha=0.9, shape='|', size=point_size) +
     theme(panel_background = element_rect(fill="white", color="white"),
           panel_grid = element_blank(),
           panel_grid_major = element_line(linetype = 'solid', colour = "white"),
@@ -85,10 +86,13 @@ def main():
                         help='height of the output picture')
     parser.add_argument('--base_size', metavar='int', default=12, type=int,
                         help='base size of the output picture')
+    parser.add_argument('--point_size', metavar='int', default=5, type=int,
+                        help='dot size of the output picture')
     args = parser.parse_args()
     for input_file in args.input:
         convertplifbyframe2png(input_file, plot_width=args.width, plot_height=args.height,
-                               occupancy=args.occupancy, filter_only_hydrophobic=args.filt_only_H, base_size=args.base_size)
+                               occupancy=args.occupancy, filter_only_hydrophobic=args.filt_only_H,
+                               point_size=args.point_size, base_size=args.base_size)
 
 
 if __name__ == '__main__':

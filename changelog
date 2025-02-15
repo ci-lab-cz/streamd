@@ -31,3 +31,4 @@ Will be added in version 0.3 (latest github version)
 - Set default temperature to 300K
 - Add Position Restraints for MCPB.py pipline
 - Logo
+- prolif draw_map point_size argument
