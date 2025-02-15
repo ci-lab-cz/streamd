@@ -29,6 +29,11 @@ from streamd.utils.utils import (filepath_type, run_check_subprocess,
                                  merge_parts_of_simulation)
 from streamd.mcpbpy_md import mcbpy_md
 
+logging.getLogger('distributed').setLevel('WARNING')
+logging.getLogger('asyncssh').setLevel('WARNING')
+logging.getLogger('MDAnalysis').setLevel('CRITICAL')
+logging.getLogger('bockeh').setLevel('WARNING')
+
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -699,12 +704,6 @@ def main():
                         level=logging.INFO,
                         handlers=[logging.FileHandler(log_file),
                                   logging.StreamHandler()])
-
-    logging.getLogger('distributed').setLevel('WARNING')
-    logging.getLogger('asyncssh').setLevel('WARNING')
-    logging.getLogger('MDAnalysis').setLevel('CRITICAL')
-    logging.getLogger('bockeh').setLevel('WARNING')
-
 
     logging.info(args)
 
