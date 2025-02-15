@@ -682,7 +682,7 @@ The conclusions can be valuable for subsequent MM-GBSA/PBSA calculations.
 
 #### **USAGE**
 ````
-usage: run_analysis.py [-h] [-i FILENAME [FILENAME ...]] [--rmsd_type backbone [backbone ...]] [--time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]] [-d dirname]
+usage: run_rmsd_analysis [-h] [-i FILENAME [FILENAME ...]] [--rmsd_type backbone [backbone ...]] [--time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]] [-d dirname]
                        [--paint_by PAINT_BY] [-o OUT_SUFFIX] [--title RMSD Mean vs RMSD Std]
 
 Run rmsd analysis for StreaMD output files
