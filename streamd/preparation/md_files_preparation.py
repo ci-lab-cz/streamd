@@ -1,8 +1,59 @@
+import logging
 import os
 import shutil
 from glob import glob
 
+
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, create_ndx
+
+def get_couple_groups(mdp_file):
+    with open(mdp_file) as inp:
+        data = inp.readlines()
+
+    tcl_group_string = None
+    for line in data:
+        if line.startswith('tc-grps'):
+            tcl_group_string = line.strip()
+            break
+
+    if tcl_group_string:
+        # tc-grps                 = Protein_UNL Water_and_ions; two coupling groups - more accurate' to catch Protein_UNL and Water_and_ions
+        groups = tcl_group_string.split('=')[-1].split(';')[0].split()
+        logging.warning(f'Create coupling groups: {groups} from user-defined mdp file {mdp_file}')
+
+        return groups
+
+
+def create_couple_group_in_index_file(couple_group, index_file, wdir, env, bash_log):
+    '''
+
+    :param couple_group: [Protein, Water, UNL]
+    :param index_file: will be modified. To add new group if not exists
+    :param env:
+    :param bash_log:
+    :return: None
+    '''
+    index_list = get_index(index_file, env=env)
+
+    if couple_group not in index_list:
+        couple_group_gmx =  couple_group.replace('_&_','&').replace('_','|')
+
+        # obtain indexes of all groups
+        couple_group_dict = {i: str(index_list.index(i)) for i in couple_group_gmx.replace('&','_').replace('|','_').replace('!','').split('_')}
+
+        # replace group names by indexes to avoid duplicated names
+        couple_group_ind = couple_group_gmx
+        for group, index in couple_group_dict.items():
+            couple_group_ind = couple_group_ind.replace(group, index)
+
+        logging.warning(f'Creating temperature coupling for {couple_group} group: {couple_group_ind}')
+        if not make_group_ndx(couple_group_ind, wdir, bash_log=bash_log, env=env):
+            logging.ERROR(f'Could not create a coupling group: {couple_group}. Calculations will be interrupted. '
+                          f'Check {os.path.join(wdir,bash_log)}')
+            return None
+
+    return couple_group
+
 
 
 def check_if_info_already_added_to_topol(topol, string):
@@ -138,47 +189,82 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     return wdir_md_cur, md_files_dict
 
 
-def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_ns, bash_log, seed, env=None):
+def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_ns, user_mdp_files, bash_log, seed, env=None):
+    '''
+
+    :param wdir_md_cur:
+    :param all_resids:
+    :param nvt_time_ps:
+    :param npt_time_ps:
+    :param mdtime_ns:
+    :param user_mdp_files:
+    :param bash_log:
+    :param seed:
+    :param env:
+    :return:
+    '''
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
         create_ndx(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
 
-    index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
-    # make couple_index_group
-    couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
-    couple_group = '_'.join(['Protein'] + all_resids)
 
-    non_couple_group = f'!{couple_group}'
+    # Check if default coupling groups will be used
+    default_couple_group, default_non_couple_group = None, None
+    if not all([i in user_mdp_files for i in ['nvt.mdp', 'npt.mdp', 'md.mdp']]):
+        default_couple_group = create_couple_group_in_index_file(couple_group='_'.join(['Protein'] + all_resids),
+                                      index_file=os.path.join(wdir_md_cur, 'index.ndx'),
+                                      wdir=wdir_md_cur, env=env, bash_log=bash_log)
+        if not default_couple_group:
+            return None
+
+        default_non_couple_group = f'!{default_couple_group}'
+        index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
+
+        if default_non_couple_group not in index_list:
+            non_couple_group_ind = f'!{index_list.index(default_couple_group)}'
+            if not make_group_ndx(non_couple_group_ind, wdir_md_cur, bash_log=bash_log, env=env):
+                return None
+
+        logging.warning(f"Default temperature coupling groups '{default_couple_group}' and '{default_non_couple_group}' "
+                        f" will be used for { {'nvt.mdp', 'npt.mdp', 'md.mdp'} - set(user_mdp_files)} mdp files")
+
+    # couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
+
 
     for mdp_fname in ['nvt.mdp', 'npt.mdp', 'md.mdp']:
         mdp_file = os.path.join(wdir_md_cur, mdp_fname)
 
-        edit_mdp(md_file=mdp_file,
-                 pattern='tc-grps',
-                 replace=f'tc-grps                 = {couple_group} {non_couple_group}; two coupling groups')
-        steps = 0
-        if mdp_fname == 'nvt.mdp':
-            steps = int(nvt_time_ps * 1000 / 2)
+        if mdp_fname in user_mdp_files:
+            # create user-defined coupling groups
+            user_coupling_groups = get_couple_groups(mdp_file)
+            if user_coupling_groups:
+                for user_group in user_coupling_groups:
+                    couple_group = create_couple_group_in_index_file(couple_group=user_group,
+                                                                     index_file=os.path.join(wdir_md_cur, 'index.ndx'),
+                                                                     wdir=wdir_md_cur, env=env, bash_log=bash_log)
+                    if user_group != couple_group:
+                        return None
+
+        else:
+            # use default parameters
             edit_mdp(md_file=mdp_file,
-                     pattern='gen_seed',
-                     replace=f'gen_seed                = {seed}        ;')
+                     pattern='tc-grps',
+                     replace=f'tc-grps                 = {default_couple_group} {default_non_couple_group}; two coupling groups')
+            steps = 0
+            if mdp_fname == 'nvt.mdp':
+                steps = int(nvt_time_ps * 1000 / 2)
+                edit_mdp(md_file=mdp_file,
+                         pattern='gen_seed',
+                         replace=f'gen_seed                = {seed}        ;')
 
-        if mdp_fname == 'npt.mdp':
-            steps = int(npt_time_ps * 1000 / 2)
-        if mdp_fname == 'md.mdp':
-            # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
-            steps = int(mdtime_ns * 1000 * 1000 / 2)
+            if mdp_fname == 'npt.mdp':
+                steps = int(npt_time_ps * 1000 / 2)
+            if mdp_fname == 'md.mdp':
+                # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
+                steps = int(mdtime_ns * 1000 * 1000 / 2)
 
-        edit_mdp(md_file=mdp_file,
-                 pattern='nsteps',
-                 replace=f'nsteps                  = {steps}        ;')
+            edit_mdp(md_file=mdp_file,
+                     pattern='nsteps',
+                     replace=f'nsteps                  = {steps}        ;')
 
-    if couple_group not in index_list:
-        if not make_group_ndx(couple_group_ind, wdir_md_cur, bash_log=bash_log, env=env):
-            return None
-    if non_couple_group not in index_list:
-        index_list = get_index(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
-        non_couple_group_ind = f'!{index_list.index(couple_group)}'
-        if not make_group_ndx(non_couple_group_ind, wdir_md_cur,  bash_log=bash_log, env=env):
-            return None
 
     return wdir_md_cur
