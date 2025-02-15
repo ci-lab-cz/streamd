@@ -46,7 +46,7 @@ def create_couple_group_in_index_file(couple_group, index_file, wdir, env, bash_
         for group, index in couple_group_dict.items():
             couple_group_ind = couple_group_ind.replace(group, index)
 
-        logging.warning(f'Creating temperature coupling for {couple_group} group: {couple_group_ind}')
+        logging.info(f'Creating temperature coupling for {couple_group} group: {couple_group_ind}')
         if not make_group_ndx(couple_group_ind, wdir, bash_log=bash_log, env=env):
             logging.ERROR(f'Could not create a coupling group: {couple_group}. Calculations will be interrupted. '
                           f'Check {os.path.join(wdir,bash_log)}')
@@ -189,7 +189,8 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
     return wdir_md_cur, md_files_dict
 
 
-def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_ns, user_mdp_files, bash_log, seed, env=None):
+def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps,
+                      mdtime_ns, user_mdp_files, bash_log, seed, explicit_time_args=(), env=None):
     '''
 
     :param wdir_md_cur:
@@ -200,6 +201,7 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_
     :param user_mdp_files:
     :param bash_log:
     :param seed:
+    :param explicit_time_args: list of mdp file names to change if time and mdp files were explicitly provided by user
     :param env:
     :return:
     '''
@@ -224,7 +226,7 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_
             if not make_group_ndx(non_couple_group_ind, wdir_md_cur, bash_log=bash_log, env=env):
                 return None
 
-        logging.warning(f"Default temperature coupling groups '{default_couple_group}' and '{default_non_couple_group}' "
+        logging.info(f"Default temperature coupling groups '{default_couple_group}' and '{default_non_couple_group}' "
                         f" will be used for { {'nvt.mdp', 'npt.mdp', 'md.mdp'} - set(user_mdp_files)} mdp files")
 
     # couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
@@ -249,6 +251,9 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_
             edit_mdp(md_file=mdp_file,
                      pattern='tc-grps',
                      replace=f'tc-grps                 = {default_couple_group} {default_non_couple_group}; two coupling groups')
+
+        # check if time were preset explicitly and need to be changed in user mdp files
+        if mdp_fname in explicit_time_args or mdp_fname not in user_mdp_files:
             steps = 0
             if mdp_fname == 'nvt.mdp':
                 steps = int(nvt_time_ps * 1000 / 2)
@@ -262,6 +267,7 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps, mdtime_
                 # picoseconds=mdtime*1000; femtoseconds=picoseconds*1000; steps=femtoseconds/2
                 steps = int(mdtime_ns * 1000 * 1000 / 2)
 
+            logging.info(f'Set {steps/1000/1000*2} ns = {steps/1000 *2} ps = {steps} steps in {mdp_fname}')
             edit_mdp(md_file=mdp_file,
                      pattern='nsteps',
                      replace=f'nsteps                  = {steps}        ;')

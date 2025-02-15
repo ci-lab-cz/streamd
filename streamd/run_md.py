@@ -11,6 +11,7 @@ import argparse
 import logging
 import os
 import shutil
+import sys
 from datetime import datetime
 from functools import partial
 from glob import glob
@@ -198,7 +199,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
           not_clean_backup_files, unique_id,
           active_site_dist=5.0, save_traj_without_water=False,
-          mdp_dir=None, bash_log=None):
+          explicit_time_args=(), mdp_dir=None, bash_log=None):
     '''
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
@@ -228,8 +229,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param unique_id:
     :param bash_log:
     :param mdp_dir:
+    :param explicit_time_args:
     :param not_clean_backup_files: bool
-    :return:
+    :return: None
     '''
 
     project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -399,7 +401,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          clean_previous=clean_previous, wdir_md=wdir_md,
                                          script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
                                          npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps,
-                                         mdp_dir=mdp_dir, bash_log=bash_log, seed=seed, env=os.environ.copy()):
+                                         mdp_dir=mdp_dir, explicit_time_args=explicit_time_args,
+                                         bash_log=bash_log, seed=seed, env=os.environ.copy()):
                         if res:
                             var_complex_prepared_dirs.append(res)
 
@@ -583,11 +586,11 @@ def main():
                               " If the --noignh argument is used, the original hydrogen atoms will be preserved during the preparation,"
                               " although there may be problems with recognition of atom names by GROMACS.")
     parser1.add_argument('--md_time', metavar='ns', required=False, default=1, type=float,
-                        help='Time of MD simulation in ns')
+                        help='Time of MD simulation in ns. Default: 1 ns.')
     parser1.add_argument('--npt_time', metavar='ps', required=False, default=1000, type=int,
-                        help='Time of NPT equilibration in ps')
+                        help='Time of NPT equilibration in ps. Default: 1000 ps.')
     parser1.add_argument('--nvt_time', metavar='ps', required=False, default=1000, type=int,
-                        help='Time of NVT equilibration in ps')
+                        help='Time of NVT equilibration in ps. Default: 1000 ps.')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
     parser1.add_argument('--no_dr', action='store_true', default=False,
@@ -688,6 +691,17 @@ def main():
                          f'If you set up --step {args.steps} you need to provide directories containing md files'
                          f' created by previous steps')
 
+    # check if user explicitly specified md, nvt or npt time and if so change user-defined mdp files
+    explicit_time_args = []
+    if '--nvt_time' in sys.argv:
+        explicit_time_args.append('nvt.mdp')
+    if '--npt_time' in sys.argv:
+        explicit_time_args.append('npt.mdp')
+    if '--md_time' in sys.argv:
+        explicit_time_args.append('md.mdp')
+
+    print(explicit_time_args)
+
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
 
     if args.out_suffix:
@@ -729,6 +743,8 @@ def main():
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
               mcpbpy_cut_off=args.metal_cutoff, unique_id=unique_id,
               save_traj_without_water=args.save_traj_without_water,
-              mdp_dir=args.mdp_dir, bash_log=bash_log)
+              mdp_dir=args.mdp_dir,
+              explicit_time_args=explicit_time_args,
+              bash_log=bash_log)
     finally:
         logging.shutdown()
