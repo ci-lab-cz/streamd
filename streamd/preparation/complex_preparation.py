@@ -73,9 +73,11 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
         logging.warning(f'{wdir_md_cur}. Prepared complex file exists. Skip complex preparation step')
 
 
+    user_mdp_files = []
     for mdp_fname in mdp_files_default:
         if mdp_dir and os.path.isfile(os.path.join(mdp_dir, mdp_fname)):
             mdp_file = os.path.join(mdp_dir, mdp_fname)
+            user_mdp_files.append(mdp_fname)
             logging.warning(f'Use user provided mdp file: {mdp_file}')
         else:
             mdp_file = os.path.join(script_path, mdp_fname)
@@ -98,6 +100,7 @@ def run_complex_preparation(wdir_var_ligand,  wdir_system_ligand_list,
     if not prepare_mdp_files(wdir_md_cur=wdir_md_cur, all_resids=md_files_dict['resid'],
                              nvt_time_ps=nvt_time_ps,
                              npt_time_ps=npt_time_ps, mdtime_ns=mdtime_ns,
+                             user_mdp_files=user_mdp_files,
                              bash_log=bash_log, seed=seed, env=env):
         return None
 
