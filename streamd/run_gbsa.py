@@ -11,6 +11,7 @@ import argparse
 import logging
 import math
 import os
+import pathlib
 import re
 import tempfile
 import shutil
@@ -177,8 +178,10 @@ def parse_gmxMMPBSA_output(fname):
     G_binding_PB = re.findall(
         r'POISSON BOLTZMANN:[A-Z0-9\w\W\n]+?Using Interaction Entropy Approximation:\nΔG binding[ =]+([0-9+\-\./ ]+)\n',
         data)
+    name = pathlib.PurePath(fname).parent.name
+    out_res = {'GBSA': {'Name': name, 'directory': os.path.dirname(fname)},
+               'PBSA': {'Name': name, 'directory': os.path.dirname(fname)}}
 
-    out_res = {'GBSA': {'Name': fname}, 'PBSA': {'Name': fname}}
     if G_binding_GB:
         out_res['GBSA'].update(get_Gbinding_values(G_binding_GB))
     if G_binding_PB:

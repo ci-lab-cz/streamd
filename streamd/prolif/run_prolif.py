@@ -109,14 +109,15 @@ def collect_outputs(output_list, output):
         df = pd.read_csv(i, sep='\t')
         # save dirname - protein_ligand pair
         df['Name'] = pathlib.PurePath(i).parent.name
+        df['directory'] = os.path.dirname(i)
         df_list.append(df)
 
     df_aggregated = pd.concat(df_list)
     df_aggregated = df_aggregated.fillna(False).sort_values('Frame')
-    amino_acids = df_aggregated.columns.drop(['Name', 'Frame']).to_list()
+    amino_acids = df_aggregated.columns.drop(['Name', 'directory', 'Frame']).to_list()
     # sort by number and type of interaction
     amino_acids.sort(key=lambda x: (int(x.split('.')[0][3:]), x.split('.')[1]))
-    sorted_columns = ['Name', 'Frame'] + amino_acids
+    sorted_columns = ['Name', 'directory', 'Frame'] + amino_acids
     df_aggregated.loc[:, sorted_columns].to_csv(output, sep='\t', index=False)
 
 

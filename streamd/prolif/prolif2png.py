@@ -49,9 +49,10 @@ def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height
                     "cationpi": "darkblue", "pistacking": 'darkslategray', 'metalacceptor': 'cyan'}
 
     df = pd.read_csv(plif_out_file, sep='\t')
-    df_occup = df.drop('Frame', axis=1).groupby('Name').apply(lambda x: round(x.sum() / len(x), 1))
+    id_columns = ['Name','directory'] if 'directory' in df.columns else ['Name']
+    df_occup = df.drop(['Frame'], axis=1).groupby(id_columns).apply(lambda x: round(x.sum() / len(x), 1))
 
-    subdf = pd.melt(df_occup.reset_index(), id_vars=['Name'])
+    subdf = pd.melt(df_occup.reset_index(), id_vars=id_columns)
     subdf = subdf[(subdf['value'] >= occupancy) & (subdf['value'] > 0)]
 
     subdf['resi'] = subdf['variable'].apply(lambda x: int(re.findall('[0-9]+', x)[0]))
