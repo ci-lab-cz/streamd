@@ -5,10 +5,10 @@
 - [Installation](#installation)
 - [Description](#description)
 - [Features](#features)
+- [Data Preparation](#data-preparation)
+  - [Target preparation](#1-target-preparation)
+  - [Docking](#2-docking-procedure)
 - [Molecular Dynamics](#run-molecular-dynamics-simulations)
-  - [Data Preparation](#data-preparation)
-    - [Target preparation](#1-target-preparation)
-    - [Docking](#2-docking-procedure)
   - [MD simulations run](#usage)
     - [Different systems](#run-simulation-for-different-systems)
       - [Protein in water](#protein-in-water)
@@ -204,7 +204,10 @@ Standard Molecular Dynamics Simulation Run:
                         To use specific MD settings, the user can provide a path to a directory that contains any of the following .mdp files: ions.mdp, minim.mdp,
                         nvt.mdp, npt.mdp, md.mdp. Missing .mdp files will be replaced by default StreaMD files. Provided .mdp files will be used as templates,
                         although the system StreaMD parameters (seed, nvt_time, npt_time, md_time, and tc-grps (can not be changed by user)) will override the ones
-                        provided. Warning: The names of the files must be strictly preserved.
+                        provided (in the latest github version (3.0) such behavior will be changed -
+                         all user mdp parameters will be preserved and used by default (incliding tcl-groups which will be created in index.ndx based on mdp files)
+                         and will be changed only if the --seed, --nvt_time. --npt_time, --md_time arguments are explicitly provided to StreaMD by user).
+                          Warning: The names of the files (nvt.mdp, npt.mdp, md.mdp) must be strictly preserved.
   --save_traj_without_water
                         Save additional md_out_nowater.tpr and md_fit_nowater.xtc files for more memory efficient analysis.
   --wdir_to_continue DIRNAME [DIRNAME ...]

@@ -199,8 +199,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
           not_clean_backup_files, unique_id,
           active_site_dist=5.0, save_traj_without_water=False,
-          explicit_time_args=(), mdp_dir=None, bash_log=None):
+          explicit_args=(), mdp_dir=None, bash_log=None):
     '''
+    Run StreaMD pipeline
+
     :param protein: protein file - pdb or gro format
     :param wdir: None or path
     :param lfile: None or file
@@ -229,7 +231,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param unique_id:
     :param bash_log:
     :param mdp_dir:
-    :param explicit_time_args:
+    :param explicit_args:
     :param not_clean_backup_files: bool
     :return: None
     '''
@@ -401,7 +403,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          clean_previous=clean_previous, wdir_md=wdir_md,
                                          script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
                                          npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps,
-                                         mdp_dir=mdp_dir, explicit_time_args=explicit_time_args,
+                                         mdp_dir=mdp_dir, explicit_args=explicit_args,
                                          bash_log=bash_log, seed=seed, env=os.environ.copy()):
                         if res:
                             var_complex_prepared_dirs.append(res)
@@ -692,15 +694,15 @@ def main():
                          f' created by previous steps')
 
     # check if user explicitly specified md, nvt or npt time and if so change user-defined mdp files
-    explicit_time_args = []
+    explicit_args = []
     if '--nvt_time' in sys.argv:
-        explicit_time_args.append('nvt.mdp')
+        explicit_args.append('nvt.mdp')
     if '--npt_time' in sys.argv:
-        explicit_time_args.append('npt.mdp')
+        explicit_args.append('npt.mdp')
     if '--md_time' in sys.argv:
-        explicit_time_args.append('md.mdp')
-
-    print(explicit_time_args)
+        explicit_args.append('md.mdp')
+    if '--seed' in sys.argv:
+        explicit_args.append('seed')
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
 
@@ -744,7 +746,7 @@ def main():
               mcpbpy_cut_off=args.metal_cutoff, unique_id=unique_id,
               save_traj_without_water=args.save_traj_without_water,
               mdp_dir=args.mdp_dir,
-              explicit_time_args=explicit_time_args,
+              explicit_args=explicit_args,
               bash_log=bash_log)
     finally:
         logging.shutdown()

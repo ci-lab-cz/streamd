@@ -190,7 +190,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
 
 def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps,
-                      mdtime_ns, user_mdp_files, bash_log, seed, explicit_time_args=(), env=None):
+                      mdtime_ns, user_mdp_files, bash_log, seed, explicit_args=(), env=None):
     '''
 
     :param wdir_md_cur:
@@ -201,7 +201,7 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps,
     :param user_mdp_files:
     :param bash_log:
     :param seed:
-    :param explicit_time_args: list of mdp file names to change if time and mdp files were explicitly provided by user
+    :param explicit_args: list of mdp file names to change if time and mdp files were explicitly provided by user
     :param env:
     :return:
     '''
@@ -252,15 +252,18 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps,
                      pattern='tc-grps',
                      replace=f'tc-grps                 = {default_couple_group} {default_non_couple_group}; two coupling groups')
 
+        # check if seed were preset explicitly and need to be changed in user mdp files
+        if mdp_fname == 'nvt.mdp' and ('seed' in explicit_args or mdp_fname not in user_mdp_files):
+            logging.info(f'Set seed: {seed} in nvt.mdp')
+            edit_mdp(md_file=mdp_file,
+                     pattern='gen_seed',
+                     replace=f'gen_seed                = {seed}        ;')
+
         # check if time were preset explicitly and need to be changed in user mdp files
-        if mdp_fname in explicit_time_args or mdp_fname not in user_mdp_files:
+        if mdp_fname in explicit_args or mdp_fname not in user_mdp_files:
             steps = 0
             if mdp_fname == 'nvt.mdp':
                 steps = int(nvt_time_ps * 1000 / 2)
-                edit_mdp(md_file=mdp_file,
-                         pattern='gen_seed',
-                         replace=f'gen_seed                = {seed}        ;')
-
             if mdp_fname == 'npt.mdp':
                 steps = int(npt_time_ps * 1000 / 2)
             if mdp_fname == 'md.mdp':

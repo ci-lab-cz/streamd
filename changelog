@@ -32,5 +32,5 @@ Will be added in version 0.3 (latest github version)
 - Add Position Restraints for MCPB.py pipline
 - Logo
 - Prolif draw_map point_size argument
-- Prolif add directories column
-- Change nvt/npt/md time in user-defined mdp files if time was explicitly set up in StreaMD arguments
+- Prolif and GBSA added directory column
+- Change nvt/npt/md time and seed in user-defined mdp files only if the --seed, --nvt_time, --npt_time and --md_time arguments were explicitly set up in the StreaMD arguments list otherwise user mdp parameters will be used
