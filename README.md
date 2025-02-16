@@ -8,7 +8,7 @@
 - [Data Preparation](#data-preparation)
   - [Target preparation](#1-target-preparation)
   - [Docking](#2-docking-procedure)
-- [Molecular Dynamics](#run-molecular-dynamics-simulations)
+- [Molecular Dynamics](#molecular-dynamics-simulation)
   - [MD simulations run](#usage)
     - [Different systems](#run-simulation-for-different-systems)
       - [Protein in water](#protein-in-water)
@@ -137,7 +137,7 @@ Required to obtain relevant poses of the ligand(s) if needed
 
 [Return to the Table Of Contents](#table-of-contents)
 
-### Run molecular dynamics simulations   
+## Molecular dynamics simulation 
 ``` source activate md ```  
 ### **Usage**
 ```
