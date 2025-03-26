@@ -27,7 +27,7 @@ version 0.2.9
 - Separate analysis output subdirectory
 - Tests added
 
-Will be added in version 0.3 (latest github version)
+version 0.3
 - Set default temperature to 300K
 - Add Position Restraints for MCPB.py pipline
 - Logo
