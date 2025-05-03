@@ -7,7 +7,7 @@ from plotnine import (ggplot, geom_point, aes, theme, element_text, element_blan
                       theme_bw, scale_color_manual, element_rect, facet_wrap, labs, scale_x_continuous, element_line,facet_grid )
 plt.ioff()
 
-def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10,
+def convertplifbyframe2png(plif_out_file, output=None, plot_width=15, plot_height=10,
                            occupancy=0, filter_only_hydrophobic=False,
                            base_size=12, point_size=5):
 
@@ -57,8 +57,12 @@ def convertplifbyframe2png(plif_out_file, plot_width=15, plot_height=10,
             facet_grid('residue', scales = 'free_y')+
         labs(y='', title='', x= '\nTime, ns')+ scale_color_manual(values = label_colors, na_value="white"))
 
-    output_name = os.path.join(os.path.dirname(plif_out_file),
+    if output is None:
+        output_name = os.path.join(os.path.dirname(plif_out_file),
                                f"{os.path.basename(plif_out_file).strip('.csv')}_framemap")
+    else:
+        output_name = os.path.splitext(output)[0]
+
     if occupancy > 0:
         output_name = f'{output_name}_occupancy{occupancy}'
     if filter_only_hydrophobic:
@@ -76,6 +80,8 @@ def main():
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='*',
                         help='input file with prolif output for the unique molecule. Supported formats: *.csv.'
                              ' Ex: plifs.csv')
+    parser.add_argument('-o', '--output', metavar='FILENAME', required=False, default=None,
+                        help='output  prefix name')
     parser.add_argument('--occupancy', metavar='float', default=0, type=float,
                         help='minimum occupancy of the unique contacts to show. Show all contacts by default')
     parser.add_argument('--filt_only_H', action='store_true', default=False,
@@ -90,7 +96,7 @@ def main():
                         help='dots size of the output picture')
     args = parser.parse_args()
     for input_file in args.input:
-        convertplifbyframe2png(input_file, plot_width=args.width, plot_height=args.height,
+        convertplifbyframe2png(input_file, output=args.output, plot_width=args.width, plot_height=args.height,
                                occupancy=args.occupancy, filter_only_hydrophobic=args.filt_only_H,
                                point_size=args.point_size, base_size=args.base_size)
 

@@ -29,7 +29,8 @@ plt.ioff()
 #     # return f'{resid_chain} {contact}'
 #     return f'{split_row[0]}{chain} {split_row[-1]}'
 
-def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height=None,
+def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
+                      plot_width=None, plot_height=None,
                       point_size=3, base_size=12):
     '''
 
@@ -83,8 +84,11 @@ def convertprolif2png(plif_out_file, occupancy=0.6, plot_width=None, plot_height
     )
             )
 
-    output_name = os.path.join(os.path.dirname(plif_out_file),
+    if output is None:
+        output_name = os.path.join(os.path.dirname(plif_out_file),
                                f"{os.path.basename(plif_out_file).rstrip('.csv')}_occupancy{occupancy}.png")
+    else:
+        output_name = os.path.splitext(output)[0]
 
     if plot_width and plot_height:
         plot.save(output_name, width=plot_width, height=plot_height, dpi=300, verbose=False)
@@ -95,6 +99,8 @@ def main():
     parser = argparse.ArgumentParser(description='''Draw prolif plot for analysis binding mode of multiple ligands''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='+',
                         help='input file with compound. Supported formats: *.csv')
+    parser.add_argument('-o', '--output', metavar='FILENAME', required=False, default=None,
+                        help='output prefix name')
     parser.add_argument('--occupancy', metavar='float', default=0.6, type=float,
                         help='minimum occupancy of the unique contacts to show')
     parser.add_argument('--width', metavar='int', default=15, type=int,
@@ -109,7 +115,7 @@ def main():
     args = parser.parse_args()
 
     for input_file in args.input:
-        convertprolif2png(input_file, occupancy=args.occupancy,
+        convertprolif2png(input_file, output=args.output, occupancy=args.occupancy,
                           plot_width=args.width, plot_height=args.height,
                           point_size=args.point_size, base_size=args.base_size)
 
