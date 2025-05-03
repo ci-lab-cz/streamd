@@ -104,7 +104,7 @@ def main():
     parser.add_argument('--base_size', metavar='int', default=12, type=int,
                         help='base size of the output picture')
     parser.add_argument('--point_size', metavar='int', default=3, type=int,
-                        help='dot size of the output picture')
+                        help='dots size of the output picture')
 
     args = parser.parse_args()
 
