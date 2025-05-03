@@ -1,9 +1,11 @@
+from contextlib import contextmanager
 from glob import glob
 import logging
 import os
 import re
 import shutil
 import subprocess
+from tempfile import mkdtemp
 
 import MDAnalysis as mda
 
@@ -90,7 +92,7 @@ def get_number_of_frames(xtc, env):
         frames, timestep = res_parsed[0]
         # starts with 0
         logging.info(f'{xtc} has {int(frames)} frames')
-        return int(frames), int(timestep)
+        return int(frames), int(timestep) if timestep else None
     else:
         logging.warning(f'Failed to read number of frames of {xtc} trajectory. {res}')
         return None
@@ -123,3 +125,21 @@ cd {wdir}
 gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,bash_log)} 2>&1
     '''
     run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)
+
+@contextmanager
+def temporary_directory_debug(remove=True, suffix=None, dir=None):
+    if dir is None:
+        dir = os.path.curdir
+    """Create a temporary directory. Remove it after the block."""
+    path = os.path.abspath(mkdtemp(dir=dir, suffix=suffix))
+    # os.makedirs(path, exist_ok=True)
+    try:
+        yield path
+    finally:
+        if remove:
+            try:
+                shutil.rmtree(path)
+            except OSError as e:
+                logging.error(f'\nCould not remove the tmp directory: {path}. Error: {e}\n')
+                # subprocess.call(f'rm -r {path}', shell=True)
+                shutil.rmtree(path, ignore_errors=True)

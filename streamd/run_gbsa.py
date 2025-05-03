@@ -24,8 +24,7 @@ import pandas as pd
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import (get_index, make_group_ndx, filepath_type, run_check_subprocess,
-                                 get_number_of_frames)
-
+                                 get_number_of_frames, temporary_directory_debug)
 logging.getLogger('distributed').setLevel('CRITICAL')
 logging.getLogger('asyncssh').setLevel('CRITICAL')
 logging.getLogger('distributed.worker').setLevel('CRITICAL')
@@ -36,12 +35,12 @@ logging.getLogger('bockeh').setLevel('CRITICAL')
 
 
 def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection,
-                  unique_id, env, bash_log, clean_previous):
+                  unique_id, env, bash_log, clean_previous, debug):
 
     def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index,
-                  ligand_index, unique_id, env, bash_log):
+                  ligand_index, unique_id, env, bash_log, debug):
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.dat")
-        with tempfile.TemporaryDirectory(dir=wdir) as tmpdirname:
+        with temporary_directory_debug(dir=wdir, remove=not debug, suffix=f'_gbsa_{unique_id}') as tmpdirname:
             logging.info(f'tmp intermediate dir: {tmpdirname}')
             cmd = f'cd {tmpdirname}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
                   f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
@@ -95,7 +94,8 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
                        ligand_index=ligand_index,
                        unique_id=unique_id,
                        env=env,
-                       bash_log=bash_log)
+                       bash_log=bash_log,
+                       debug=debug)
 
     if os.path.isfile(os.path.join(wdir, 'gmx_MMPBSA.log')):
         shutil.copy(os.path.join(wdir, 'gmx_MMPBSA.log'), os.path.join(wdir, f'gmx_MMPBSA_{unique_id}.log'))
@@ -104,7 +104,7 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
 
 
 def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid,
-                       append_protein_selection, unique_id, env, bash_log, clean_previous):
+                       append_protein_selection, unique_id, env, bash_log, clean_previous, debug):
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
@@ -113,7 +113,7 @@ def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid,
                          topol=topol, index=index, mmpbsa=mmpbsa,
                          np=np, ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
                          unique_id=unique_id,
-                         env=env, bash_log=bash_log, clean_previous=clean_previous)
+                         env=env, bash_log=bash_log, clean_previous=clean_previous, debug=debug)
 
 
 def clean_temporary_gmxMMBPSA_files(wdir, prefix="_GMXMMPBSA_"):
@@ -235,7 +235,7 @@ def get_used_number_of_frames(var_number_of_frames, startframe, endframe, interv
 
 def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid,
           append_protein_selection, hostfile, unique_id, bash_log,
-          gmxmmpbsa_out_files=None, clean_previous=False):
+          gmxmmpbsa_out_files=None, clean_previous=False, debug=False):
     '''
 
     :param wdir_to_run: list
@@ -298,7 +298,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                                      ligand_resid=ligand_resid,
                                      append_protein_selection=append_protein_selection,
                                      unique_id=unique_id, env=os.environ.copy(),
-                                     bash_log=bash_log, clean_previous=clean_previous):
+                                     bash_log=bash_log, clean_previous=clean_previous,
+                                     debug=debug):
                     if res:
                         var_gbsa_out_files.append(res)
             finally:
@@ -319,7 +320,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             res = run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
                           np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
                           unique_id=unique_id, env=os.environ.copy(),
-                          bash_log=bash_log, clean_previous=clean_previous)
+                          bash_log=bash_log, clean_previous=clean_previous, debug=debug)
             var_gbsa_out_files.append(res)
 
     else:
@@ -386,6 +387,8 @@ def main():
                              'Example: ZN MG')
     parser.add_argument('--clean_previous', action='store_true', default=False,
                         help=' Clean previous temporary gmxMMPBSA files')
+    parser.add_argument('--debug', action='store_true', default=False,
+                        help=' Save all temporary gmxMMPBSA files')
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
@@ -432,6 +435,7 @@ def main():
               mmpbsa=args.mmpbsa, ncpu=args.ncpu, unique_id=unique_id,
               gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id,
               append_protein_selection=args.append_protein_selection,
-              hostfile=args.hostfile, bash_log=bash_log, clean_previous=args.clean_previous)
+              hostfile=args.hostfile, bash_log=bash_log,
+              clean_previous=args.clean_previous, debug=args.debug)
     finally:
         logging.shutdown()

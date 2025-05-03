@@ -1,12 +1,13 @@
 import logging
 # import subprocess
-from contextlib import contextmanager
+
 from glob import glob
 import os
 import shutil
-from tempfile import mkdtemp #, TemporaryDirectory
+ #, TemporaryDirectory
 
 import pytest
+from streamd.utils.utils import temporary_directory_debug
 # from _pytest.mark import Mark
 
 import streamd
@@ -72,21 +73,7 @@ def pytest_addoption(parser):
 
 # For the debug purposes tests temporary directories can support optional removal (remove=True by default, use --not_clean otherwise)
 # The current version of Streamd is limited to python 3.10 and TemporaryDirectory(remove=False) supports optional remove only from python 3.12
-@contextmanager
-def temporary_directory_debug(remove=True, suffix=None):
-    """Create a temporary directory. Remove it after the block."""
-    path = os.path.abspath(mkdtemp(dir=os.path.curdir, suffix=suffix))
-    # os.makedirs(path, exist_ok=True)
-    try:
-        yield path
-    finally:
-        if remove:
-            try:
-                shutil.rmtree(path)
-            except OSError as e:
-                logging.error(f'\nCould not remove the tmp directory: {path}. Error: {e}\n')
-                # subprocess.call(f'rm -r {path}', shell=True)
-                shutil.rmtree(path, ignore_errors=True)
+
 
 
 # @pytest.fixture(scope="session")
