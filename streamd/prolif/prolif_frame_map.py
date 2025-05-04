@@ -84,8 +84,8 @@ def main():
                         help='output  prefix name')
     parser.add_argument('--occupancy', metavar='float', default=0, type=float,
                         help='minimum occupancy of the unique contacts to show. Show all contacts by default')
-    parser.add_argument('--filt_only_H', action='store_true', default=False,
-                        help='filt residues where only hydrophobic contacts occur')
+    parser.add_argument('--filter_only_H', action='store_true', default=False,
+                        help='filter residues where only hydrophobic contacts occur')
     parser.add_argument('--width', metavar='int', default=15, type=int,
                         help='width of the output picture')
     parser.add_argument('--height', metavar='int', default=10, type=int,
@@ -97,7 +97,7 @@ def main():
     args = parser.parse_args()
     for input_file in args.input:
         convertplifbyframe2png(input_file, output=args.output, plot_width=args.width, plot_height=args.height,
-                               occupancy=args.occupancy, filter_only_hydrophobic=args.filt_only_H,
+                               occupancy=args.occupancy, filter_only_hydrophobic=args.filter_only_H,
                                point_size=args.point_size, base_size=args.base_size)
 
 
