@@ -39,7 +39,7 @@ def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone',
 
 def make_lower_case(df, cols):
     for col in cols:
-        df[col] = df[col].str.lower()
+        df[col] = df[col].astype(str).str.lower()
     return df
 
 def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
