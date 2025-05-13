@@ -39,6 +39,10 @@ def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone',
 
 def make_lower_case(df, cols):
     for col in cols:
+        if df[col].isna().any():
+            logging.warning(f'The RMSD DataFrame column {col} contains the None value, '
+                            f'which could potentially cause an issue for MD system identification. '
+                            f'Check the RMSD Input/Output data for inconsistencies.')
         df[col] = df[col].astype(str).str.lower()
     return df
 
