@@ -1,10 +1,10 @@
-version 0.2.6
+**0.2.6**
 - Added GPU support
 - Use only available CPUs
 - Fixed logging
 - Added mdrun_per_node argument
 
-version 0.2.7
+**0.2.7**
 - Fixed an issue with ligand restraints during NPT and NVT
 - RMSD of ligand, backbone, Active Site groups are calculated by MDanalysis and saved in 1 common output file
 - Use xtc and tpr files containing no water for RMSD analysis (to prevent memory issues)
@@ -15,11 +15,11 @@ version 0.2.7
 - Calculate MMPBSA intermediate files in tmp directories for multiple run in one directory
 - Add unique suffix for run_md and run_gbsa output files for simultaneous runs in the same working directory
 
-version 0.2.8
+**0.2.8**
 - Added n_jobs and protein_selection arguments to run_prolif
 - Added save_traj_without_water argument to run_md
 
-version 0.2.9
+**0.2.9**
 - Prolif n_jobs automatic calculation
 - Fixed bug with interrupted continuation runs
 - Fixed bug with protein only in water simulations analysis
@@ -27,10 +27,13 @@ version 0.2.9
 - Separate analysis output subdirectory
 - Tests added
 
-version 0.3
+**0.3**
 - Set default temperature to 300K
 - Add Position Restraints for MCPB.py pipline
 - Logo
 - Prolif draw_map point_size argument
 - Prolif and GBSA added directory column
-- Change nvt/npt/md time and seed in user-defined mdp files only if the --seed, --nvt_time, --npt_time and --md_time arguments were explicitly set up in the StreaMD arguments list otherwise user mdp parameters will be used
+- Change nvt/npt/md time and seed in user-defined mdp files only if the `--seed`, `--nvt_time`, `--npt_time` and `--md_time` arguments were explicitly set up in the StreaMD arguments list otherwise user mdp parameters will be used
+
+**future version 0.3.1 (the latest version from github)**
+- allow to keep all gmx_MMPBSA temporary files for debugging or for `gmx_MMPBSA_ana` usage (`--debug argument`)
