@@ -1,3 +1,4 @@
+import logging
 from glob import glob
 import os
 import shutil
@@ -113,12 +114,23 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     # choose group to fit the trajectory
     if os.path.isfile(molid_resid_pairs_fname) and os.path.getsize(molid_resid_pairs_fname) > 0:
         molid_resid_pairs = list(get_mol_resid_pair(molid_resid_pairs_fname))
-        if f'Protein_{ligand_resid}' not in index_list:
-            if not make_group_ndx(query=f'"Protein"|{index_list.index(ligand_resid)}', wdir=wdir,  bash_log=bash_log, env=env):
-                return None
-            index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
+        if ligand_resid in index_list:
+            if f'Protein_{ligand_resid}' not in index_list:
+                if not make_group_ndx(query=f'"Protein"|{index_list.index(ligand_resid)}', wdir=wdir,  bash_log=bash_log, env=env):
+                    return None
+                index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
 
-        index_group = index_list.index(f'Protein_{ligand_resid}')
+            index_group = index_list.index(f'Protein_{ligand_resid}')
+        else: # cofactors only
+            cofactors_resid =  '_'.join([i[1] for i in molid_resid_pairs])
+            logging.warning(f'Fit trajectory to Protein_all-cofactors group: {molid_resid_pairs}')
+            if f'Protein_{cofactors_resid}' not in index_list:
+                if not make_group_ndx(query=f'"Protein"|{index_list.index(ligand_resid)}', wdir=wdir,  bash_log=bash_log, env=env):
+                    return None
+                index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
+            index_group = index_list.index(f'Protein_{cofactors_resid}')
+
+
     else:
         molid_resid_pairs = []
         index_group = index_list.index('Protein')
