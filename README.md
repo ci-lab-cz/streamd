@@ -75,23 +75,23 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 #### **Fully automated pipeline for molecular dynamics**
 
 ## Features:  
-- run of multiple simultaneous molecular dynamics simulations
-- simulation for different systems:  
+- Run of multiple simultaneous molecular dynamics simulations
+- Simulation for different systems:  
     - Protein in Water;  
     - Protein - Ligand;  
     - Protein - Cofactor (multiple);  
     - Protein - Ligand - Cofactor (multiple);  
   
-- simulations of boron-containing molecules using Gaussian Software
-- simulations of ligand binding metalloproteins with MCPB.py
-- distributed computing using dask library
-- running of parallel simulations on multiple servers
-- extending time of MD simulations 
-- continue of interrupted MD simulation
-- interrupted MD preparation can be restarted by invoking the same command
-- implemented tools for end-state free energy calculations (gmx_MMPBSA) and Protein-Ligand Interaction analysis (ProLIF)
-- supports of customized .mdp files
-- interactive trajectory convergence analysis for multiple complexes
+- Simulations of boron-containing molecules using Gaussian software
+- Simulations of ligand-binding metalloproteins with MCPB.py
+- Distributed computing using dask library
+- Running parallel simulations on multiple servers
+- Extending the time of MD simulations 
+- Continuing interrupted MD simulations
+- Restarting interrupted MD preparation by invoking the same command
+- Implemented tools for end-state free energy calculations (gmx_MMPBSA) and protein–ligand interaction analysis (ProLIF)
+- Support for customized .mdp files
+- Interactive trajectory convergence analysis for multiple complexes
 - GPU support
 
 [Return to the Table Of Contents](#table-of-contents)  
