@@ -40,7 +40,7 @@ def test_plot_rmsd_mean_std_creates_file(rmsd_summary_df):
             data=rmsd_summary_df,
             paint_by_col='system',
             show_legend=True,
-            out_name=output_path,
+            out_name=str(output_path),
             title="RMSD Plot"
         )
         assert output_path.exists() # check if output exists
