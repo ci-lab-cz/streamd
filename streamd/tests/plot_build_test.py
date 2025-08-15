@@ -6,6 +6,11 @@ from pathlib import Path
 
 from streamd.analysis.plot_build import plot_rmsd, plot_rmsd_mean_std
 
+analysis_test = pytest.mark.skipif(
+    "not config.getoption('--run-analysis')",
+    reason="Only run when --run-analysis is given",
+)
+
 @pytest.fixture
 def rmsd_df():
     return pd.DataFrame({
@@ -25,14 +30,14 @@ def rmsd_summary_df():
         'system': ['X', 'X', 'Y', 'Y']
     })
 
-
+@analysis_test
 def test_plot_rmsd_creates_file(rmsd_df):
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = Path(tmpdir) / "rmsd_plot.png"
         plot_rmsd(rmsd_df, "TestSystem", output_path)
         assert output_path.exists() # Check if output exists
 
-
+@analysis_test
 def test_plot_rmsd_mean_std_creates_file(rmsd_summary_df):
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = Path(tmpdir) / "rmsd_mean_std.html"
