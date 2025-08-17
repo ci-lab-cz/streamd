@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
+"""Utilities for running the StreaMD molecular dynamics pipeline.
+
+This module orchestrates preparation, equilibration, simulation, and
+continuation steps for molecular dynamics workflows, delegating heavy lifting
+to helper scripts and utility functions.
+"""
 # ==============================================================================
-# author          : Aleksandra Ivanova, Olena Mokshyna, Pavel Polishchuk 
+# author          : Aleksandra Ivanova, Olena Mokshyna, Pavel Polishchuk
 # date            : 14-06-2024
 # version         :
 # python_version  :
-# copyright       : 
+# copyright       :
 # license         : MIT
 # ==============================================================================
 import argparse
@@ -36,12 +42,31 @@ logging.getLogger('MDAnalysis').setLevel('CRITICAL')
 logging.getLogger('bockeh').setLevel('WARNING')
 
 
-class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
-    pass
+class RawTextArgumentDefaultsHelpFormatter(
+    argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter
+):
+    """Help formatter preserving line breaks and showing defaults."""
 
 
 def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device,
                       device_param, gpu_args, analysis_dirname='md_analysis', env=None):
+    """Run the equilibration stage of the StreaMD pipeline.
+
+    The function executes an external shell script to perform the
+    equilibration step. If checkpoint files are already present, the step is
+    skipped to avoid recomputation.
+
+    :param wdir: Directory containing simulation files.
+    :param project_dir: Base project directory with bundled scripts.
+    :param bash_log: Name of the log file to capture shell output.
+    :param ncpu: Number of CPU cores to use.
+    :param compute_device: Target device ("cpu" or "gpu") for the run.
+    :param device_param: Command line parameters for device selection.
+    :param gpu_args: Additional GPU-related command line arguments.
+    :param analysis_dirname: Name of the output analysis directory.
+    :param env: Optional environment variables for the subprocess call.
+    :return: Path to the working directory or ``None`` on failure.
+    """
     if os.path.isfile(os.path.join(wdir, 'npt.gro')) and os.path.isfile(os.path.join(wdir, 'npt.cpt')):
         logging.warning(f'{wdir}. Checkpoint files after Equilibration step exist. '
                         f'Equilibration step will be skipped ')
@@ -63,6 +88,28 @@ def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device,
 def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
                    tpr, cpt, xtc, deffnm, deffnm_next, ncpu,
                    compute_device, device_param, gpu_args, env=None):
+    """Execute the main molecular dynamics simulation.
+
+    The simulation is either started from scratch or continued from existing
+    checkpoint files. All heavy lifting is delegated to an external shell
+    script which runs the GROMACS ``mdrun`` command.
+
+    :param wdir: Working directory of the simulation.
+    :param project_dir: Base directory containing helper scripts.
+    :param bash_log: Name of the log file to collect shell output.
+    :param mdtime_ns: Desired simulation time in nanoseconds.
+    :param tpr: Optional path to a ``.tpr`` file for continuation.
+    :param cpt: Optional path to a ``.cpt`` checkpoint file.
+    :param xtc: Optional trajectory file used when continuing a run.
+    :param deffnm: Base name for simulation output files.
+    :param deffnm_next: Base name for the next continuation step.
+    :param ncpu: Number of CPU cores to use.
+    :param compute_device: Target device ("cpu" or "gpu").
+    :param device_param: Command line parameters describing device usage.
+    :param gpu_args: Additional GPU specific arguments.
+    :param env: Optional environment variables for the subprocess call.
+    :return: Tuple with working directory and ``deffnm`` or ``None`` on failure.
+    """
     # continue/extend simulation if checkpoint files exist
     if (tpr is not None and os.path.isfile(tpr) and cpt is not None and os.path.isfile(cpt) and xtc is not None and os.path.isfile(str(xtc))) or \
         (os.path.isfile(os.path.join(wdir, f'{deffnm}.tpr')) and os.path.isfile(os.path.join(wdir, f'{deffnm}.cpt'))
@@ -87,7 +134,44 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
 def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
                          mdtime_ns, project_dir, bash_log, ncpu, compute_device,
                          device_param, gpu_args, env=None):
+    """Continue a molecular dynamics run from an existing directory.
+
+    This helper checks for required checkpoint files, validates simulation
+    length, and merges any partial trajectories produced by previous
+    continuation attempts. The actual continuation is executed through an
+    external shell script.
+
+    :param wdir_to_continue: Directory containing previous run data.
+    :param tpr: Path to a ``.tpr`` file or ``None`` to use the default.
+    :param cpt: Path to a checkpoint ``.cpt`` file or ``None``.
+    :param xtc: Path to a trajectory ``.xtc`` file or ``None``.
+    :param deffnm: Base name of current simulation files.
+    :param deffnm_next: Base name for the next continuation step.
+    :param mdtime_ns: Total desired simulation time in nanoseconds.
+    :param project_dir: Base directory with helper scripts.
+    :param bash_log: Log file capturing shell output.
+    :param ncpu: Number of CPU cores available.
+    :param compute_device: Target compute device.
+    :param device_param: Device-specific command line parameters.
+    :param gpu_args: GPU-specific command line parameters.
+    :param env: Optional environment variables for the subprocess call.
+    :return: Path to the working directory or ``None`` if continuation fails.
+    """
     def continue_md(tpr, cpt, xtc, wdir, new_mdtime_ps, deffnm_next, project_dir, bash_log, compute_device, env):
+        """Execute continuation step for a single run.
+
+        :param tpr: Path to the ``.tpr`` file describing the system.
+        :param cpt: Checkpoint ``.cpt`` file to restart from.
+        :param xtc: Input trajectory fragment to append.
+        :param wdir: Working directory where the command is executed.
+        :param new_mdtime_ps: Target simulation time in picoseconds.
+        :param deffnm_next: Base name for output of the next step.
+        :param project_dir: Base directory with helper scripts.
+        :param bash_log: Log file capturing shell output.
+        :param compute_device: Selected compute device.
+        :param env: Optional environment variables for the subprocess call.
+        :return: Working directory if successful, otherwise ``None``.
+        """
         cmd = f'wdir={wdir} tpr={tpr} cpt={cpt} xtc={xtc} new_mdtime_ps={new_mdtime_ps} ' \
               f'deffnm_next={deffnm_next} ncpu={ncpu} compute_device={compute_device} device_param={device_param} gpu_args={gpu_args} bash {os.path.join(project_dir, "scripts/script_sh/continue_md.sh")}' \
               f'>> {os.path.join(wdir, bash_log)} 2>&1'
@@ -200,42 +284,53 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           not_clean_backup_files, unique_id,
           active_site_dist=5.0, save_traj_without_water=False,
           explicit_args=(), mdp_dir=None, bash_log=None):
-    '''
-    Run StreaMD pipeline
+    """Run StreaMD pipeline.
 
-    :param protein: protein file - pdb or gro format
-    :param wdir: None or path
-    :param lfile: None or file
-    :param system_lfile: None or file. Mol or sdf format
-    :param noignh: don't use -ignh argument (gmx pdb2gmx)
-    :param no_dr: Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt.
-    :param forcefield_name: str
-    :param clean_previous: boolean. Remove all previous md files
-    :param mdtime_ns: float. Time in ns
-    :param npt_time_ps: int. Time in ps
-    :param nvt_time_ps: int. Time in ps
-    :param topol: None or file
-    :param topol_itp_list: None or list of files
-    :param posre_list_protein: None or list of files
-    :param wdir_to_continue_list: list of paths
-    :param tpr_prev: None or file
-    :param cpt_prev: None or file
-    :param xtc_prev: None or file
-    :param ligand_resid: UNL. Used for md analysis only if continue simulation
-    :param ligand_list_file_prev: None or file
-    :param hostfile: None or file
-    :param ncpu:
-    :param compute_device:
-    :param gpu_ids:
-    :param ntmpi_per_gpu:
-    :param unique_id:
-    :param bash_log:
-    :param mdp_dir:
-    :param explicit_args:
-    :param not_clean_backup_files: bool
-    :return: None
-    '''
-
+    :param protein: Protein file in PDB or GRO format.
+    :param wdir: Working directory or ``None`` for current path.
+    :param lfile: Optional ligand file.
+    :param system_lfile: Optional cofactor file in MOL or SDF format.
+    :param noignh: Do not use ``-ignh`` argument in ``gmx pdb2gmx``.
+    :param no_dr: Disable acdoctor mode when processing ligand file.
+    :param forcefield_name: Force field to use for preparation.
+    :param clean_previous: Whether to remove previous MD files.
+    :param mdtime_ns: Simulation time in nanoseconds.
+    :param npt_time_ps: Equilibration NPT time in picoseconds.
+    :param nvt_time_ps: Equilibration NVT time in picoseconds.
+    :param topol: Optional topology file.
+    :param topol_itp_list: Optional list of ITP files for protein chains.
+    :param posre_list_protein: Optional list of position restraint files.
+    :param wdir_to_continue_list: List of directories with runs to continue.
+    :param deffnm: Base name for simulation output files.
+    :param tpr_prev: Optional ``.tpr`` file for continuation.
+    :param cpt_prev: Optional checkpoint ``.cpt`` file.
+    :param xtc_prev: Optional trajectory ``.xtc`` file.
+    :param ligand_resid: Ligand residue name used for analysis on continuation.
+    :param ligand_list_file_prev: Optional previous ligand list file.
+    :param activate_gaussian: Command used to activate the Gaussian environment.
+    :param gaussian_exe: Path to the Gaussian executable.
+    :param gaussian_basis: Gaussian basis set name.
+    :param gaussian_memory: Amount of memory to allocate for Gaussian jobs.
+    :param metal_resnames: List of metal residue names to process.
+    :param metal_charges: Mapping of metal residue names to their charges.
+    :param mcpbpy_cut_off: Cut-off distance for MCPB.py metal center processing.
+    :param seed: Random seed for stochastic steps.
+    :param steps: Tuple selecting specific pipeline stages to run.
+    :param hostfile: Optional file with Dask host addresses.
+    :param ncpu: Number of CPU cores.
+    :param mdrun_per_node: Number of ``mdrun`` instances to launch per node.
+    :param compute_device: Compute device to use.
+    :param gpu_ids: Optional list of GPU IDs.
+    :param ntmpi_per_gpu: Number of thread-MPI ranks per GPU.
+    :param unique_id: Unique identifier for run artifacts.
+    :param bash_log: Name of log file capturing shell output.
+    :param mdp_dir: Directory containing MDP files.
+    :param explicit_args: Tuple of additional command-line arguments.
+    :param not_clean_backup_files: Keep backup files instead of removing.
+    :param active_site_dist: Distance threshold in Å for active-site analysis.
+    :param save_traj_without_water: Whether to output trajectories without water.
+    :return: ``None``.
+    """
     project_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(project_dir, 'scripts')
     script_mdp_path = os.path.join(script_path, 'mdp')
@@ -531,6 +626,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                     os.remove(f)
 
 def main():
+    """Entry point for the command-line interface."""
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
     Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple) ''')
     parser1 = parser.add_argument_group('Standard Molecular Dynamics Simulation Run')

@@ -1,3 +1,5 @@
+"""Compute formal charge of a molecule using RDKit."""
+
 import argparse
 import sys
 from rdkit import Chem
@@ -5,6 +7,7 @@ from rdkit.Chem import rdmolops
 
 
 def main(fname):
+    """Return the formal charge for a molecule stored in a file."""
     mol = Chem.MolFromMolFile(fname)
     if mol:
         charge = rdmolops.GetFormalCharge(mol)

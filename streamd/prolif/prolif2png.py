@@ -1,3 +1,5 @@
+"""Convert ProLIF aggregated outputs to occupancy heatmap plots."""
+
 import argparse
 import os
 import pandas as pd
@@ -32,17 +34,7 @@ plt.ioff()
 def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
                       plot_width=None, plot_height=None,
                       point_size=3, base_size=12):
-    '''
-
-    :param plif_out_file:
-    :param occupancy:
-    :param plot_width:
-    :param plot_height:
-    :param point_size:
-    :param base_size:
-    :return:
-    '''
-
+    """Plot contact occupancy for one or more ligands from ProLIF CSV files."""
     new_names = {"HBACCEPTOR": "A", "ANIONIC": "N", "HYDROPHOBIC": "H", 'METALACCEPTOR':'MeA',
                  "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONPI": "+pi", "CATIONIC": "P"}
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
@@ -96,6 +88,7 @@ def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
         plot.save(output_name, dpi=300, verbose=False)
 
 def main():
+    """CLI for converting ProLIF CSV outputs into PNG plots."""
     parser = argparse.ArgumentParser(description='''Draw prolif plot for analysis binding mode of multiple ligands''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='+',
                         help='input file with compound. Supported formats: *.csv')

@@ -1,3 +1,5 @@
+"""MD trajectory analysis helpers for StreaMD."""
+
 import logging
 from glob import glob
 import os
@@ -9,7 +11,6 @@ from MDAnalysis.analysis import rms
 from streamd.analysis.xvg2png import convertxvg2png
 from streamd.analysis.plot_build import plot_rmsd
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, backup_prev_files
-
 
 
 def rmsd_for_atomgroups(universe, selection1, selection2=None):
@@ -26,10 +27,9 @@ def rmsd_for_atomgroups(universe, selection1, selection2=None):
 
     Returns
     -------
-    rmsd_df: pandas.core.frame.DataFrame
+    pandas.DataFrame
         DataFrame containing RMSD of the selected atom groups over time.
     """
-
     universe.trajectory[0]
     ref = universe
     rmsd_analysis = rms.RMSD(universe, ref, select=selection1, groupselections=selection2, in_memory=False)
@@ -47,7 +47,7 @@ def rmsd_for_atomgroups(universe, selection1, selection2=None):
 def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                      molid_resid_pairs,
                      ligand_resid="UNL", active_site_dist=5.0):
-    #groupselections = ['protein']
+    """Calculate RMSD profiles for a single MD system."""
     rmsd_out_file = os.path.join(wdir_out_analysis, f'rmsd_{system_name}.csv')
     universe = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
     groupselections = []
@@ -87,6 +87,7 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                     save_traj_without_water = False,
                     analysis_dirname = 'md_analysis',
                     ligand_list_file_prev=None, env=None, system_name=None):
+    """Prepare trajectories and execute RMSD analysis."""
     wdir, deffnm = var_md_dirs_deffnm
 
     # create subdir for analysis files only

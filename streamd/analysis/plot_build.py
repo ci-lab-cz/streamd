@@ -1,3 +1,5 @@
+"""Plotting utilities for StreaMD analyses."""
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -14,7 +16,9 @@ sns.set_context("paper", rc={"font.size":15,"axes.titlesize":15,"axes.labelsize"
 
 plt.ioff()
 
+
 def plot_rmsd(rmsd_df, system_name, out):
+    """Plot RMSD over time and save to disk."""
     plot = rmsd_df.set_index('time(ns)').plot(title=f"RMSD of {system_name}")
     plt.ylabel("RMSD (Å)")
     plt.xlabel("Time (ns)")
@@ -24,6 +28,7 @@ def plot_rmsd(rmsd_df, system_name, out):
     plt.close('all')
 
 def plot_rmsd_mean_std(data, paint_by_col, show_legend, out_name, title=None):
+    """Render RMSD mean vs. standard deviation scatter plots."""
     #pd.DataFrame.iteritems = pd.DataFrame.items
     # df = pd.read_csv(rmsd_mean_std_fname, sep='\t')
     # g = sns.FacetGrid(df, row='rmsd_system', col='time',
@@ -87,3 +92,4 @@ def plot_rmsd_mean_std(data, paint_by_col, show_legend, out_name, title=None):
     fig.for_each_xaxis(lambda xaxis: xaxis.update(showticklabels=True))
     fig.for_each_yaxis(lambda yaxis: yaxis.update(showticklabels=True))
     plotly.offline.plot(fig, filename=out_name,  auto_open=False)
+

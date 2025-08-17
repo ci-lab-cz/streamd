@@ -1,5 +1,6 @@
-import os
+"""Tests for the ProLIF interaction workflow."""
 
+import os
 import pandas as pd
 import pytest
 
@@ -18,6 +19,7 @@ prolif_detailed_test = pytest.mark.skipif(
 @pytest.mark.filterwarnings('ignore::DeprecationWarning')
 @prolif_test
 def test_run_prolif_full_pipline(dir_with_streamd_output_for_prolif):
+    """Run the ProLIF pipeline and verify outputs."""
     wdir = dir_with_streamd_output_for_prolif
 
     occupancy = 0.6
@@ -70,6 +72,7 @@ def test_run_prolif_full_pipline(dir_with_streamd_output_for_prolif):
 @prolif_detailed_test
 @pytest.mark.filterwarnings('ignore::DeprecationWarning')
 def test_run_prolif_full_pipline_from_files(dir_with_streamd_output_for_prolif):
+    """Run ProLIF using explicit file paths and verify outputs."""
     wdir = dir_with_streamd_output_for_prolif
 
     occupancy = 0.6

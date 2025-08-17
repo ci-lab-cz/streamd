@@ -1,5 +1,6 @@
-import os
+"""Tests for the molecular dynamics pipeline."""
 
+import os
 import pytest
 
 from streamd.run_md import start
@@ -18,6 +19,7 @@ md_detailed_test = pytest.mark.skipif(
 @md_test
 @pytest.mark.filterwarnings('ignore::DeprecationWarning')
 def test_run_md_full_pipline(dir_with_input_for_preparation):
+    """Run MD pipeline and verify expected outputs."""
     wdir = dir_with_input_for_preparation
 
     expected_output_files = ['md_fit.xtc', 'md_out.xtc',

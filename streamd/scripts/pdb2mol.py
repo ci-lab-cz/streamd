@@ -1,3 +1,5 @@
+"""Convert PDB structures to MOL files using RDKit templates."""
+
 import argparse
 import sys
 from rdkit import Chem
@@ -5,6 +7,7 @@ from rdkit.Chem import AllChem
 import os
 
 def read_smi(fname, sep="\t"):
+    """Yield SMILES strings and optional identifiers from a file."""
     with open(fname) as f:
         for line in f:
             items = line.strip().split(sep)
@@ -15,6 +18,7 @@ def read_smi(fname, sep="\t"):
 
 
 def main(fname, smi, mol_id=None, preserveH=True):
+    """Create an RDKit MOL block from a PDB file using a SMILES template."""
     mol_block = None
     if fname.endswith('.pdbqt'):
         with open(fname) as inp:

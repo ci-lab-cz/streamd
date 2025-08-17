@@ -1,3 +1,5 @@
+"""Generic helper functions used across the StreaMD project."""
+
 from contextlib import contextmanager
 from glob import glob
 import logging
@@ -11,6 +13,15 @@ import MDAnalysis as mda
 
 
 def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=False):
+    """Validate file paths and optionally ensure existence and extension.
+
+    :param x: Path to validate.
+    :param ext: Iterable of allowed file extensions without leading dots.
+    :param check_exist: If ``True``, ensure the path exists.
+    :param exist_type: Expectation for existing path: ``'file'`` or ``'dir'``.
+    :param create_dir: Create the directory if it does not exist and ``x`` is a directory path.
+    :return: Absolute path to the validated file or directory.
+    """
     value = os.path.abspath(x) if x else x
     if create_dir:
         os.makedirs(value, exist_ok=True)
@@ -25,6 +36,12 @@ def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=F
 
 
 def get_index(index_file, env=None):
+    """Return group names from a GROMACS index file.
+
+    :param index_file: Path to the ``index.ndx`` file.
+    :param env: Optional environment variables for subprocess calls.
+    :return: List of index group names.
+    """
     with open(index_file) as input:
         data = input.read()
 
@@ -38,6 +55,14 @@ def get_index(index_file, env=None):
 
 
 def make_group_ndx(query, wdir, bash_log, env=None):
+    """Create a new index group using ``gmx make_ndx``.
+
+    :param query: ``make_ndx`` selection string.
+    :param wdir: Working directory containing ``index.ndx``.
+    :param bash_log: Log file capturing shell output.
+    :param env: Optional environment variables for subprocess calls.
+    :return: ``True`` on success, ``False`` otherwise.
+    """
     cmd = f'''
         cd {wdir}
         gmx make_ndx -f solv_ions.gro -n index.ndx << INPUT  >> {os.path.join(wdir,bash_log)} 2>&1
@@ -51,6 +76,12 @@ def make_group_ndx(query, wdir, bash_log, env=None):
     return True
 
 def create_ndx(index_file, env=None):
+    """Generate an index file with ``gmx make_ndx`` if absent.
+
+    :param index_file: Path where the index file should exist.
+    :param env: Optional environment variables for subprocess calls.
+    :return: ``None``.
+    """
     wdir = os.path.dirname(index_file)
     cmd = f'''
         cd {wdir}
@@ -61,6 +92,11 @@ def create_ndx(index_file, env=None):
     run_check_subprocess(cmd, key=wdir, log=None, env=env)
 
 def get_mol_resid_pair(fname):
+    """Yield molecule and residue identifiers from a text file.
+
+    :param fname: File containing tab-separated molecule and residue pairs.
+    :return: Generator yielding ``(molid, resid)`` tuples.
+    """
     with open(fname) as inp:
         data = inp.readlines()
     for molid_resid_pair in data:
@@ -70,6 +106,15 @@ def get_mol_resid_pair(fname):
             yield molid, resid
 
 def run_check_subprocess(cmd, key=None, log=None, env=None, ignore_error=False):
+    """Run a shell command and log failures.
+
+    :param cmd: Command string executed via ``subprocess.check_output``.
+    :param key: Identifier used in log messages.
+    :param log: Path to a log file to mention when the command fails.
+    :param env: Optional environment variables for the subprocess.
+    :param ignore_error: Suppress raising/logging errors if ``True``.
+    :return: ``True`` if the command succeeded, ``False`` otherwise.
+    """
     try:
         subprocess.check_output(cmd, shell=True, env=env, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
@@ -81,11 +126,22 @@ def run_check_subprocess(cmd, key=None, log=None, env=None, ignore_error=False):
     return True
 
 def get_protein_resid_set(protein_fname):
+    """Return set of residue names present in a protein structure.
+
+    :param protein_fname: Path to a protein PDB or GRO file.
+    :return: Set of residue names found in the structure.
+    """
     protein = mda.Universe(protein_fname)
     protein_resid_set = set(protein.residues.resnames.tolist())
     return protein_resid_set
 
 def get_number_of_frames(xtc, env):
+    """Return number of frames and timestep from an XTC trajectory.
+
+    :param xtc: Path to the trajectory ``.xtc`` file.
+    :param env: Optional environment variables for subprocess calls.
+    :return: Tuple of ``(frames, timestep)`` or ``None`` if parsing fails.
+    """
     res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
     res_parsed = re.findall('Step[ ]*([0-9]*)[ ]*([0-9]*)\n', res.stderr.decode("utf-8"))
     if res_parsed:
@@ -98,6 +154,13 @@ def get_number_of_frames(xtc, env):
         return None
 
 def backup_prev_files(file_to_backup, wdir=None, copy=False):
+    """Rename or copy an existing file to avoid overwriting.
+
+    :param file_to_backup: File path that may be overwritten.
+    :param wdir: Directory where backups are stored. Defaults to the file's directory.
+    :param copy: If ``True``, copy instead of moving the file.
+    :return: ``None``.
+    """
     if wdir is None:
         wdir = os.path.dirname(file_to_backup)
     n = len(glob(os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.*#'))) + 1
@@ -109,6 +172,13 @@ def backup_prev_files(file_to_backup, wdir=None, copy=False):
     logging.warning(f'Backup previous file {file_to_backup} to {new_f}')
 
 def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
+    """Check whether a trajectory reached the desired simulation time.
+
+    :param xtc: Path to the trajectory ``.xtc`` file.
+    :param new_mdtime_ps: Desired simulation time in picoseconds.
+    :param env: Optional environment variables for subprocess calls.
+    :return: ``False`` if the desired time is already reached, otherwise ``True``.
+    """
     current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
     if current_number_of_frames and timestep:
         time_ns = (current_number_of_frames*timestep-timestep)/1000
@@ -120,6 +190,16 @@ def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
     return True
 
 def merge_parts_of_simulation(start_xtc, part_xtc, new_xtc, wdir, bash_log, env=None):
+    """Concatenate trajectory parts using ``gmx trjcat``.
+
+    :param start_xtc: Initial trajectory file.
+    :param part_xtc: Additional trajectory fragment to append.
+    :param new_xtc: Output trajectory file name.
+    :param wdir: Working directory containing the trajectory files.
+    :param bash_log: Log file capturing shell output.
+    :param env: Optional environment variables for subprocess calls.
+    :return: ``None``.
+    """
     cmd =f'''
 cd {wdir}
 gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,bash_log)} 2>&1
@@ -128,9 +208,15 @@ gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,b
 
 @contextmanager
 def temporary_directory_debug(remove=True, suffix=None, dir=None):
+    """Create a temporary directory removed after use.
+
+    :param remove: Whether to remove the directory upon exit.
+    :param suffix: Optional suffix for the temporary directory name.
+    :param dir: Parent directory in which to create the temporary directory.
+    :return: Context manager yielding the path to the temporary directory.
+    """
     if dir is None:
         dir = os.path.curdir
-    """Create a temporary directory. Remove it after the block."""
     path = os.path.abspath(mkdtemp(dir=dir, suffix=suffix))
     # os.makedirs(path, exist_ok=True)
     try:

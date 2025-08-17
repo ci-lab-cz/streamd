@@ -1,3 +1,5 @@
+"""Convert GROMACS XVG output to CSV and PNG visualizations."""
+
 import argparse
 import os
 import matplotlib.pyplot as plt
@@ -7,6 +9,7 @@ from streamd.utils.utils import backup_prev_files
 
 
 def convertxvg2png(xvg_file, system_name=None, transform_nm_to_A=False):
+    """Parse an XVG file and save corresponding CSV and PNG plots."""
     def check_if_value_found(value):
         if value:
             return value[0]
@@ -77,6 +80,7 @@ def convertxvg2png(xvg_file, system_name=None, transform_nm_to_A=False):
         plot1.figure.savefig(png_file, bbox_inches="tight")
     plt.clf()
     plt.close('all')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Draw png plot for xvg outputs of md analysis''')

@@ -1,3 +1,5 @@
+"""Utilities for aggregating and plotting RMSD analysis results."""
+
 import argparse
 from datetime import datetime
 from functools import partial
@@ -8,7 +10,9 @@ import logging
 from streamd.analysis.plot_build import plot_rmsd_mean_std
 from streamd.utils.utils import filepath_type
 
+
 def merge_rmsd_csv(csv_files, out):
+    """Concatenate multiple RMSD CSV files into one DataFrame."""
     all_data_list = []
     csv_files.sort()
     for i in csv_files:
@@ -21,6 +25,7 @@ def merge_rmsd_csv(csv_files, out):
 
 
 def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone', system_cols=['ligand_name','system']):
+    """Return mean and standard deviation of RMSD per time range."""
     res_list = []
     for start, end in time_ranges:
         key = f'{start}-{end}ns'
@@ -37,7 +42,9 @@ def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone',
     res = pd.concat(res_list)
     return res
 
+
 def make_lower_case(df, cols):
+    """Lower-case specified columns and warn on missing values."""
     for col in cols:
         if df[col].isna().any():
             logging.warning(f'The RMSD DataFrame column {col} contains the None value, '
@@ -46,9 +53,11 @@ def make_lower_case(df, cols):
         df[col] = df[col].astype(str).str.lower()
     return df
 
+
 def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
                       rmsd_type_list=['backbone', 'ligand'], paint_by_fname=None,
                       title=None):
+    """Execute RMSD analysis workflow and write summary files."""
     if len(rmsd_files) > 1:
         rmsd_merged_data = merge_rmsd_csv(rmsd_files, os.path.join(wdir, f'rmsd_all_systems_{unique_id}.csv'))
     else:
@@ -114,12 +123,8 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
                        title=title)
 
 
-# def create_html_rmsd_mean_std(data, paint_by_col,show_legend, out_name):
-#     plot_rmsd_mean_std(data=data, paint_by_col=paint_by_col,
-#                        show_legend=show_legend,
-#                        out_name=out_name)
-
 def main():
+    """CLI entry point for RMSD analysis."""
     parser = argparse.ArgumentParser(description='''Run rmsd analysis for StreaMD output files''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=False, nargs='+',
                         help='input file(s) with rmsd. Supported formats: *.csv. Required columns: '

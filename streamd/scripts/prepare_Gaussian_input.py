@@ -1,8 +1,11 @@
+"""Prepare Gaussian input files for quantum calculations."""
+
 import argparse
 from rdkit import Chem
 from rdkit.Chem import rdmolops, Descriptors
 
 def main(fname, opt_param, charges_param, freq_param, out):
+    """Generate Gaussian input decks for optimization, charges and frequencies."""
     mol = Chem.MolFromMolFile(fname, removeHs=False)
     title_smi = Chem.MolToSmiles(mol)
 

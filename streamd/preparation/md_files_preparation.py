@@ -1,12 +1,14 @@
+"""Utility helpers for preparing MD simulation input files."""
+
 import logging
 import os
 import shutil
 from glob import glob
 
-
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, create_ndx
 
 def get_couple_groups(mdp_file):
+    """Return temperature coupling group names from an MDP file."""
     with open(mdp_file) as inp:
         data = inp.readlines()
 
@@ -25,14 +27,7 @@ def get_couple_groups(mdp_file):
 
 
 def create_couple_group_in_index_file(couple_group, index_file, wdir, env, bash_log):
-    '''
-
-    :param couple_group: [Protein, Water, UNL]
-    :param index_file: will be modified. To add new group if not exists
-    :param env:
-    :param bash_log:
-    :return: None
-    '''
+    """Ensure an index file contains a coupling group combination."""
     index_list = get_index(index_file, env=env)
 
     if couple_group not in index_list:
@@ -57,11 +52,13 @@ def create_couple_group_in_index_file(couple_group, index_file, wdir, env, bash_
 
 
 def check_if_info_already_added_to_topol(topol, string):
+    """Return True if the given text snippet is already in topology file."""
     with open(topol) as inp:
         data = inp.read()
-    return string in data # True or False
+    return string in data  # True or False
 
 def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
+    """Insert ligand include statements into the topology file."""
     itp_posres_include_list, resid_include_list = [], []
     for itp, posres, resid in zip(all_itp_list, all_posres_list, all_resids):
         itp_posres_include_list.append(f'; Include {resid} topology\n'
@@ -83,6 +80,7 @@ def add_ligands_to_topol(all_itp_list, all_posres_list, all_resids, topol):
 
 
 def edit_mdp(md_file, pattern, replace):
+    """Replace a line in an MDP file matching a pattern."""
     new_mdp = []
     with open(md_file) as inp:
         for line in inp.readlines():
@@ -94,6 +92,7 @@ def edit_mdp(md_file, pattern, replace):
         out.write(''.join(new_mdp))
 
 def edit_topology_file(topol_file, pattern, add, how='before', n=0, count_pattern=1):
+    """Insert text into a topology file relative to a pattern."""
     with open(topol_file) as input:
         data = input.read()
 
@@ -126,17 +125,7 @@ def edit_topology_file(topol_file, pattern, add, how='before', n=0, count_patter
 
 
 def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_protein, wdir_md, clean_previous=False):
-    '''
-
-    :param wdir_var_ligand:
-    :param protein_name:
-    :param wdir_system_ligand_list:
-    :param wdir_protein: None (if mcpbpy procedure is applied) or path where topol and gro files are stored
-    :param wdir_md:
-    :param clean_previous:
-    :return: wdir to run md, dict with the list of md files which will be add to topol.top or to complex.gro
-    Important: topol.top requires the same order of all additional files, so the same order should be preserved in all lists of the output dict
-    '''
+    """Prepare MD working directories and copy ligand/protein files."""
 
     def copy_md_files_to_wdir(files, wdir_copy_to):
         for file in files:
@@ -191,20 +180,7 @@ def prep_md_files(wdir_var_ligand, protein_name, wdir_system_ligand_list, wdir_p
 
 def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps,
                       mdtime_ns, user_mdp_files, bash_log, seed, explicit_args=(), env=None):
-    '''
-
-    :param wdir_md_cur:
-    :param all_resids:
-    :param nvt_time_ps:
-    :param npt_time_ps:
-    :param mdtime_ns:
-    :param user_mdp_files:
-    :param bash_log:
-    :param seed:
-    :param explicit_args: list of mdp file names to change if time and mdp files were explicitly provided by user
-    :param env:
-    :return:
-    '''
+    """Create MDP files for equilibration and production runs."""
     if not os.path.isfile(os.path.join(wdir_md_cur, 'index.ndx')):
         create_ndx(os.path.join(wdir_md_cur, 'index.ndx'), env=env)
 
@@ -227,7 +203,7 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps,
                 return None
 
         logging.info(f"Default temperature coupling groups '{default_couple_group}' and '{default_non_couple_group}' "
-                        f" will be used for { {'nvt.mdp', 'npt.mdp', 'md.mdp'} - set(user_mdp_files)} mdp files")
+                          f" will be used for { {'nvt.mdp', 'npt.mdp', 'md.mdp'} - set(user_mdp_files)} mdp files")
 
     # couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein'] + all_resids])
 

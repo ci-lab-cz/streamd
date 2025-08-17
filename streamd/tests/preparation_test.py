@@ -1,5 +1,9 @@
-import os
+"""Tests for preparation utilities."""
 
+import os
+import pytest
+
+import os
 import pytest
 
 from streamd.utils.utils import run_check_subprocess, get_mol_resid_pair
@@ -13,6 +17,7 @@ preparation_test = pytest.mark.skipif(
 
 @preparation_test
 def test_prepare_protein_gro(dir_with_input_for_preparation, dir_with_control_files_for_preparation):
+    """Prepare protein GRO file and compare against control outputs."""
     dirname = dir_with_input_for_preparation
 
     assert not os.path.isfile(f'{os.path.join(dirname, "protein.gro")}')
@@ -36,6 +41,7 @@ def test_prepare_protein_gro(dir_with_input_for_preparation, dir_with_control_fi
 # @pytest.mark.skip(reason="Test directly with -k test_prepare_ligand. Takes some time")
 @preparation_test
 def test_prepare_ligand(dir_with_input_for_preparation):
+    """Ensure ligand preparation produces expected files."""
     expected_mol_id = '1ke7_LS3'
     dirname = dir_with_input_for_preparation
 
