@@ -1,5 +1,6 @@
-import os
+"""Tests for analysis routines."""
 
+import os
 import pandas as pd
 import pytest
 
@@ -16,6 +17,7 @@ def test_rmsd_analysis(dir_with_streamd_output_for_analysis,
                        # list_expected_system_analysis_output,
                        # list_expected_analysis_output
                        ):
+    """Ensure RMSD analysis generates expected files."""
     # import here to avoid bunch of not functional warnings from matplotlib
     from streamd.analysis.md_system_analysis import run_md_analysis
 
@@ -83,6 +85,7 @@ def test_rmsd_analysis(dir_with_streamd_output_for_analysis,
     pytest.param(['ActiveSite5.0A'], id="ActiveSite5.0A"),
 ])
 def test_rmsd_analysis(rmsd_type_list, dir_and_rmsd_files):
+    """Run summary RMSD analysis with optional time ranges."""
     wdir, rmsd_file_list = dir_and_rmsd_files
     rmsd_expected_output = os.path.join(wdir, f'rmsd_all_systems_test.csv')
     rmsd_expected_output_ranges = os.path.join(wdir, 'rmsd_mean_std_time-ranges_test.csv')
@@ -123,6 +126,7 @@ def test_rmsd_analysis(rmsd_type_list, dir_and_rmsd_files):
 @analysis_test
 @pytest.mark.filterwarnings('ignore::DeprecationWarning')
 def test_rmsd_analysis_html_paintby(dir_and_rmsd_files, tmp_experimental_file_for_html_paintby):
+    """Validate painting of RMSD plots by experimental data."""
     wdir, rmsd_file_list = dir_and_rmsd_files
     paint_by_file = tmp_experimental_file_for_html_paintby
 

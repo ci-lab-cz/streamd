@@ -5,14 +5,16 @@ from dask.distributed import Client, SSHCluster
 from rdkit import Chem
 import time
 
-def init_dask_cluster(n_tasks_per_node, ncpu, use_multi_servers=True, hostfile=None):
-    '''
 
-    :param n_tasks_per_node: number of task on a single server
-    :param ncpu: number of cpu on a single server
-    :param hostfile:
-    :return:
-    '''
+def init_dask_cluster(n_tasks_per_node, ncpu, use_multi_servers=True, hostfile=None):
+    """Initialize a Dask cluster on local or remote hosts.
+
+    :param n_tasks_per_node: Number of tasks on a single server.
+    :param ncpu: Number of CPU cores on a server.
+    :param use_multi_servers: Whether to span the cluster across multiple hosts.
+    :param hostfile: Optional file listing hostnames for SSH cluster.
+    :return: Tuple of (dask_client, cluster).
+    """
     if hostfile and use_multi_servers:
         with open(hostfile) as f:
             hosts = [line.strip() for line in f if line.strip()]
@@ -48,6 +50,19 @@ def init_dask_cluster(n_tasks_per_node, ncpu, use_multi_servers=True, hostfile=N
 
 
 def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
+    """Execute a function over an iterable using a Dask client.
+
+    Tasks are submitted to the provided client and results are yielded as
+    soon as they finish. When ``dask_report_fname`` is provided a performance
+    report is written for later inspection.
+
+    :param func: Callable executed for each item in ``main_arg``.
+    :param main_arg: Iterable supplying positional arguments to ``func``.
+    :param dask_client: Active :class:`dask.distributed.Client` instance.
+    :param dask_report_fname: Optional path for a Dask performance report.
+    :param kwargs: Extra keyword arguments passed to ``func``.
+    :return: Generator yielding results from ``func``.
+    """
     main_arg = iter(main_arg)
     Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
     task_times = {}  # Dictionary to store start times for each task

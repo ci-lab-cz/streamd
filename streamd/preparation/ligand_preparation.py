@@ -1,6 +1,9 @@
+"""Routines for preparing ligand parameters and inputs."""
+
 import itertools
 import logging
 import os
+
 from glob import glob
 import re
 
@@ -13,10 +16,7 @@ from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import run_check_subprocess
 
 def reorder_hydrogens(mol):
-    """
-    Reorders the atoms in the molecule so that all hydrogens bonded to a heavy atom
-    are listed immediately after that heavy atom.
-    """
+    """Move hydrogens to follow their heavy atom in atom order."""
     new_order = []
     for atom in mol.GetAtoms():
         if atom.GetAtomicNum() != 1:  # Not a hydrogen
@@ -28,6 +28,7 @@ def reorder_hydrogens(mol):
     return mol
 
 def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
+    """Yield RDKit molecules with generated residue identifiers."""
     def generate_resid(protein_resid_set):
         ascii_uppercase_digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         for i in itertools.product(ascii_uppercase_digits, repeat=3):
@@ -71,11 +72,10 @@ def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
 
 
 def check_mols(fname):
-    '''
-
+    """Return number of molecules and list of problematic ones.
     :param fname:
     :return: number of mols, list of problem_mols
-    '''
+    """
     def check_if_problem(mol, n):
         molid = mol.GetProp('_Name') if mol.HasProp('_Name') else n
         try:
@@ -109,6 +109,7 @@ def check_mols(fname):
 
 
 def make_all_itp(fileitp_input_list, fileitp_output_list, out_file):
+    """Merge ligand ITP files and collect unique atom types."""
     atom_type_list = []
     start_columns = None
     # '[ atomtypes ]\n; name    at.num    mass    charge ptype  sigma      epsilon\n'
@@ -130,6 +131,7 @@ def make_all_itp(fileitp_input_list, fileitp_output_list, out_file):
         output.write('\n'.join(atom_type_uniq) + '\n')
 
 def prepare_tleap(tleap_template, tleap, molid, conda_env_path):
+    """Fill a tleap template with ligand identifiers and environment path."""
     with open(tleap_template) as inp:
         data = inp.read()
     new_data = data.replace('env_path', conda_env_path).replace('ligand', molid)
@@ -139,6 +141,7 @@ def prepare_tleap(tleap_template, tleap, molid, conda_env_path):
 
 def prepare_gaussian_files(file_template, file_out, ncpu, opt_restart=False, gaussian_basis=r'B3LYP/6-31G*',
                            gaussian_memory='60GB'):
+    """Create Gaussian input from template adjusting resources and options."""
     with open(file_template) as inp:
         data = inp.read()
     standard_basis = r'B3LYP/6-31G\*'
@@ -159,6 +162,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
                 conda_env_path, bash_log, gaussian_exe=None,
                 activate_gaussian=None, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB', ncpu=1,
                 mol2_file=None, env=None):
+    """Prepare force-field parameters and conformers for a single ligand."""
     mol, molid, resid = mol_tuple
 
     wdir_ligand_cur = os.path.abspath(os.path.join(wdir_ligand, molid))
@@ -245,9 +249,8 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
 def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_path, project_dir, wdir_ligand,
                           no_dr, gaussian_exe, activate_gaussian, gaussian_basis, gaussian_memory,
                           hostfile, ncpu, bash_log):
-    '''
-
-    :param ligand_fname:
+    """Prepare parameterization inputs for multiple ligands.
+     :param ligand_fname:
     :param preset_resid:
     :param script_path:
     :param project_dir:
@@ -259,7 +262,7 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
     :param ncpu:
     :param bash_log:
     :return:
-    '''
+    """
     lig_wdirs = []
 
     if ligand_fname.endswith('.mol2'):

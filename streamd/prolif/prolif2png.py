@@ -1,3 +1,5 @@
+"""Convert ProLIF aggregated outputs to occupancy heatmap plots."""
+
 import argparse
 import os
 import pandas as pd
@@ -96,6 +98,7 @@ def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
         plot.save(output_name, dpi=300, verbose=False)
 
 def main():
+    """CLI for converting ProLIF CSV outputs into PNG plots."""
     parser = argparse.ArgumentParser(description='''Draw prolif plot for analysis binding mode of multiple ligands''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='+',
                         help='input file with compound. Supported formats: *.csv')

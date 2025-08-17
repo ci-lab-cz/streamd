@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Run ProLIF interaction analysis over MD trajectories."""
+
 import argparse
 from datetime import datetime
 import os
@@ -25,8 +27,8 @@ plt.ioff()
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     pass
 
-
 def backup_output(output):
+    """Rename existing output to avoid overwriting previous results."""
     if os.path.isfile(output):
         all_outputs = glob(os.path.join(os.path.dirname(output), f'#{os.path.basename(output)}*#'))
         n = len(all_outputs) + 1
@@ -35,7 +37,7 @@ def backup_output(output):
 
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
                     occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None):
-    '''
+    """Compute protein–ligand interaction fingerprints for a single trajectory.
 
     :param tpr:
     :param xtc:
@@ -50,7 +52,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     :param plot_width:  in inches
     :param plot_height: in inches
     :return: pandas dataframe
-    '''
+    """
     u = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
 
     protein = u.atoms.select_atoms(protein_selection)
@@ -85,6 +87,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 
 def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
                          plot_width, plot_height, save_viz, pdb, n_jobs, occupancy):
+    """Execute ProLIF analysis using paths relative to a directory."""
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     if pdb:
@@ -104,6 +107,7 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
 
 
 def collect_outputs(output_list, output):
+    """Concatenate individual ProLIF CSV outputs into one file."""
     df_list = []
     for i in output_list:
         df = pd.read_csv(i, sep='\t')
@@ -124,8 +128,7 @@ def collect_outputs(output_list, output):
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
           protein_selection, ligand_resid, hostfile, ncpu, n_jobs,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose):
-    '''
-
+    """Run ProLIF across multiple directories and aggregate results.
     :param wdir_to_run: list
     :param wdir_output: path to dirn
     :param tpr: path to file
@@ -145,7 +148,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param pdb: None or path to file (protein.pdb for renumbering)
     :param verbose: bool
     :return:
-    '''
+    """
     output = 'plifs.csv'
     output_aggregated = os.path.join(wdir_output, f'prolif_output_{unique_id}.csv')
 
@@ -213,6 +216,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
 
 
 def main():
+    """CLI entry point for ProLIF analysis."""
     parser = argparse.ArgumentParser(description='Get protein-ligand interactions from MD trajectories using '
                                                  'ProLIF module.',
                                      formatter_class=RawTextArgumentDefaultsHelpFormatter)

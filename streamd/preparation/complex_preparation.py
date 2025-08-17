@@ -1,6 +1,8 @@
-import logging
+"""Utilities for constructing protein–ligand complexes for MD simulations."""
+
 import os
 import shutil
+import logging
 
 from streamd.preparation.ligand_preparation import make_all_itp
 from streamd.preparation.md_files_preparation import prep_md_files, add_ligands_to_topol, \
@@ -9,7 +11,9 @@ from streamd.utils.utils import run_check_subprocess
 
 from glob import glob
 
+
 def complex_preparation(protein_gro, ligand_gro_list, out_file):
+    """Merge protein and ligand GRO files into a single complex structure."""
     atoms_list = []
     with open(protein_gro) as input:
         prot_data = input.readlines()
@@ -32,7 +36,7 @@ def run_complex_preparation(wdir_var_ligand, wdir_system_ligand_list,
                             protein_name, wdir_protein, wdir_md, script_path, project_dir,
                             mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, seed, bash_log,
                             mdp_dir=None, explicit_args=(), env=None):
-
+    """Prepare all input files for MD by combining protein and ligand data."""
     wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
                                                wdir_system_ligand_list=wdir_system_ligand_list,
                                                wdir_protein=wdir_protein,

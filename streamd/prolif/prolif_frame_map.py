@@ -1,3 +1,5 @@
+"""Utilities for plotting ProLIF interaction occurrence over time."""
+
 import argparse
 import os
 import re
@@ -10,7 +12,7 @@ plt.ioff()
 def convertplifbyframe2png(plif_out_file, output=None, plot_width=15, plot_height=10,
                            occupancy=0, filter_only_hydrophobic=False,
                            base_size=12, point_size=5):
-
+    """Convert ProLIF CSV output to a frame-wise PNG plot."""
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
                     "hydrophobic": "orange", "pication": "black", "cationpi": "darkblue",
                     "pistacking": 'darkslategray', 'metalacceptor': 'cyan'}
@@ -76,6 +78,7 @@ def convertplifbyframe2png(plif_out_file, output=None, plot_width=15, plot_heigh
         plot.save(output_name, dpi=300, verbose=False)
 
 def main():
+    """CLI for generating frame maps from ProLIF outputs."""
     parser = argparse.ArgumentParser(description='''Draw prolif plot for analysis of contacts by each frame of the unique ligand''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='*',
                         help='input file with prolif output for the unique molecule. Supported formats: *.csv.'

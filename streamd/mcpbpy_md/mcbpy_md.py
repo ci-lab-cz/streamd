@@ -1,3 +1,5 @@
+"""Helper to prepare MD systems with MCPB.py for metal centers."""
+
 import logging
 import os
 import shutil
@@ -10,7 +12,7 @@ def main(wdir_var_ligand, protein_name, protein_file, metal_resnames, metal_char
          system_lig_wdirs, wdir_metal, wdir_md, script_path, ncpu, activate_gaussian,
          gaussian_version, gaussian_basis, gaussian_memory, bash_log, seed,
          nvt_time_ps, npt_time_ps, mdtime_ns, env, cut_off=2.8):
-
+    """Run the MCPB.py-based metal center preparation workflow."""
     wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
                                                wdir_system_ligand_list=system_lig_wdirs,
                                                wdir_protein=None,

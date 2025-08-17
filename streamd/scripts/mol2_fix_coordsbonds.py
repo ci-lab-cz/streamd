@@ -1,7 +1,10 @@
+"""Correct coordinates and bond records in a MOL2 file."""
+
 import argparse
 
 
 def main(filemol, filemol2, output):
+    """Fix coordinates and bonds in a MOL2 file using an auxiliary MOL file."""
     # work with text instead of mol because mol2 is incorrect
     with open(filemol) as inp:
         mol_data = inp.readlines()

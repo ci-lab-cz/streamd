@@ -7,6 +7,8 @@
 # copyright       :
 # license         : MIT
 # ==============================================================================
+"""Run MM-GBSA/MM-PBSA calculations using the gmx_MMPBSA tool."""
+
 import argparse
 import logging
 import math
@@ -36,9 +38,44 @@ logging.getLogger('bockeh').setLevel('CRITICAL')
 
 def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection,
                   unique_id, env, bash_log, clean_previous, debug):
+    """Run a GBSA calculation for a prepared simulation directory.
+
+    :param wdir: Working directory containing the simulation files.
+    :param tpr: Path to the ``.tpr`` file.
+    :param xtc: Path to the trajectory ``.xtc`` file.
+    :param topol: Path to the topology ``.top`` file.
+    :param index: Path to the GROMACS index file.
+    :param mmpbsa: gmx_MMPBSA input file.
+    :param np: Number of MPI processes to use.
+    :param ligand_resid: Residue name of the ligand in the index file.
+    :param append_protein_selection: Additional selections to merge with the protein group.
+    :param unique_id: Identifier appended to output files.
+    :param env: Optional environment variables for subprocess calls.
+    :param bash_log: Name of the log file capturing shell output.
+    :param clean_previous: Whether to remove previous GBSA outputs.
+    :param debug: If ``True``, keep intermediate files for debugging.
+    :return: Path to the generated GBSA results file or ``None`` on failure.
+    """
 
     def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index,
                   ligand_index, unique_id, env, bash_log, debug):
+        """Launch gmx_MMPBSA for a single trajectory.
+
+        :param wdir: Working directory for temporary files and logs.
+        :param tpr: Path to the ``.tpr`` file.
+        :param xtc: Path to the trajectory ``.xtc`` file.
+        :param topol: Topology file path.
+        :param index: Index file path.
+        :param mmpbsa: gmx_MMPBSA input file.
+        :param np: Number of MPI processes.
+        :param protein_index: Index of the protein selection.
+        :param ligand_index: Index of the ligand selection.
+        :param unique_id: Identifier appended to output files.
+        :param env: Optional environment variables for subprocess calls.
+        :param bash_log: Log file capturing shell output.
+        :param debug: Keep intermediate files if ``True``.
+        :return: Path to the generated results file or ``None`` on failure.
+        """
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.dat")
         with temporary_directory_debug(dir=wdir, remove=not debug, suffix=f'_gbsa_{unique_id}') as tmpdirname:
             logging.info(f'tmp intermediate dir: {tmpdirname}')
@@ -105,6 +142,24 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
 
 def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid,
                        append_protein_selection, unique_id, env, bash_log, clean_previous, debug):
+    """Execute GBSA using file paths relative to the working directory.
+
+    :param wdir: Base working directory containing simulation files.
+    :param tpr: Relative path to the ``.tpr`` file inside ``wdir``.
+    :param xtc: Relative path to the ``.xtc`` trajectory file inside ``wdir``.
+    :param topol: Relative path to the topology file inside ``wdir``.
+    :param index: Relative path to the index file inside ``wdir``.
+    :param mmpbsa: gmx_MMPBSA input file path.
+    :param np: Number of MPI processes to use.
+    :param ligand_resid: Residue name of the ligand in the index file.
+    :param append_protein_selection: Additional selections to merge with the protein group.
+    :param unique_id: Identifier appended to output files.
+    :param env: Optional environment variables for subprocess calls.
+    :param bash_log: Name of the log file capturing shell output.
+    :param clean_previous: Whether to remove previous GBSA outputs.
+    :param debug: If ``True``, keep intermediate files for debugging.
+    :return: Path to the generated GBSA results file or ``None`` on failure.
+    """
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
@@ -117,7 +172,12 @@ def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid,
 
 
 def clean_temporary_gmxMMBPSA_files(wdir, prefix="_GMXMMPBSA_"):
-    # remove intermediate files
+    """Remove intermediate files produced by gmx_MMPBSA.
+
+    :param wdir: Working directory in which to run the clean command.
+    :param prefix: Prefix used by gmx_MMPBSA to tag temporary files.
+    :return: ``None``.
+    """
     try:
         subprocess.check_output(f'cd {wdir}; gmx_MMPBSA --clean -prefix "{prefix}" > /dev/null 2>&1 ', shell=True)
     except subprocess.CalledProcessError as e:
@@ -126,7 +186,18 @@ def clean_temporary_gmxMMBPSA_files(wdir, prefix="_GMXMMPBSA_"):
 
 
 def parse_gmxMMPBSA_output(fname):
+    """Parse energies from a gmx_MMPBSA result file.
+
+    :param fname: Path to the ``FINAL_RESULTS_MMPBSA`` output file.
+    :return: Nested dictionaries with GBSA and PBSA energy terms.
+    """
+
     def get_IE_values(IE_parsed_out):
+        """Map interaction energy fields to values.
+
+        :param IE_parsed_out: Parsed regex groups for interaction energies.
+        :return: Dictionary with ``IE_`` prefixed energy components.
+        """
         IE_res = {}
         IE_columns = [i.strip() for i in IE_parsed_out[0][0].split('  ') if i]
         IE_values = [i.strip() for i in IE_parsed_out[0][1].split('  ') if i]
@@ -135,6 +206,12 @@ def parse_gmxMMPBSA_output(fname):
         return IE_res
 
     def get_delta_total_values(delta_total_columns_re, delta_total_values_re):
+        """Collect total energy terms from regex matches.
+
+        :param delta_total_columns_re: Regex match with column names.
+        :param delta_total_values_re: Regex match with column values.
+        :return: Dictionary with ``ΔTOTAL_`` prefixed energy components.
+        """
         delta_total_res = {}
         delta_total_columns = [i.strip() for i in delta_total_columns_re[0].split('  ') if i]
         delta_total_values = [i.strip() for i in delta_total_values_re[0].split('  ') if i]
@@ -145,6 +222,11 @@ def parse_gmxMMPBSA_output(fname):
         return delta_total_res
 
     def get_Gbinding_values(Gbind_parsed_out):
+        """Parse binding free energy and its error.
+
+        :param Gbind_parsed_out: Regex match with binding energy values.
+        :return: Dictionary with ``ΔGbinding`` and its uncertainty.
+        """
         Gbinding_res = {}
         G_values = [i.strip() for i in Gbind_parsed_out[0].split(' ') if i and i != '+/-']
         Gbinding_res['ΔGbinding'] = G_values[0]
@@ -204,10 +286,22 @@ def parse_gmxMMPBSA_output(fname):
     return out_res
 
 def run_get_frames_from_wdir(wdir, xtc, env):
+    """Return number of trajectory frames for a working directory.
+
+    :param wdir: Directory containing the trajectory file.
+    :param xtc: Name of the trajectory ``.xtc`` file relative to ``wdir``.
+    :param env: Optional environment variables for subprocess calls.
+    :return: Tuple of frame count and timestep or ``None``.
+    """
     return get_number_of_frames(os.path.join(wdir, xtc), env=env)
 
 
 def get_mmpbsa_start_end_interval(mmpbsa):
+    """Extract start, end and interval parameters from an MMPBSA input file.
+
+    :param mmpbsa: Path to the gmx_MMPBSA input file.
+    :return: Tuple of ``(startframe, endframe, interval)``.
+    """
     with open(mmpbsa) as inp:
         mmpbsa_data = inp.read()
     logging.info(f'{mmpbsa}:\n{mmpbsa_data}')
@@ -231,30 +325,55 @@ def get_mmpbsa_start_end_interval(mmpbsa):
     return startframe, endframe, interval
 
 def get_used_number_of_frames(var_number_of_frames, startframe, endframe, interval):
+    """Calculate number of frames used based on limits and stride.
+
+    :param var_number_of_frames: Number of frames present in the trajectory.
+    :param startframe: Starting frame for analysis (1-indexed).
+    :param endframe: Last frame to include in analysis.
+    :param interval: Stride between frames.
+    :return: Number of frames that will be used.
+    """
     return math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
 
 def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid,
           append_protein_selection, hostfile, unique_id, bash_log,
           gmxmmpbsa_out_files=None, clean_previous=False, debug=False):
-    '''
+    """Start GBSA calculations and aggregate resulting energies.
 
-    :param wdir_to_run: list
-    :param tpr: path to file
-    :param xtc: path to file
-    :param topol: path to file
-    :param index: path to file
-    :param out_wdir: dir path
-    :param mmpbsa: path to file
-    :param ncpu: iny
-    :param ligand_resid: str
-    :param append_protein_selection: None or str
-    :param hostfile: None or path to file
-    :param unique_id: str (unique id for output files)
-    :param bash_log: file name
-    :param gmxmmpbsa_out_files: pathes to files
-    :param clean_previous: bool
-    :return:
-    '''
+    Parameters
+    ----------
+    wdir_to_run : list[str] | None
+        Working directories containing trajectories; overrides individual file arguments.
+    tpr, xtc, topol, index : str | None
+        Paths to required simulation files when ``wdir_to_run`` is not used.
+    out_wdir : str
+        Directory to write output tables.
+    mmpbsa : str
+        Input file for gmx_MMPBSA.
+    ncpu : int
+        Number of CPU cores to use.
+    ligand_resid : str
+        Residue identifier for the ligand.
+    append_protein_selection : str | None
+        Extra selection appended to protein group.
+    hostfile : str | None
+        Hostfile for distributed runs.
+    unique_id : str
+        Unique identifier used in output filenames.
+    bash_log : str
+        Name of log file capturing gmx_MMPBSA output.
+    gmxmmpbsa_out_files : list[str] | None
+        Precomputed gmx_MMPBSA result files to parse instead of running calculations.
+    clean_previous : bool
+        Remove previous outputs before running.
+    debug : bool
+        Enable verbose debugging output.
+
+    Returns
+    -------
+    list[str] | None
+        Paths to generated GBSA output files or ``None`` on failure.
+    """
     dask_client, cluster, pool = None, None, None
     var_gbsa_out_files = []
     if gmxmmpbsa_out_files is None:
@@ -353,6 +472,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
 
 
 def main():
+    """CLI entry point for GBSA calculations."""
     parser = argparse.ArgumentParser(description='''Run MM-GBSA/MM-PBSA calculation using gmx_MMPBSA tool''')
     parser.add_argument('-i', '--wdir_to_run', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),

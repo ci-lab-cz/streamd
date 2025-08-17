@@ -1,5 +1,6 @@
-import os
+"""Tests for the GBSA workflow."""
 
+import os
 import pandas as pd
 import pytest
 
@@ -20,6 +21,7 @@ gbsa_detailed_test = pytest.mark.skipif(
 
 @gbsa_full_test
 def test_get_frames(dir_with_streamd_output_for_gbsa):
+    """Validate frame counting utilities."""
     wdir = dir_with_streamd_output_for_gbsa
 
     startframe, endframe, interval = get_mmpbsa_start_end_interval(os.path.join(wdir, 'mmpbsa.in'))
@@ -42,6 +44,7 @@ def test_get_frames(dir_with_streamd_output_for_gbsa):
 
 @gbsa_full_test
 def test_run_gbsa_full_pipline(dir_with_streamd_output_for_gbsa):
+    """Run GBSA on a prepared directory and check outputs."""
     wdir = dir_with_streamd_output_for_gbsa
 
     assert not os.path.isfile( os.path.join(wdir, f"finished_gbsa_files_test.txt"))
@@ -82,6 +85,7 @@ def test_run_gbsa_full_pipline(dir_with_streamd_output_for_gbsa):
 
 @gbsa_detailed_test
 def test_run_gbsa_full_pipline_from_files(dir_with_streamd_output_for_gbsa):
+    """Execute GBSA using explicit file paths and validate output."""
     wdir = dir_with_streamd_output_for_gbsa
 
     assert not os.path.isfile( os.path.join(wdir, f"finished_gbsa_files_test.txt"))

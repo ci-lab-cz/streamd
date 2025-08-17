@@ -1,3 +1,5 @@
+"""Prepare metal-centered systems using the MCPB.py workflow."""
+
 from glob import glob
 import logging
 import os
@@ -11,12 +13,11 @@ from streamd.preparation.ligand_preparation import prepare_gaussian_files
 from streamd.preparation.md_files_preparation import check_if_info_already_added_to_topol, edit_topology_file
 
 def convert_pdb2mol2(metal_pdb, charge_dict, bash_log_curr, env):
-    '''
-
+    """Convert a metal PDB file to MOL2 using charge dictionary.
     :param metal_pdb: metal pdb file path
     :param charge_dict: {MN:2, ZN:2, CA:2}
     :return: metal mol2 file path
-    '''
+    """
     atom = os.path.basename(metal_pdb).split('_')[0]
     charge = charge_dict.get(atom, None)
     if not charge:
@@ -35,12 +36,12 @@ def convert_pdb2mol2(metal_pdb, charge_dict, bash_log_curr, env):
 
 
 def split_metal(protein_fname, metal_resnames, wdir):
-    '''
+    """Split protein PDB into protein-only and separate metal PDB files.
     :param protein_fname:
     :param metal_resnames:
     :param wdir:
     :return: clean_protein pdb file path, list of each metal pdb file path
-    '''
+    """
     protein = mda.Universe(protein_fname)
 
     me_selection = ' or '.join([f'resname {i}' for i in metal_resnames])
@@ -61,6 +62,7 @@ def split_metal(protein_fname, metal_resnames, wdir):
     return protein_clean_pdb, metal_pdb_list
 
 def get_new_metal_ids(protein_fname, metal_resnames):
+    """Return mapping of atom IDs to metal residue names."""
     protein = mda.Universe(protein_fname)
     me_selection = ' or '.join([f'resname {i}' for i in metal_resnames])
     metal_atoms = list(protein.select_atoms(me_selection))
@@ -71,13 +73,12 @@ def get_new_metal_ids(protein_fname, metal_resnames):
     return atom_ids
 
 def merge_complex(protein_pdb, ligand_mol2_list, metal_mol2_list, wdir):
-    '''
-
+    """Combine protein, ligand, and metal structures into a single complex.
     :param protein_pdb: pdb file path
     :param ligand_mol2_list: list of mol2 file paths
     :param metal_mol2_list: list of mol2 file paths
     :return: merged complex pdb file path
-    '''
+    """
     def add_resids(protein, resid_list_fname):
         complex = protein
         for resid_fname in resid_list_fname:
@@ -97,6 +98,7 @@ def merge_complex(protein_pdb, ligand_mol2_list, metal_mol2_list, wdir):
     return complex_file
 
 def remove_allHs_from_pdb(complex_file):
+    """Strip protein hydrogens from a PDB file."""
     complex_mda = mda.Universe(complex_file)
     complex_mda_noH = complex_mda.atoms.select_atoms('not (type H and protein)')
 
@@ -105,10 +107,10 @@ def remove_allHs_from_pdb(complex_file):
 
 
 def copy_rename_ligand_files(lig_wdir_list, wdir, ext_list=('mol2','frcmod')):
-    '''
+    """Copy ligand files into working directory and rename by residue ID.
     mol2 and frcmod file names should correspond residue id
     :return: dict
-    '''
+    """
     lig_new_file_ext_dict = {i: [] for i in ext_list}
     molids_pairs_dict = {}
     for lig_wdir in lig_wdir_list:
@@ -129,6 +131,7 @@ def copy_rename_ligand_files(lig_wdir_list, wdir, ext_list=('mol2','frcmod')):
 
 def prepare_protein_in(file_in_template, file_out, complex_file,variable_ion_ids, variable_ion_mol2_files,
                        variable_ligand_mol2_files, variable_ligand_frcmod_files, gaussian_version, force_field, cut_off=2.8, large_opt=1):
+    """Generate MCPB.py input file from a template."""
     with open(file_in_template) as inp:
         data = inp.read()
 
@@ -152,6 +155,7 @@ def prepare_protein_in(file_in_template, file_out, complex_file,variable_ion_ids
 
 
 def set_up_gaussian_files(wdir, ncpu, gaussian_basis, gaussian_memory):
+    """Adjust Gaussian input files with resource settings."""
     gaussian_files = glob(os.path.join(wdir, 'protein*.com'))
     for gau_file in gaussian_files:
         chk = gau_file.replace('.com','.chk')
@@ -166,6 +170,7 @@ def set_up_gaussian_files(wdir, ncpu, gaussian_basis, gaussian_memory):
 
 
 def run_MCPBPY(protein_in_file, wdir, s, bash_log, env):
+    """Execute the MCPB.py workflow for the prepared system."""
     cmd = f'cd {wdir}; MCPB.py -i {protein_in_file} -s {s} >> {bash_log} 2>&1'
     if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
@@ -173,6 +178,7 @@ def run_MCPBPY(protein_in_file, wdir, s, bash_log, env):
 
 
 def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log, env):
+    """Run Gaussian calculations for MCPB.py generated inputs."""
     def run_task(gau_cmd, activate_gaussian, log, wdir, env, check_only_if_exist=False):
         def check_gau_log_file(log):
             if os.path.isfile(log):
@@ -216,21 +222,21 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log
 
 
 def run_tleap(wdir, bash_log, env):
-    #TODO check
-    cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out >> {bash_log} 2>&1'
+    """Execute tleap to generate topology files for the MCPB.py system."""
+    # TODO check
     # cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out'
+    cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out >> {bash_log} 2>&1'
     if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
     return wdir
 
 
 def get_renamed_mcpbpy_residues(complex_original, complex_mcpbpy):
-    '''
-
+    """Map MCPB.py residue names back to original ones.
     :param complex_original:
     :param complex_mcpbpy:
     :return: dict {mcpbpy_resname:orig_resname}
-    '''
+    """
     pdb_orig = mda.Universe(complex_original)
     pdb_mcpbpy = mda.Universe(complex_mcpbpy)
 
@@ -245,7 +251,7 @@ def get_renamed_mcpbpy_residues(complex_original, complex_mcpbpy):
     return diff_dict
 
 def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
-    '''
+    """Rename residues back and convert AMBER outputs to GROMACS format.
     MCPBPY renames refined amino acids. Here we rename them back and transform files from amber to gromacs format
     :param complex_original:
     :param complex_mcpbpy:
@@ -253,8 +259,7 @@ def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
     :param inpcrd:
     :param wdir:
     :return:
-    '''
-
+    """
     topol_top, solv_ions_gro = os.path.join(wdir, 'topol.top'), os.path.join(wdir, 'solv_ions.gro')
 
     diff_residues_dict = get_renamed_mcpbpy_residues(complex_original=complex_original,
@@ -269,6 +274,7 @@ def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
     parm.save(solv_ions_gro)
 
 def create_posre(all_resids, wdir, bash_log, env):
+    """Generate position restraint file for specified residues."""
     index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
     couple_group_ind = '|'.join([str(index_list.index(i)) for i in ['Protein-H'] + all_resids])
     couple_group = '_'.join(['Protein-H'] + all_resids)
@@ -285,6 +291,7 @@ def create_posre(all_resids, wdir, bash_log, env):
     return wdir
 
 def add_restraints_to_topol(topol):
+    """Include position restraint file in topology if missing."""
     string = '''; system1 position restraints
 #ifdef POSRES
 #include "posre.itp"

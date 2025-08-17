@@ -1,3 +1,5 @@
+"""Tests for plotting helpers."""
+
 import os
 import pytest
 import tempfile
@@ -11,8 +13,10 @@ analysis_test = pytest.mark.skipif(
     reason="Only run when --run-analysis is given",
 )
 
+
 @pytest.fixture
 def rmsd_df():
+    """Provide a small RMSD DataFrame."""
     return pd.DataFrame({
         'time(ns)': [0, 1, 2, 3, 4, 5],
         'replica_1': [2.2, 2.1, 2.2, 2.0, 1.8, 1.75],
@@ -22,6 +26,7 @@ def rmsd_df():
 
 @pytest.fixture
 def rmsd_summary_df():
+    """Provide a summary RMSD DataFrame."""
     return pd.DataFrame({
         'RMSD_mean': [1.0, 3.0, 4.5, 2.5],
         'RMSD_std': [0.2, 0.4, 0.6, 0.3],
@@ -30,8 +35,10 @@ def rmsd_summary_df():
         'system': ['X', 'X', 'Y', 'Y']
     })
 
+
 @analysis_test
 def test_plot_rmsd_creates_file(rmsd_df):
+    """Ensure RMSD plot is written to disk."""
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = Path(tmpdir) / "rmsd_plot.png"
         plot_rmsd(rmsd_df, "TestSystem", output_path)
@@ -39,6 +46,7 @@ def test_plot_rmsd_creates_file(rmsd_df):
 
 @analysis_test
 def test_plot_rmsd_mean_std_creates_file(rmsd_summary_df):
+    """Ensure RMSD mean/std plot is written to disk."""
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = Path(tmpdir) / "rmsd_mean_std.html"
         plot_rmsd_mean_std(
