@@ -42,8 +42,7 @@ def test_plot_rmsd_creates_file(rmsd_df):
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = Path(tmpdir) / "rmsd_plot.png"
         plot_rmsd(rmsd_df, "TestSystem", output_path)
-        assert output_path.exists()
-
+        assert output_path.exists() # Check if output exists
 
 @analysis_test
 def test_plot_rmsd_mean_std_creates_file(rmsd_summary_df):
@@ -55,6 +54,6 @@ def test_plot_rmsd_mean_std_creates_file(rmsd_summary_df):
             paint_by_col='system',
             show_legend=True,
             out_name=str(output_path),
-            title="RMSD Plot")
-        assert output_path.exists()
-
+            title="RMSD Plot"
+        )
+        assert output_path.exists() # check if output exists
