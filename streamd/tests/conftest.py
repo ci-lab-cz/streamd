@@ -15,27 +15,31 @@ logging.basicConfig(level=logging.ERROR)
 
 
 def pytest_addoption(parser):
-    """Add custom command-line options for selective test runs."""
     parser.addoption("--run-preparation", action="store_true", default=False,
-                     help="Run slow ligand and protein preparation tests")
+        help="Run slow ligand and protein preparation tests")
     parser.addoption("--run-md", action="store_true", default=False,
-                     help="Run md tests")
+        help="Run md tests")
     parser.addoption("--run-md-full", action="store_true", default=False,
-                     help="Run detailed md tests")
-    parser.addoption("--run-gbsa", action="store_true", default=False,
-                     help="Run gbsa tests")
+        help="Run detailed md tests")
+    parser.addoption("--run-gbsa", action="store_true", default=False, help="Run gbsa tests")
     parser.addoption("--run-gbsa-full", action="store_true", default=False,
-                     help="Run detailed gbsa tests")
+        help="Run detailed gbsa tests")
     parser.addoption("--run-prolif", action="store_true", default=False,
-                     help="Run prolif tests")
+        help="Run prolif tests")
     parser.addoption("--run-prolif-full", action="store_true", default=False,
-                     help="Run detailed prolif tests")
+        help="Run detailed prolif tests")
     parser.addoption("--run-analysis", action="store_true", default=False,
-                     help="Run full analysis tests")
+        help="Run full analysis tests")
     parser.addoption("--not-cleanup", action="store_true", default=False,
-                     help="Do not clean tmp directories with test output for more detailed investigation")
+        help="Do not clean tmp directories with test output for more detailed investigation")
 
 
+# For the debug purposes tests temporary directories can support optional removal (remove=True by default, use --not_clean otherwise)
+# The current version of Streamd is limited to python 3.10 and TemporaryDirectory(remove=False) supports optional remove only from python 3.12
+
+
+
+# @pytest.fixture(scope="session")
 def pytest_configure(config):
     """Configure pytest globals for test suite."""
     pytest.streamd_directory = os.path.dirname(streamd.__file__)
@@ -47,6 +51,12 @@ def pytest_configure(config):
     pytest.ff = 'amber99sb-ildn'
     pytest.cleanup = not config.getoption("--not-cleanup")
 
+# provide arguments to fixture dir_with_input_for_protein_preparation
+# def get_marker(request, name) -> Mark:
+#     markers =
+#     if len(markers) > 1:
+#         pytest.fail(f"Found multiple markers for {name}")
+#     return markers[0]
 
 @pytest.fixture
 def dir_with_input_for_preparation() -> str:
@@ -66,8 +76,8 @@ def dir_with_control_files_for_preparation() -> str:
         prot_files = ['protein_HIS.gro', 'topol.top', 'posre.itp']
         for f in prot_files:
             shutil.copyfile(os.path.join(pytest.data_directory, 'mdrun_test',
-                                         'md_preparation', 'protein', 'protein_HIS', f),
-                            os.path.join(dirname, f))
+                                     'md_preparation', 'protein', 'protein_HIS', f),
+                        os.path.join(dirname, f))
         ligand_files = ['1ke7_LS3.gro', '1ke7_LS3.mol2', '1ke7_LS3.top','posre_1ke7_LS3.itp', 'resid.txt']
         for f in ligand_files:
             shutil.copyfile(os.path.join(pytest.data_directory, 'mdrun_test',

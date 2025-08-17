@@ -1,2 +1,2 @@
-"""Preparation utilities for generating simulation inputs."""
+"""Utilities for preparation input files for simulation."""
 

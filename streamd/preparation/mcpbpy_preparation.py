@@ -13,7 +13,11 @@ from streamd.preparation.ligand_preparation import prepare_gaussian_files
 from streamd.preparation.md_files_preparation import check_if_info_already_added_to_topol, edit_topology_file
 
 def convert_pdb2mol2(metal_pdb, charge_dict, bash_log_curr, env):
-    """Convert a metal PDB file to MOL2 using charge dictionary."""
+    """Convert a metal PDB file to MOL2 using charge dictionary.
+    :param metal_pdb: metal pdb file path
+    :param charge_dict: {MN:2, ZN:2, CA:2}
+    :return: metal mol2 file path
+    """
     atom = os.path.basename(metal_pdb).split('_')[0]
     charge = charge_dict.get(atom, None)
     if not charge:
@@ -32,7 +36,12 @@ def convert_pdb2mol2(metal_pdb, charge_dict, bash_log_curr, env):
 
 
 def split_metal(protein_fname, metal_resnames, wdir):
-    """Split protein PDB into protein-only and separate metal PDB files."""
+    """Split protein PDB into protein-only and separate metal PDB files.
+    :param protein_fname:
+    :param metal_resnames:
+    :param wdir:
+    :return: clean_protein pdb file path, list of each metal pdb file path
+    """
     protein = mda.Universe(protein_fname)
 
     me_selection = ' or '.join([f'resname {i}' for i in metal_resnames])
@@ -64,7 +73,12 @@ def get_new_metal_ids(protein_fname, metal_resnames):
     return atom_ids
 
 def merge_complex(protein_pdb, ligand_mol2_list, metal_mol2_list, wdir):
-    """Combine protein, ligand, and metal structures into a single complex."""
+    """Combine protein, ligand, and metal structures into a single complex.
+    :param protein_pdb: pdb file path
+    :param ligand_mol2_list: list of mol2 file paths
+    :param metal_mol2_list: list of mol2 file paths
+    :return: merged complex pdb file path
+    """
     def add_resids(protein, resid_list_fname):
         complex = protein
         for resid_fname in resid_list_fname:
@@ -93,7 +107,10 @@ def remove_allHs_from_pdb(complex_file):
 
 
 def copy_rename_ligand_files(lig_wdir_list, wdir, ext_list=('mol2','frcmod')):
-    """Copy ligand files into working directory and rename by residue ID."""
+    """Copy ligand files into working directory and rename by residue ID.
+    mol2 and frcmod file names should correspond residue id
+    :return: dict
+    """
     lig_new_file_ext_dict = {i: [] for i in ext_list}
     molids_pairs_dict = {}
     for lig_wdir in lig_wdir_list:
@@ -206,6 +223,8 @@ def run_gaussian_calculation(wdir, gaussian_version, activate_gaussian, bash_log
 
 def run_tleap(wdir, bash_log, env):
     """Execute tleap to generate topology files for the MCPB.py system."""
+    # TODO check
+    # cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out'
     cmd = f'cd {wdir}; tleap -s -f protein_tleap.in > protein_tleap.out >> {bash_log} 2>&1'
     if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
@@ -213,7 +232,11 @@ def run_tleap(wdir, bash_log, env):
 
 
 def get_renamed_mcpbpy_residues(complex_original, complex_mcpbpy):
-    """Map MCPB.py residue names back to original ones."""
+    """Map MCPB.py residue names back to original ones.
+    :param complex_original:
+    :param complex_mcpbpy:
+    :return: dict {mcpbpy_resname:orig_resname}
+    """
     pdb_orig = mda.Universe(complex_original)
     pdb_mcpbpy = mda.Universe(complex_mcpbpy)
 
@@ -228,7 +251,15 @@ def get_renamed_mcpbpy_residues(complex_original, complex_mcpbpy):
     return diff_dict
 
 def amber2gmx(complex_original, complex_mcpbpy, prmtop, inpcrd, wdir):
-    """Rename residues back and convert AMBER outputs to GROMACS format."""
+    """Rename residues back and convert AMBER outputs to GROMACS format.
+    MCPBPY renames refined amino acids. Here we rename them back and transform files from amber to gromacs format
+    :param complex_original:
+    :param complex_mcpbpy:
+    :param prmtop:
+    :param inpcrd:
+    :param wdir:
+    :return:
+    """
     topol_top, solv_ions_gro = os.path.join(wdir, 'topol.top'), os.path.join(wdir, 'solv_ions.gro')
 
     diff_residues_dict = get_renamed_mcpbpy_residues(complex_original=complex_original,

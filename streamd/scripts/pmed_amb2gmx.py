@@ -4,15 +4,14 @@ import parmed as pmd
 import argparse
 
 def arg_parser():
-        """Build the command-line argument parser."""
-        parser = argparse.ArgumentParser(description="Convert AMBER topology to GROMACS using ParmED")
-        parser.add_argument("--prmtop", "-p", type=str,
-                                                help="*prmtop file")
-        parser.add_argument("--inpcrd", "-x", type=str,
-                                                help="*inpcrd file")
-        parser.add_argument("--output", "-o", type=str,
-                                                help="Output name")
-        return parser
+	parser = argparse.ArgumentParser(description="Convert AMBER topology to GROMACS using ParmED")
+	parser.add_argument("--prmtop", "-p", type=str,
+						            help="*prmtop file")
+	parser.add_argument("--inpcrd", "-x", type=str,
+						            help="*inpcrd file")
+	parser.add_argument("--output", "-o", type=str,
+						            help="Output name")
+	return parser
 
 
 parser = arg_parser()

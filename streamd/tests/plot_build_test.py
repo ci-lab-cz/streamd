@@ -55,7 +55,6 @@ def test_plot_rmsd_mean_std_creates_file(rmsd_summary_df):
             paint_by_col='system',
             show_legend=True,
             out_name=str(output_path),
-            title="RMSD Plot",
-        )
+            title="RMSD Plot")
         assert output_path.exists()
 

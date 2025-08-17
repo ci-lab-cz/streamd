@@ -1,5 +1,3 @@
-"""Helpers for initializing Dask clusters and running distributed tasks."""
-
 import logging
 import math
 

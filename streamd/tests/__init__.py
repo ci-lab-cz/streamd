@@ -1,1 +1,1 @@
-"""Test suite for StreaMD."""
+"""Tests for StreaMD."""

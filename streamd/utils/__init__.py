@@ -1,2 +1,2 @@
-"""Shared utility functions for StreaMD."""
+"""utility functions for StreaMD."""
 

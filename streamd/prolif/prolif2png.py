@@ -34,7 +34,17 @@ plt.ioff()
 def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
                       plot_width=None, plot_height=None,
                       point_size=3, base_size=12):
-    """Plot contact occupancy for one or more ligands from ProLIF CSV files."""
+    '''
+
+    :param plif_out_file:
+    :param occupancy:
+    :param plot_width:
+    :param plot_height:
+    :param point_size:
+    :param base_size:
+    :return:
+    '''
+
     new_names = {"HBACCEPTOR": "A", "ANIONIC": "N", "HYDROPHOBIC": "H", 'METALACCEPTOR':'MeA',
                  "PISTACKING": "pi-s", "HBDONOR": "D", "PICATION": "pi+", "CATIONPI": "+pi", "CATIONIC": "P"}
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",

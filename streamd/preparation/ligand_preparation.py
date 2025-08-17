@@ -72,7 +72,10 @@ def supply_mols_tuple(fname, preset_resid=None, protein_resid_set=None):
 
 
 def check_mols(fname):
-    """Return number of molecules and list of problematic ones."""
+    """Return number of molecules and list of problematic ones.
+    :param fname:
+    :return: number of mols, list of problem_mols
+    """
     def check_if_problem(mol, n):
         molid = mol.GetProp('_Name') if mol.HasProp('_Name') else n
         try:
@@ -246,7 +249,20 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
 def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_path, project_dir, wdir_ligand,
                           no_dr, gaussian_exe, activate_gaussian, gaussian_basis, gaussian_memory,
                           hostfile, ncpu, bash_log):
-    """Prepare parameterization inputs for multiple ligands."""
+    """Prepare parameterization inputs for multiple ligands.
+     :param ligand_fname:
+    :param preset_resid:
+    :param script_path:
+    :param project_dir:
+    :param wdir_ligand:
+    :param no_dr:
+    :param gaussian_exe: str or None
+    :param activate_gaussian: str or None
+    :param hostfile:
+    :param ncpu:
+    :param bash_log:
+    :return:
+    """
     lig_wdirs = []
 
     if ligand_fname.endswith('.mol2'):

@@ -215,6 +215,8 @@ def parse_gmxMMPBSA_output(fname):
         delta_total_res = {}
         delta_total_columns = [i.strip() for i in delta_total_columns_re[0].split('  ') if i]
         delta_total_values = [i.strip() for i in delta_total_values_re[0].split('  ') if i]
+    #['Energy Component' - skip, 'Average', 'SD(Prop.)', 'SD', 'SEM(Prop.)', 'SEM']
+
         for n, i in enumerate(delta_total_columns[1:]):
             delta_total_res[f'ΔTOTAL_{i}'] = delta_total_values[n]
         return delta_total_res

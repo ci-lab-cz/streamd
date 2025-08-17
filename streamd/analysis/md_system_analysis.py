@@ -48,6 +48,7 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                      molid_resid_pairs,
                      ligand_resid="UNL", active_site_dist=5.0):
     """Calculate RMSD profiles for a single MD system."""
+    # groupselections = ['protein']
     rmsd_out_file = os.path.join(wdir_out_analysis, f'rmsd_{system_name}.csv')
     universe = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
     groupselections = []

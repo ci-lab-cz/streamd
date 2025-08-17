@@ -123,6 +123,11 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
                        title=title)
 
 
+# def create_html_rmsd_mean_std(data, paint_by_col,show_legend, out_name):
+#     plot_rmsd_mean_std(data=data, paint_by_col=paint_by_col,
+#                        show_legend=show_legend,
+#                        out_name=out_name)
+
 def main():
     """CLI entry point for RMSD analysis."""
     parser = argparse.ArgumentParser(description='''Run rmsd analysis for StreaMD output files''')

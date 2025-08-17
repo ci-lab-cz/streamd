@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Utilities for running the StreaMD molecular dynamics pipeline.
 
-This module orchestrates preparation, equilibration, simulation, and
-continuation steps for molecular dynamics workflows, delegating heavy lifting
-to helper scripts and utility functions.
+This module orchestrates preparation, equilibration, simulation (and
+continuation) and analysis steps for MD workflow.
 """
 # ==============================================================================
 # author          : Aleksandra Ivanova, Olena Mokshyna, Pavel Polishchuk
@@ -42,10 +41,8 @@ logging.getLogger('MDAnalysis').setLevel('CRITICAL')
 logging.getLogger('bockeh').setLevel('WARNING')
 
 
-class RawTextArgumentDefaultsHelpFormatter(
-    argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter
-):
-    """Help formatter preserving line breaks and showing defaults."""
+class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
+    pass
 
 
 def run_equilibration(wdir, project_dir, bash_log, ncpu, compute_device,
