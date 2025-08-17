@@ -81,7 +81,6 @@ def convertxvg2png(xvg_file, system_name=None, transform_nm_to_A=False):
     plt.clf()
     plt.close('all')
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Draw png plot for xvg outputs of md analysis''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=True,
