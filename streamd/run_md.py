@@ -623,7 +623,6 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                     os.remove(f)
 
 def main():
-    """Entry point for the command-line interface."""
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
     Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple) ''')
     parser1 = parser.add_argument_group('Standard Molecular Dynamics Simulation Run')
