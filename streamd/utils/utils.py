@@ -49,6 +49,29 @@ def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) 
         config_args = {
             k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
         }
+
+        # Convert configuration values according to parser specifications so that
+        # defaults set from YAML mimic CLI parsing behaviour.  This handles
+        # ``nargs`` options as well as applying any ``type`` conversions.
+        for action in parser._actions:
+            dest = action.dest
+            if dest not in config_args:
+                continue
+            value = config_args[dest]
+
+            if action.nargs not in (None, '?'):
+                if isinstance(value, str):
+                    value = value.split()
+                elif not isinstance(value, (list, tuple)):
+                    value = [value]
+                if action.type:
+                    value = [action.type(v) for v in value]
+            else:
+                if action.type:
+                    value = action.type(value)
+
+            config_args[dest] = value
+
         parser.set_defaults(**config_args)
 
     return parser.parse_args(cli_args), config_args

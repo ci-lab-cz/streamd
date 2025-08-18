@@ -96,6 +96,27 @@ def test_run_gbsa_argument_parsing(tmp_path: Path) -> None:
     assert not hasattr(args, "unused")
 
 
+def test_list_argument_from_config(tmp_path: Path) -> None:
+    """Lists provided via YAML are split and converted by ``nargs``/``type``."""
+
+    parser = _make_parser([
+        ("--steps", {"nargs": "*", "type": int, "default": []}),
+    ])
+
+    # Provided as a single whitespace-separated string in YAML
+    config = {"steps": "1 2"}
+    config_path = _write_config(tmp_path, config)
+
+    args, _ = parse_with_config(parser, ["--config", str(config_path)])
+    assert args.steps == [1, 2]
+
+    # CLI values still override config-provided defaults
+    args, _ = parse_with_config(
+        parser, ["--config", str(config_path), "--steps", "3", "4"]
+    )
+    assert args.steps == [3, 4]
+
+
 def test_run_prolif_argument_parsing(tmp_path: Path) -> None:
     """Validate ProLIF parser config/CLI precedence."""
 
