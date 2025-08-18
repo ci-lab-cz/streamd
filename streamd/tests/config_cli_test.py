@@ -62,7 +62,7 @@ def _make_parser(options: Iterable[Tuple[str, dict]]) -> argparse.ArgumentParser
                 ("--debug", {"action": "store_true", "default": False}),
                 ("--ncpu", {"type": int, "default": 1}),
             ],
-            {"ligand_id": "ABC", "ncpu": 4, "unused": "x"},
+            {"ligand_id": "ABC", "unused": "x"},
             ["--tpr", "file.tpr", "--xtc", "file.xtc", "--debug"],
             {
                 "tpr": "file.tpr",
