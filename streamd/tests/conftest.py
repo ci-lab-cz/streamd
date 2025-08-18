@@ -8,67 +8,82 @@ import shutil
 
 import sys
 import types
+import importlib
+
+
+def _stub_if_missing(name: str, attrs: dict | None = None) -> None:
+    """Register a lightweight stub for *name* if importing it fails.
+
+    Parameters
+    ----------
+    name:
+        Fully qualified module name to check.
+    attrs:
+        Optional mapping of attributes to set on the created stub module.
+    """
+
+    if name in sys.modules:
+        return
+    try:
+        importlib.import_module(name)
+        return
+    except Exception:
+        mod = types.ModuleType(name)
+        if attrs:
+            for key, value in attrs.items():
+                setattr(mod, key, value)
+        sys.modules[name] = mod
+
 
 # Stub heavy optional dependencies for tests so that modules importing them
-# during test collection do not fail.  Only lightweight placeholders are
-# provided – the tests that require real functionality are skipped unless
-# corresponding command-line flags are supplied.
-sys.modules.setdefault("MDAnalysis", types.ModuleType("MDAnalysis"))
+# during test collection do not fail. Only lightweight placeholders are
+# provided – real modules, when installed, are left untouched.
+_stub_if_missing("MDAnalysis")
 
 # ProLIF-related stubs
-sys.modules.setdefault("prolif", types.ModuleType("prolif"))
-sys.modules.setdefault("prolif.plotting", types.ModuleType("prolif.plotting"))
-barcode_mod = types.ModuleType("prolif.plotting.barcode")
-barcode_mod.Barcode = type("Barcode", (), {})
-network_mod = types.ModuleType("prolif.plotting.network")
-network_mod.LigNetwork = type("LigNetwork", (), {})
-sys.modules.setdefault("prolif.plotting.barcode", barcode_mod)
-sys.modules.setdefault("prolif.plotting.network", network_mod)
+_stub_if_missing("prolif")
+_stub_if_missing("prolif.plotting")
+_stub_if_missing("prolif.plotting.barcode", {"Barcode": type("Barcode", (), {})})
+_stub_if_missing("prolif.plotting.network", {"LigNetwork": type("LigNetwork", (), {})})
 
-plt_mod = types.ModuleType("matplotlib.pyplot")
-plt_mod.ioff = lambda: None
-mat_mod = types.ModuleType("matplotlib")
-mat_mod.rcParams = {}
-sys.modules.setdefault("matplotlib", mat_mod)
-sys.modules.setdefault("matplotlib.pyplot", plt_mod)
+_stub_if_missing("matplotlib", {"rcParams": {}})
+_stub_if_missing("matplotlib.pyplot", {"ioff": lambda: None})
 
-conv_mod = types.ModuleType("streamd.prolif.prolif2png")
-conv_mod.convertprolif2png = lambda *a, **k: None
-frame_mod = types.ModuleType("streamd.prolif.prolif_frame_map")
-frame_mod.create_framemap = lambda *a, **k: None
-frame_mod.convertplifbyframe2png = lambda *a, **k: None
-sys.modules.setdefault("streamd.prolif.prolif2png", conv_mod)
-sys.modules.setdefault("streamd.prolif.prolif_frame_map", frame_mod)
+_stub_if_missing(
+    "streamd.prolif.prolif2png", {"convertprolif2png": lambda *a, **k: None}
+)
+_stub_if_missing(
+    "streamd.prolif.prolif_frame_map",
+    {
+        "create_framemap": lambda *a, **k: None,
+        "convertplifbyframe2png": lambda *a, **k: None,
+    },
+)
 
 # Other optional libraries
-sys.modules.setdefault("dask", types.ModuleType("dask"))
-sys.modules.setdefault("dask.distributed", types.ModuleType("dask.distributed"))
-sys.modules["dask.distributed"].Client = type("Client", (), {})
-sys.modules["dask.distributed"].SSHCluster = type("SSHCluster", (), {})
+_stub_if_missing("dask")
+_stub_if_missing(
+    "dask.distributed",
+    {
+        "Client": type("Client", (), {}),
+        "SSHCluster": type("SSHCluster", (), {}),
+    },
+)
 
-mda_analysis = types.ModuleType("MDAnalysis.analysis")
-mda_analysis.rms = object()
-sys.modules.setdefault("MDAnalysis.analysis", mda_analysis)
+_stub_if_missing("MDAnalysis.analysis", {"rms": object()})
 
-sns_mod = types.ModuleType("seaborn")
-sns_mod.set_context = lambda *a, **k: None
-sys.modules.setdefault("seaborn", sns_mod)
-plotly_mod = types.ModuleType("plotly")
-plotly_mod.__path__ = []
-sys.modules.setdefault("plotly", plotly_mod)
-sys.modules.setdefault("plotly.offline", types.ModuleType("plotly.offline"))
-sys.modules.setdefault("plotly.express", types.ModuleType("plotly.express"))
+_stub_if_missing("seaborn", {"set_context": lambda *a, **k: None})
+_stub_if_missing("plotly", {"__path__": []})
+_stub_if_missing("plotly.offline")
+_stub_if_missing("plotly.express")
 
-sys.modules.setdefault("parmed", types.ModuleType("parmed"))
-sys.modules.setdefault("rdkit", types.ModuleType("rdkit"))
-sys.modules.setdefault("rdkit.Chem", types.ModuleType("rdkit.Chem"))
-sys.modules.setdefault("rdkit.Chem.rdmolops", types.ModuleType("rdkit.Chem.rdmolops"))
+_stub_if_missing("parmed")
+_stub_if_missing("rdkit")
+_stub_if_missing("rdkit.Chem")
+_stub_if_missing("rdkit.Chem.rdmolops")
 
-pandas_mod = types.ModuleType("pandas")
-pandas_mod.DataFrame = type("DataFrame", (), {})
-sys.modules.setdefault("pandas", pandas_mod)
-
-sys.modules.setdefault("numpy", types.ModuleType("numpy"))
+_stub_if_missing("pandas", {"DataFrame": type("DataFrame", (), {})})
+_stub_if_missing("numpy")
 
 import pytest
 from streamd.utils.utils import temporary_directory_debug
