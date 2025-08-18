@@ -8,8 +8,50 @@ import re
 import shutil
 import subprocess
 from tempfile import mkdtemp
+from typing import Iterable, Tuple, Dict, Any
+
+import argparse
+import yaml
 
 import MDAnalysis as mda
+
+
+def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) -> Tuple[argparse.Namespace, Dict[str, Any]]:
+    """Parse ``cli_args`` using ``parser`` honouring an optional ``--config`` file.
+
+    Parameters
+    ----------
+    parser:
+        Configured ``argparse.ArgumentParser`` that includes a ``--config`` option.
+    cli_args:
+        Sequence of command-line arguments excluding the program name.
+
+    Returns
+    -------
+    Tuple[argparse.Namespace, Dict[str, Any]]
+        The parsed arguments and the subset of configuration values that were
+        applied as defaults.
+    """
+
+    args, _ = parser.parse_known_args(cli_args)
+    config_args: Dict[str, Any] = {}
+    if getattr(args, "config", None):
+        with open(args.config) as fh:
+            config_args = yaml.safe_load(fh) or {}
+        if not isinstance(config_args, dict):
+            raise ValueError("Config file must contain key-value pairs")
+        valid_keys = {action.dest for action in parser._actions}
+        cli_dests = {
+            action.dest
+            for action in parser._actions
+            if any(opt in cli_args for opt in action.option_strings)
+        }
+        config_args = {
+            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
+        }
+        parser.set_defaults(**config_args)
+
+    return parser.parse_args(cli_args), config_args
 
 
 def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=False):

@@ -64,6 +64,12 @@ sys.modules.setdefault("rdkit", types.ModuleType("rdkit"))
 sys.modules.setdefault("rdkit.Chem", types.ModuleType("rdkit.Chem"))
 sys.modules.setdefault("rdkit.Chem.rdmolops", types.ModuleType("rdkit.Chem.rdmolops"))
 
+pandas_mod = types.ModuleType("pandas")
+pandas_mod.DataFrame = type("DataFrame", (), {})
+sys.modules.setdefault("pandas", pandas_mod)
+
+sys.modules.setdefault("numpy", types.ModuleType("numpy"))
+
 import pytest
 from streamd.utils.utils import temporary_directory_debug
 # from _pytest.mark import Mark

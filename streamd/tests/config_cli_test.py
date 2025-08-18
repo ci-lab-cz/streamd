@@ -18,38 +18,11 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Iterable
 
 import yaml
 
-
-def _parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) -> argparse.Namespace:
-    """Parse ``cli_args`` using ``parser`` honouring ``--config`` files.
-
-    This helper replicates the configuration merging logic implemented in
-    the actual entry points.  ``cli_args`` is a sequence of command-line
-    arguments *excluding* the program name.
-    """
-
-    args, _ = parser.parse_known_args(cli_args)
-    if getattr(args, "config", None):
-        with open(args.config) as fh:
-            config_args = yaml.safe_load(fh) or {}
-        if not isinstance(config_args, dict):  # defensive check
-            raise ValueError("Config file must contain key-value pairs")
-
-        valid_keys = {action.dest for action in parser._actions}
-        cli_dests = {
-            action.dest
-            for action in parser._actions
-            if any(opt in cli_args for opt in action.option_strings)
-        }
-        config_args = {
-            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
-        }
-        parser.set_defaults(**config_args)
-
-    return parser.parse_args(cli_args)
+from streamd.utils.utils import parse_with_config
 
 
 def _write_config(tmp_path: Path, data: dict) -> Path:
@@ -81,7 +54,7 @@ def test_run_md_argument_parsing(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, config)
 
     cli = ["--config", str(config_path), "--protein", "PRO.pdb", "--ncpu", "8"]
-    args = _parse_with_config(parser, cli)
+    args, _ = parse_with_config(parser, cli)
 
     assert args.protein == "PRO.pdb"  # CLI only
     assert args.ligand == "LIG_A"  # from config
@@ -114,7 +87,7 @@ def test_run_gbsa_argument_parsing(tmp_path: Path) -> None:
         "--ncpu",
         "2",
     ]
-    args = _parse_with_config(parser, cli)
+    args, _ = parse_with_config(parser, cli)
 
     assert args.tpr == "file.tpr"
     assert args.xtc == "file.xtc"
@@ -148,7 +121,7 @@ def test_run_prolif_argument_parsing(tmp_path: Path) -> None:
         "--ncpu",
         "2",
     ]
-    args = _parse_with_config(parser, cli)
+    args, _ = parse_with_config(parser, cli)
 
     assert args.tpr == "file.tpr"
     assert args.xtc == "file.xtc"

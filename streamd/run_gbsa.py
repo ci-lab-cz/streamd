@@ -21,13 +21,20 @@ import subprocess
 from datetime import datetime
 from functools import partial
 from multiprocessing import Pool
-import yaml
+import sys
 
 import pandas as pd
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import (get_index, make_group_ndx, filepath_type, run_check_subprocess,
-                                 get_number_of_frames, temporary_directory_debug)
+from streamd.utils.utils import (
+    get_index,
+    make_group_ndx,
+    filepath_type,
+    run_check_subprocess,
+    get_number_of_frames,
+    temporary_directory_debug,
+    parse_with_config,
+)
 logging.getLogger('distributed').setLevel('CRITICAL')
 logging.getLogger('asyncssh').setLevel('CRITICAL')
 logging.getLogger('distributed.worker').setLevel('CRITICAL')
@@ -516,24 +523,7 @@ def main():
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
-    config_args = {}
-    args, _ = parser.parse_known_args()
-    if args.config:
-        with open(args.config) as fh:
-            config_args = yaml.safe_load(fh) or {}
-        if not isinstance(config_args, dict):
-            raise ValueError('Config file must contain key-value pairs')
-        valid_keys = {action.dest for action in parser._actions}
-        cli_dests = {
-            action.dest
-            for action in parser._actions
-            if any(opt in sys.argv[1:] for opt in action.option_strings)
-        }
-        config_args = {
-            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
-        }
-        parser.set_defaults(**config_args)
-    args = parser.parse_args()
+    args, _ = parse_with_config(parser, sys.argv[1:])
 
     if args.wdir is None:
         wdir = os.getcwd()

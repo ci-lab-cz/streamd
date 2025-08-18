@@ -22,18 +22,21 @@ from functools import partial
 from glob import glob
 import json
 import re
-import yaml
 
 from streamd.analysis.md_system_analysis import run_md_analysis
 from streamd.analysis.run_analysis import run_rmsd_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import (filepath_type, run_check_subprocess,
-                                 get_protein_resid_set,
-                                 backup_prev_files,
-                                 check_to_continue_simulation_time,
-                                 merge_parts_of_simulation)
+from streamd.utils.utils import (
+    filepath_type,
+    run_check_subprocess,
+    get_protein_resid_set,
+    backup_prev_files,
+    check_to_continue_simulation_time,
+    merge_parts_of_simulation,
+    parse_with_config,
+)
 from streamd.mcpbpy_md import mcbpy_md
 
 logging.getLogger('distributed').setLevel('WARNING')
@@ -774,24 +777,7 @@ def main():
                              'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up, '
                              'otherwise standard gmx2pdb procedure will be run')
 
-    config_args = {}
-    args, _ = parser.parse_known_args()
-    if args.config:
-        with open(args.config) as fh:
-            config_args = yaml.safe_load(fh) or {}
-        if not isinstance(config_args, dict):
-            raise ValueError('Config file must contain key-value pairs')
-        valid_keys = {action.dest for action in parser._actions}
-        cli_dests = {
-            action.dest
-            for action in parser._actions
-            if any(opt in sys.argv[1:] for opt in action.option_strings)
-        }
-        config_args = {
-            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
-        }
-        parser.set_defaults(**config_args)
-    args = parser.parse_args()
+    args, config_args = parse_with_config(parser, sys.argv[1:])
 
     if args.wdir is None:
         wdir = os.getcwd()

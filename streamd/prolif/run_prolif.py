@@ -10,7 +10,7 @@ from functools import partial
 from glob import glob
 import logging
 import pathlib
-import yaml
+import sys
 
 import MDAnalysis as mda
 import pandas as pd
@@ -20,7 +20,7 @@ from prolif.plotting.network import LigNetwork
 import matplotlib.pyplot as plt
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import filepath_type
+from streamd.utils.utils import filepath_type, parse_with_config
 from streamd.prolif.prolif2png import convertprolif2png
 from streamd.prolif.prolif_frame_map import convertplifbyframe2png
 plt.ioff()
@@ -277,24 +277,7 @@ def main():
                         metavar='string', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
-    config_args = {}
-    args, _ = parser.parse_known_args()
-    if args.config:
-        with open(args.config) as fh:
-            config_args = yaml.safe_load(fh) or {}
-        if not isinstance(config_args, dict):
-            raise ValueError('Config file must contain key-value pairs')
-        valid_keys = {action.dest for action in parser._actions}
-        cli_dests = {
-            action.dest
-            for action in parser._actions
-            if any(opt in sys.argv[1:] for opt in action.option_strings)
-        }
-        config_args = {
-            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
-        }
-        parser.set_defaults(**config_args)
-    args = parser.parse_args()
+    args, _ = parse_with_config(parser, sys.argv[1:])
 
     if args.wdir is None:
         wdir = os.getcwd()
