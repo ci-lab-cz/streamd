@@ -49,6 +49,7 @@
   - [Examples](#examples-2)
   - [Output](#output-3)
 - [Logging](#logging)
+- [config.yaml file](#config-file)
 - [License](#license)
 - [Citation](#citation)
     
@@ -247,8 +248,7 @@ MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and B
                         Metal residue charges in dictionary formatStart MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are
                         set up, otherwise standard gmx2pdb procedure will be run
 
-``` 
-
+```
 #### **Run simulation for different systems:**
 ##### Protein in Water
 ```
@@ -743,6 +743,21 @@ log_mmpbsa_bash_*unique-suffix*.log - StreaMD bash system logging info
 ```
 log_prolif_*unique-suffix*.log - StreaMD logging user info
 ```
+
+## config file
+**All arguments for run_md, run_prolif, run_gbsa tools can be provided in a config file with --config config.yml argument**
+> [!NOTE]
+> CLI arguments override YAML
+
+Example of config.yml for _run_md_:
+```
+ligand: ligand.mol
+steps: 1 2 3
+md_time: 10
+seed: 1024
+
+```
+
 
 [Return to the Table Of Contents](#table-of-contents)   
 
