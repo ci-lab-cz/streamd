@@ -787,7 +787,7 @@ def main():
     if args.steps is not None:
         if not all([i in [1, 2, 3, 4] for i in args.steps]):
             raise ValueError(f'--steps {args.steps} argument is not valid. Please choose the combination from: 1, 2, 3, 4')
-        if any([i in [2, 3, 4] for i in args.steps]) and args.wdir_to_continue is None:
+        if not 1 in args.steps and any([i in [2, 3, 4] for i in args.steps]) and args.wdir_to_continue is None:
             raise ValueError(f'--wdir_to_continue argument is not valid. '
                          f'If you set up --step {args.steps} you need to provide directories containing md files'
                          f' created by previous steps')
