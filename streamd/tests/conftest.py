@@ -4,7 +4,13 @@ import logging
 from glob import glob
 import os
 import shutil
- #, TemporaryDirectory
+#, TemporaryDirectory
+
+import sys
+import types
+
+# Stub heavy optional dependencies for tests
+sys.modules.setdefault("MDAnalysis", types.ModuleType("MDAnalysis"))
 
 import pytest
 from streamd.utils.utils import temporary_directory_debug
