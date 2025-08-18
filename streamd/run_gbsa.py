@@ -21,12 +21,20 @@ import subprocess
 from datetime import datetime
 from functools import partial
 from multiprocessing import Pool
+import sys
 
 import pandas as pd
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import (get_index, make_group_ndx, filepath_type, run_check_subprocess,
-                                 get_number_of_frames, temporary_directory_debug)
+from streamd.utils.utils import (
+    get_index,
+    make_group_ndx,
+    filepath_type,
+    run_check_subprocess,
+    get_number_of_frames,
+    temporary_directory_debug,
+    parse_with_config,
+)
 logging.getLogger('distributed').setLevel('CRITICAL')
 logging.getLogger('asyncssh').setLevel('CRITICAL')
 logging.getLogger('distributed.worker').setLevel('CRITICAL')
@@ -474,6 +482,9 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
 def main():
     """CLI entry point for GBSA calculations."""
     parser = argparse.ArgumentParser(description='''Run MM-GBSA/MM-PBSA calculation using gmx_MMPBSA tool''')
+    parser.add_argument('--config', metavar='FILENAME', required=False,
+                        type=partial(filepath_type, ext=("yml", "yaml")),
+                        help='Path to YAML configuration file with default arguments')
     parser.add_argument('-i', '--wdir_to_run', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),
                         help='''single or multiple directories for simulations.
@@ -512,8 +523,7 @@ def main():
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
-
-    args = parser.parse_args()
+    args, _ = parse_with_config(parser, sys.argv[1:])
 
     if args.wdir is None:
         wdir = os.getcwd()

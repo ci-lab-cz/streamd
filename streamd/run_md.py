@@ -28,11 +28,15 @@ from streamd.analysis.run_analysis import run_rmsd_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import (filepath_type, run_check_subprocess,
-                                 get_protein_resid_set,
-                                 backup_prev_files,
-                                 check_to_continue_simulation_time,
-                                 merge_parts_of_simulation)
+from streamd.utils.utils import (
+    filepath_type,
+    run_check_subprocess,
+    get_protein_resid_set,
+    backup_prev_files,
+    check_to_continue_simulation_time,
+    merge_parts_of_simulation,
+    parse_with_config,
+)
 from streamd.mcpbpy_md import mcbpy_md
 
 logging.getLogger('distributed').setLevel('WARNING')
@@ -625,6 +629,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 def main():
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
     Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple) ''')
+    parser.add_argument('--config', metavar='FILENAME', required=False,
+                        type=partial(filepath_type, ext=("yml", "yaml")),
+                        help='Path to YAML configuration file with default arguments')
     parser1 = parser.add_argument_group('Standard Molecular Dynamics Simulation Run')
     parser1.add_argument('-p', '--protein', metavar='FILENAME', required=False,
                         type=partial(filepath_type, ext=('pdb', 'gro'), check_exist=True),
@@ -770,7 +777,7 @@ def main():
                              'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up, '
                              'otherwise standard gmx2pdb procedure will be run')
 
-    args = parser.parse_args()
+    args, config_args = parse_with_config(parser, sys.argv[1:])
 
     if args.wdir is None:
         wdir = os.getcwd()
@@ -787,13 +794,13 @@ def main():
 
     # check if user explicitly specified md, nvt or npt time and if so change user-defined mdp files
     explicit_args = []
-    if '--nvt_time' in sys.argv:
+    if '--nvt_time' in sys.argv or 'nvt_time' in config_args:
         explicit_args.append('nvt.mdp')
-    if '--npt_time' in sys.argv:
+    if '--npt_time' in sys.argv or 'npt_time' in config_args:
         explicit_args.append('npt.mdp')
-    if '--md_time' in sys.argv:
+    if '--md_time' in sys.argv or 'md_time' in config_args:
         explicit_args.append('md.mdp')
-    if '--seed' in sys.argv:
+    if '--seed' in sys.argv or 'seed' in config_args:
         explicit_args.append('seed')
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'

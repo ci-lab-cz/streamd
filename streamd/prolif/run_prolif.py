@@ -10,6 +10,7 @@ from functools import partial
 from glob import glob
 import logging
 import pathlib
+import sys
 
 import MDAnalysis as mda
 import pandas as pd
@@ -19,7 +20,7 @@ from prolif.plotting.network import LigNetwork
 import matplotlib.pyplot as plt
 
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import filepath_type
+from streamd.utils.utils import filepath_type, parse_with_config
 from streamd.prolif.prolif2png import convertprolif2png
 from streamd.prolif.prolif_frame_map import convertplifbyframe2png
 plt.ioff()
@@ -220,6 +221,9 @@ def main():
     parser = argparse.ArgumentParser(description='Get protein-ligand interactions from MD trajectories using '
                                                  'ProLIF module.',
                                      formatter_class=RawTextArgumentDefaultsHelpFormatter)
+    parser.add_argument('--config', metavar='FILENAME', required=False,
+                        type=partial(filepath_type, ext=("yml", "yaml")),
+                        help='Path to YAML configuration file with default arguments')
     parser.add_argument('-i', '--wdir_to_run', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),
                         help='''single or multiple directories for simulations.
@@ -273,8 +277,7 @@ def main():
                         metavar='string', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
-
-    args = parser.parse_args()
+    args, _ = parse_with_config(parser, sys.argv[1:])
 
     if args.wdir is None:
         wdir = os.getcwd()

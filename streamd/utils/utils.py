@@ -8,8 +8,73 @@ import re
 import shutil
 import subprocess
 from tempfile import mkdtemp
+from typing import Iterable, Tuple, Dict, Any
+
+import argparse
+import yaml
 
 import MDAnalysis as mda
+
+
+def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) -> Tuple[argparse.Namespace, Dict[str, Any]]:
+    """Parse ``cli_args`` using ``parser`` honouring an optional ``--config`` file.
+
+    Parameters
+    ----------
+    parser:
+        Configured ``argparse.ArgumentParser`` that includes a ``--config`` option.
+    cli_args:
+        Sequence of command-line arguments excluding the program name.
+
+    Returns
+    -------
+    Tuple[argparse.Namespace, Dict[str, Any]]
+        The parsed arguments and the subset of configuration values that were
+        applied as defaults.
+    """
+
+    args, _ = parser.parse_known_args(cli_args)
+    config_args: Dict[str, Any] = {}
+    if getattr(args, "config", None):
+        with open(args.config) as fh:
+            config_args = yaml.safe_load(fh) or {}
+        if not isinstance(config_args, dict):
+            raise ValueError("Config file must contain key-value pairs")
+        valid_keys = {action.dest for action in parser._actions}
+        cli_dests = {
+            action.dest
+            for action in parser._actions
+            if any(opt in cli_args for opt in action.option_strings)
+        }
+        config_args = {
+            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
+        }
+
+        # Convert configuration values according to parser specifications so that
+        # defaults set from YAML mimic CLI parsing behaviour.  This handles
+        # ``nargs`` options as well as applying any ``type`` conversions.
+        for action in parser._actions:
+            dest = action.dest
+            if dest not in config_args:
+                continue
+            value = config_args[dest]
+
+            if action.nargs not in (None, '?'):
+                if isinstance(value, str):
+                    value = value.split()
+                elif not isinstance(value, (list, tuple)):
+                    value = [value]
+                if action.type:
+                    value = [action.type(v) for v in value]
+            else:
+                if action.type:
+                    value = action.type(value)
+
+            config_args[dest] = value
+
+        parser.set_defaults(**config_args)
+
+    return parser.parse_args(cli_args), config_args
 
 
 def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=False):
