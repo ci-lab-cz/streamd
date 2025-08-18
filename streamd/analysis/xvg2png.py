@@ -9,8 +9,31 @@ from streamd.utils.utils import backup_prev_files
 
 
 def convertxvg2png(xvg_file, system_name=None, transform_nm_to_A=False):
-    """Parse an XVG file and save corresponding CSV and PNG plots."""
+    """Parse an XVG file and save corresponding CSV and PNG plots.
+
+    Parameters
+    ----------
+    xvg_file : str | os.PathLike
+        Path to the GROMACS ``.xvg`` file.
+    system_name : str | None, optional
+        System name appended to the plot title.
+    transform_nm_to_A : bool, optional
+        If ``True`` convert values from nanometres to Ångström.
+    """
+
     def check_if_value_found(value):
+        """Return the first element of ``value`` or an empty string.
+
+        Parameters
+        ----------
+        value : list[str]
+            Regex match result.
+
+        Returns
+        -------
+        str
+            First matched value or an empty string.
+        """
         if value:
             return value[0]
         else:
