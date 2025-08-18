@@ -47,7 +47,30 @@ def rmsd_for_atomgroups(universe, selection1, selection2=None):
 def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                      molid_resid_pairs,
                      ligand_resid="UNL", active_site_dist=5.0):
-    """Calculate RMSD profiles for a single MD system."""
+    """Calculate RMSD profiles for a single MD system.
+
+    Parameters
+    ----------
+    tpr : str | os.PathLike
+        Path to the topology ``.tpr`` file of the simulation.
+    xtc : str | os.PathLike
+        Path to the trajectory ``.xtc`` file.
+    wdir_out_analysis : str | os.PathLike
+        Directory where analysis outputs will be stored.
+    system_name : str
+        Identifier of the analysed system used in file names.
+    molid_resid_pairs : Iterable[tuple[str, str]]
+        Pairs mapping molecule identifiers to residue names.
+    ligand_resid : str, optional
+        Residue name of the ligand to analyse.
+    active_site_dist : float, optional
+        Distance in Ångström defining the active-site region around the ligand.
+
+    Returns
+    -------
+    str
+        Path to the generated ``rmsd_*.csv`` file.
+    """
     # groupselections = ['protein']
     rmsd_out_file = os.path.join(wdir_out_analysis, f'rmsd_{system_name}.csv')
     universe = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
@@ -88,7 +111,39 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                     save_traj_without_water = False,
                     analysis_dirname = 'md_analysis',
                     ligand_list_file_prev=None, env=None, system_name=None):
-    """Prepare trajectories and execute RMSD analysis."""
+    """Prepare trajectories and execute RMSD analysis.
+
+    Parameters
+    ----------
+    var_md_dirs_deffnm : tuple[str, str]
+        Tuple of working directory and deffnm base name.
+    mdtime_ns : float
+        Target simulation length in nanoseconds.
+    project_dir : str | os.PathLike
+        Base directory containing helper scripts.
+    bash_log : str
+        Name of log file capturing shell output.
+    active_site_dist : float, optional
+        Distance in Ångström to define the active site around the ligand.
+    ligand_resid : str, optional
+        Residue name identifying the ligand.
+    save_traj_without_water : bool, optional
+        Keep intermediate trajectories without water if ``True``.
+    analysis_dirname : str, optional
+        Name of the directory to store analysis files.
+    ligand_list_file_prev : str | None, optional
+        Optional file listing ligand/residue pairs from a previous run.
+    env : dict | None, optional
+        Environment variables for subprocess calls.
+    system_name : str | None, optional
+        Custom name for the MD system.
+
+    Returns
+    -------
+    tuple[str, str, str] | None
+        Tuple of RMSD output file path, analysis directory and working
+        directory, or ``None`` on failure.
+    """
     wdir, deffnm = var_md_dirs_deffnm
 
     # create subdir for analysis files only
