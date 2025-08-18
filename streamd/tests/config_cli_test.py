@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Tuple
 
 import yaml
+import pytest
 
 from streamd.utils.utils import parse_with_config
 
@@ -39,60 +40,69 @@ def _make_parser(options: Iterable[Tuple[str, dict]]) -> argparse.ArgumentParser
     return parser
 
 
-def test_run_md_argument_parsing(tmp_path: Path) -> None:
-    """CLI values override YAML and unused keys are ignored for MD parser."""
+@pytest.mark.parametrize(
+    "options, config, cli, expected",
+    [
+        (
+            [
+                ("--protein", {}),
+                ("--ligand", {}),
+                ("--ncpu", {"type": int, "default": 1}),
+            ],
+            {"ligand": "LIG_A", "ncpu": 4, "unused": "x"},
+            ["--protein", "PRO.pdb", "--ncpu", "8"],
+            {"protein": "PRO.pdb", "ligand": "LIG_A", "ncpu": 8},
+        ),
+        (
+            [
+                ("--tpr", {}),
+                ("--xtc", {}),
+                ("--ligand_id", {}),
+                ("--ncpu", {"type": int, "default": 1}),
+            ],
+            {"ligand_id": "ABC", "ncpu": 4, "unused": "x"},
+            ["--tpr", "file.tpr", "--xtc", "file.xtc", "--ncpu", "2"],
+            {
+                "tpr": "file.tpr",
+                "xtc": "file.xtc",
+                "ligand_id": "ABC",
+                "ncpu": 2,
+            },
+        ),
+        (
+            [
+                ("--tpr", {}),
+                ("--xtc", {}),
+                ("--ligand", {}),
+                ("--ncpu", {"type": int, "default": 1}),
+            ],
+            {"ligand": "LIG1", "ncpu": 4, "unused": "x"},
+            ["--tpr", "file.tpr", "--xtc", "file.xtc", "--ncpu", "2"],
+            {
+                "tpr": "file.tpr",
+                "xtc": "file.xtc",
+                "ligand": "LIG1",
+                "ncpu": 2,
+            },
+        ),
+    ],
+    ids=["md", "gbsa", "prolif"],
+)
+def test_argument_parsing(
+    tmp_path: Path,
+    options: Iterable[Tuple[str, dict]],
+    config: dict,
+    cli: list[str],
+    expected: dict,
+) -> None:
+    """Common test ensuring YAML/CLI merging works for all entry points."""
 
-    parser = _make_parser(
-        [
-            ("--protein", {}),
-            ("--ligand", {}),
-            ("--ncpu", {"type": int, "default": 1}),
-        ]
-    )
-
-    config = {"ligand": "LIG_A", "ncpu": 4, "unused": "x"}
+    parser = _make_parser(options)
     config_path = _write_config(tmp_path, config)
+    args, _ = parse_with_config(parser, ["--config", str(config_path), *cli])
 
-    cli = ["--config", str(config_path), "--protein", "PRO.pdb", "--ncpu", "8"]
-    args, _ = parse_with_config(parser, cli)
-
-    assert args.protein == "PRO.pdb"  # CLI only
-    assert args.ligand == "LIG_A"  # from config
-    assert args.ncpu == 8  # CLI overrides config
-    assert not hasattr(args, "unused")
-
-
-def test_run_gbsa_argument_parsing(tmp_path: Path) -> None:
-    """Ensure GBSA parser merges config and CLI options correctly."""
-
-    parser = _make_parser(
-        [
-            ("--tpr", {}),
-            ("--xtc", {}),
-            ("--ligand_id", {}),
-            ("--ncpu", {"type": int, "default": 1}),
-        ]
-    )
-
-    config = {"ligand_id": "ABC", "ncpu": 4, "unused": "x"}
-    config_path = _write_config(tmp_path, config)
-
-    cli = [
-        "--config",
-        str(config_path),
-        "--tpr",
-        "file.tpr",
-        "--xtc",
-        "file.xtc",
-        "--ncpu",
-        "2",
-    ]
-    args, _ = parse_with_config(parser, cli)
-
-    assert args.tpr == "file.tpr"
-    assert args.xtc == "file.xtc"
-    assert args.ligand_id == "ABC"  # from config
-    assert args.ncpu == 2  # CLI overrides config
+    for key, value in expected.items():
+        assert getattr(args, key) == value
     assert not hasattr(args, "unused")
 
 
@@ -115,38 +125,4 @@ def test_list_argument_from_config(tmp_path: Path) -> None:
         parser, ["--config", str(config_path), "--steps", "3", "4"]
     )
     assert args.steps == [3, 4]
-
-
-def test_run_prolif_argument_parsing(tmp_path: Path) -> None:
-    """Validate ProLIF parser config/CLI precedence."""
-
-    parser = _make_parser(
-        [
-            ("--tpr", {}),
-            ("--xtc", {}),
-            ("--ligand", {}),
-            ("--ncpu", {"type": int, "default": 1}),
-        ]
-    )
-
-    config = {"ligand": "LIG1", "ncpu": 4, "unused": "x"}
-    config_path = _write_config(tmp_path, config)
-
-    cli = [
-        "--config",
-        str(config_path),
-        "--tpr",
-        "file.tpr",
-        "--xtc",
-        "file.xtc",
-        "--ncpu",
-        "2",
-    ]
-    args, _ = parse_with_config(parser, cli)
-
-    assert args.tpr == "file.tpr"
-    assert args.xtc == "file.xtc"
-    assert args.ligand == "LIG1"  # from config
-    assert args.ncpu == 2  # CLI overrides config
-    assert not hasattr(args, "unused")
 
