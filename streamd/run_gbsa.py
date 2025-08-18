@@ -45,7 +45,7 @@ logging.getLogger('bockeh').setLevel('CRITICAL')
 
 
 def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append_protein_selection,
-                  unique_id, env, bash_log, clean_previous, debug):
+                  unique_id, env, bash_log, clean_previous, debug, decomp=False):
     """Run a GBSA calculation for a prepared simulation directory.
 
     :param wdir: Working directory containing the simulation files.
@@ -62,11 +62,12 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
     :param bash_log: Name of the log file capturing shell output.
     :param clean_previous: Whether to remove previous GBSA outputs.
     :param debug: If ``True``, keep intermediate files for debugging.
+    :param decomp: If ``True``, perform per-residue decomposition and save additional files.
     :return: Path to the generated GBSA results file or ``None`` on failure.
     """
 
     def calc_gbsa(wdir, tpr, xtc, topol, index, mmpbsa, np, protein_index,
-                  ligand_index, unique_id, env, bash_log, debug):
+                  ligand_index, unique_id, env, bash_log, debug, decomp=False):
         """Launch gmx_MMPBSA for a single trajectory.
 
         :param wdir: Working directory for temporary files and logs.
@@ -82,16 +83,24 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
         :param env: Optional environment variables for subprocess calls.
         :param bash_log: Log file capturing shell output.
         :param debug: Keep intermediate files if ``True``.
+        :param decomp: If ``True``, perform per-residue decomposition and save additional files.
         :return: Path to the generated results file or ``None`` on failure.
         """
         output = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.dat")
         with temporary_directory_debug(dir=wdir, remove=not debug, suffix=f'_gbsa_{unique_id}') as tmpdirname:
             logging.info(f'tmp intermediate dir: {tmpdirname}')
-            cmd = f'cd {tmpdirname}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} ' \
-                  f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui ' \
-                  f'-o {output} ' \
-                  f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")}' \
-                  f' >> {os.path.join(wdir, bash_log)} 2>&1'
+            cmd = (
+                f'cd {tmpdirname}; mpirun -np {np} gmx_MMPBSA MPI -O -i {mmpbsa} '
+                f' -cs {tpr} -ci {index} -cg {protein_index} {ligand_index} -ct {xtc} -cp {topol} -nogui '
+                f'-o {output} '
+                f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")} '
+            )
+            if decomp:
+                cmd += (
+                    f'-do {os.path.join(wdir, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")} '
+                    f'-deo {os.path.join(wdir, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")} '
+                )
+            cmd += f'>> {os.path.join(wdir, bash_log)} 2>&1'
 
             if not run_check_subprocess(cmd, key=xtc, log=os.path.join(wdir, bash_log), env=env):
                 run_check_subprocess(f'ls {tmpdirname}', key=tmpdirname, log=os.path.join(wdir, bash_log), env=env)
@@ -133,14 +142,22 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
 
     ligand_index = index_list.index(ligand_resid)
 
-    output = calc_gbsa(wdir=wdir, tpr=tpr, xtc=xtc, topol=topol,
-                       index=index, mmpbsa=mmpbsa,
-                       np=np, protein_index=protein_index,
-                       ligand_index=ligand_index,
-                       unique_id=unique_id,
-                       env=env,
-                       bash_log=bash_log,
-                       debug=debug)
+    output = calc_gbsa(
+        wdir=wdir,
+        tpr=tpr,
+        xtc=xtc,
+        topol=topol,
+        index=index,
+        mmpbsa=mmpbsa,
+        np=np,
+        protein_index=protein_index,
+        ligand_index=ligand_index,
+        unique_id=unique_id,
+        env=env,
+        bash_log=bash_log,
+        debug=debug,
+        decomp=decomp,
+    )
 
     if os.path.isfile(os.path.join(wdir, 'gmx_MMPBSA.log')):
         shutil.copy(os.path.join(wdir, 'gmx_MMPBSA.log'), os.path.join(wdir, f'gmx_MMPBSA_{unique_id}.log'))
@@ -149,7 +166,7 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
 
 
 def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid,
-                       append_protein_selection, unique_id, env, bash_log, clean_previous, debug):
+                       append_protein_selection, unique_id, env, bash_log, clean_previous, debug, decomp=False):
     """Execute GBSA using file paths relative to the working directory.
 
     :param wdir: Base working directory containing simulation files.
@@ -166,17 +183,30 @@ def run_gbsa_from_wdir(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid,
     :param bash_log: Name of the log file capturing shell output.
     :param clean_previous: Whether to remove previous GBSA outputs.
     :param debug: If ``True``, keep intermediate files for debugging.
+    :param decomp: If ``True``, perform per-residue decomposition and save additional files.
     :return: Path to the generated GBSA results file or ``None`` on failure.
     """
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
     topol = os.path.join(wdir, topol)
     index = os.path.join(wdir, index)
-    return run_gbsa_task(wdir=wdir, tpr=tpr, xtc=xtc,
-                         topol=topol, index=index, mmpbsa=mmpbsa,
-                         np=np, ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
-                         unique_id=unique_id,
-                         env=env, bash_log=bash_log, clean_previous=clean_previous, debug=debug)
+    return run_gbsa_task(
+        wdir=wdir,
+        tpr=tpr,
+        xtc=xtc,
+        topol=topol,
+        index=index,
+        mmpbsa=mmpbsa,
+        np=np,
+        ligand_resid=ligand_resid,
+        append_protein_selection=append_protein_selection,
+        unique_id=unique_id,
+        env=env,
+        bash_log=bash_log,
+        clean_previous=clean_previous,
+        debug=debug,
+        decomp=decomp,
+    )
 
 
 def clean_temporary_gmxMMBPSA_files(wdir, prefix="_GMXMMPBSA_"):
@@ -343,9 +373,25 @@ def get_used_number_of_frames(var_number_of_frames, startframe, endframe, interv
     """
     return math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
 
-def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid,
-          append_protein_selection, hostfile, unique_id, bash_log,
-          gmxmmpbsa_out_files=None, clean_previous=False, debug=False):
+def start(
+    wdir_to_run,
+    tpr,
+    xtc,
+    topol,
+    index,
+    out_wdir,
+    mmpbsa,
+    ncpu,
+    ligand_resid,
+    append_protein_selection,
+    hostfile,
+    unique_id,
+    bash_log,
+    gmxmmpbsa_out_files=None,
+    clean_previous=False,
+    debug=False,
+    decomp=False,
+):
     """Start GBSA calculations and aggregate resulting energies.
 
     Parameters
@@ -376,6 +422,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         Remove previous outputs before running.
     debug : bool
         Enable verbose debugging output.
+    decomp : bool
+        Perform per-residue decomposition analysis and save additional files.
 
     Returns
     -------
@@ -384,6 +432,8 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
     """
     dask_client, cluster, pool = None, None, None
     var_gbsa_out_files = []
+    frame_csv_files = []
+    decomp_csv_files = []
     if gmxmmpbsa_out_files is None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
         if not mmpbsa:
@@ -419,16 +469,34 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
                 dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=n_tasks_per_node,
                                                          ncpu=ncpu)
                 var_gbsa_out_files = []
-                for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
-                                     tpr=tpr, xtc=xtc, topol=topol, index=index,
-                                     mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames),
-                                     ligand_resid=ligand_resid,
-                                     append_protein_selection=append_protein_selection,
-                                     unique_id=unique_id, env=os.environ.copy(),
-                                     bash_log=bash_log, clean_previous=clean_previous,
-                                     debug=debug):
+                for res in calc_dask(
+                    run_gbsa_from_wdir,
+                    wdir_to_run,
+                    dask_client=dask_client,
+                    tpr=tpr,
+                    xtc=xtc,
+                    topol=topol,
+                    index=index,
+                    mmpbsa=mmpbsa,
+                    np=min(ncpu, used_number_of_frames),
+                    ligand_resid=ligand_resid,
+                    append_protein_selection=append_protein_selection,
+                    unique_id=unique_id,
+                    env=os.environ.copy(),
+                    bash_log=bash_log,
+                    clean_previous=clean_previous,
+                    debug=debug,
+                    decomp=decomp,
+                ):
                     if res:
                         var_gbsa_out_files.append(res)
+                        frame_csv_files.append(
+                            os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
+                        )
+                        if decomp:
+                            decomp_csv_files.append(
+                                os.path.join(os.path.dirname(res), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                            )
             finally:
                 if dask_client:
                     dask_client.retire_workers(dask_client.scheduler_info()['workers'],
@@ -444,14 +512,43 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
             if used_number_of_frames <= 0:
                 logging.error('Used number of frames are less or equal than 0. Run will be interrupted')
                 raise ValueError
-            res = run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
-                          np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
-                          unique_id=unique_id, env=os.environ.copy(),
-                          bash_log=bash_log, clean_previous=clean_previous, debug=debug)
+            res = run_gbsa_task(
+                wdir=os.path.dirname(xtc),
+                tpr=tpr,
+                xtc=xtc,
+                topol=topol,
+                index=index,
+                mmpbsa=mmpbsa,
+                np=min(ncpu, used_number_of_frames),
+                ligand_resid=ligand_resid,
+                append_protein_selection=append_protein_selection,
+                unique_id=unique_id,
+                env=os.environ.copy(),
+                bash_log=bash_log,
+                clean_previous=clean_previous,
+                debug=debug,
+                decomp=decomp,
+            )
             var_gbsa_out_files.append(res)
+            frame_csv_files.append(
+                os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
+            )
+            if decomp:
+                decomp_csv_files.append(
+                    os.path.join(os.path.dirname(res), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                )
 
     else:
         var_gbsa_out_files = gmxmmpbsa_out_files
+        frame_csv_files = [
+            os.path.join(os.path.dirname(f), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
+            for f in var_gbsa_out_files
+        ]
+        if decomp:
+            decomp_csv_files = [
+                os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                for f in var_gbsa_out_files
+            ]
 
     # collect energies
     if var_gbsa_out_files:
@@ -470,13 +567,48 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
         if list(pd_pbsa.columns) != ['Name']:
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{unique_id}.csv'), sep='\t', index=False)
 
+        if frame_csv_files:
+            frame_dfs = []
+            for f in frame_csv_files:
+                if os.path.isfile(f):
+                    try:
+                        df = pd.read_csv(f)
+                    except Exception:
+                        df = pd.read_csv(f, sep="\t")
+                    df.insert(0, "Name", pathlib.PurePath(f).parent.name)
+                    frame_dfs.append(df)
+            if frame_dfs:
+                pd.concat(frame_dfs, ignore_index=True).to_csv(
+                    os.path.join(out_wdir, f"GBSA_frames_{unique_id}.csv"),
+                    sep="\t",
+                    index=False,
+                )
+
+        if decomp and decomp_csv_files:
+            decomp_dfs = []
+            for f in decomp_csv_files:
+                if os.path.isfile(f):
+                    try:
+                        df = pd.read_csv(f)
+                    except Exception:
+                        df = pd.read_csv(f, sep="\t")
+                    df.insert(0, "Name", pathlib.PurePath(f).parent.name)
+                    decomp_dfs.append(df)
+            if decomp_dfs:
+                pd.concat(decomp_dfs, ignore_index=True).to_csv(
+                    os.path.join(out_wdir, f"GBSA_decomp_{unique_id}.csv"),
+                    sep="\t",
+                    index=False,
+                )
+
         finished_complexes_file = os.path.join(out_wdir, f"finished_gbsa_files_{unique_id}.txt")
-        with open(finished_complexes_file, 'w') as output:
+        with open(finished_complexes_file, "w") as output:
             output.write("\n".join(var_gbsa_out_files))
 
         logging.info(
-            f'gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\n'
-            f'Successfully finished complexes have been saved in {finished_complexes_file} file')
+            f"gmxMMPBSA energy calculation of {len(var_gbsa_out_files)} were successfully finished.\n"
+            f"Successfully finished complexes have been saved in {finished_complexes_file} file"
+        )
 
 
 def main():
@@ -520,6 +652,8 @@ def main():
                         help=' Clean previous temporary gmxMMPBSA files')
     parser.add_argument('--debug', action='store_true', default=False,
                         help=' Save all temporary gmxMMPBSA files')
+    parser.add_argument('--decomp', action='store_true', default=False,
+                        help='Perform per-residue decomposition analysis')
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
@@ -566,6 +700,7 @@ def main():
               gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id,
               append_protein_selection=args.append_protein_selection,
               hostfile=args.hostfile, bash_log=bash_log,
-              clean_previous=args.clean_previous, debug=args.debug)
+              clean_previous=args.clean_previous, debug=args.debug,
+              decomp=args.decomp)
     finally:
         logging.shutdown()
