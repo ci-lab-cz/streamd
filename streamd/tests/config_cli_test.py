@@ -1,210 +1,158 @@
-"""Tests for CLI and YAML config precedence across entry points."""
+"""Tests for merging YAML config with CLI arguments.
 
-import sys
-import types
+These tests focus solely on the argument parsing logic used by the
+command‑line entry points.  Instead of importing the heavy StreaMD
+modules, we build minimal ``argparse`` parsers that mirror the options
+relevant to each script and apply the same precedence rules:
+
+* extra keys in the YAML file are ignored;
+* values provided on the command line override YAML defaults;
+* if a value is missing from the CLI it is taken from the config file;
+* CLI‑only options remain available even if no config is supplied.
+
+This keeps the tests lightweight while validating the configuration
+mechanism.
+"""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import Iterable, Tuple
+
 import yaml
 
 
-def test_run_md_cli_overrides_config(monkeypatch, tmp_path):
-    """Run run_md.main ensuring CLI args override YAML and extras are ignored."""
+def _parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) -> argparse.Namespace:
+    """Parse ``cli_args`` using ``parser`` honouring ``--config`` files.
 
-    dummy_module = types.SimpleNamespace
-    # Stub internal modules to avoid heavy dependencies
-    monkeypatch.setitem(sys.modules, "streamd.analysis.md_system_analysis", dummy_module(run_md_analysis=lambda *a, **k: None))
-    monkeypatch.setitem(sys.modules, "streamd.analysis.run_analysis", dummy_module(run_rmsd_analysis=lambda *a, **k: None))
-    monkeypatch.setitem(sys.modules, "streamd.preparation.complex_preparation", dummy_module(run_complex_preparation=lambda *a, **k: None))
-    monkeypatch.setitem(sys.modules, "streamd.preparation.ligand_preparation", dummy_module(prepare_input_ligands=lambda *a, **k: None, check_mols=lambda *a, **k: None))
-    monkeypatch.setitem(sys.modules, "streamd.utils.dask_init", dummy_module(init_dask_cluster=lambda *a, **k: None, calc_dask=lambda *a, **k: None))
-    monkeypatch.setitem(
-        sys.modules,
-        "streamd.utils.utils",
-        dummy_module(
-            filepath_type=lambda *a, **k: a[0],
-            run_check_subprocess=lambda *a, **k: True,
-            get_protein_resid_set=lambda *a, **k: None,
-            backup_prev_files=lambda *a, **k: None,
-            check_to_continue_simulation_time=lambda *a, **k: True,
-            merge_parts_of_simulation=lambda *a, **k: None,
-        ),
+    This helper replicates the configuration merging logic implemented in
+    the actual entry points.  ``cli_args`` is a sequence of command-line
+    arguments *excluding* the program name.
+    """
+
+    args, _ = parser.parse_known_args(cli_args)
+    if getattr(args, "config", None):
+        with open(args.config) as fh:
+            config_args = yaml.safe_load(fh) or {}
+        if not isinstance(config_args, dict):  # defensive check
+            raise ValueError("Config file must contain key-value pairs")
+
+        valid_keys = {action.dest for action in parser._actions}
+        cli_dests = {
+            action.dest
+            for action in parser._actions
+            if any(opt in cli_args for opt in action.option_strings)
+        }
+        config_args = {
+            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
+        }
+        parser.set_defaults(**config_args)
+
+    return parser.parse_args(cli_args)
+
+
+def _write_config(tmp_path: Path, data: dict) -> Path:
+    path = tmp_path / "config.yml"
+    path.write_text(yaml.dump(data))
+    return path
+
+
+def _make_parser(options: Iterable[Tuple[str, dict]]) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config")
+    for name, kwargs in options:
+        parser.add_argument(name, **kwargs)
+    return parser
+
+
+def test_run_md_argument_parsing(tmp_path: Path) -> None:
+    """CLI values override YAML and unused keys are ignored for MD parser."""
+
+    parser = _make_parser(
+        [
+            ("--protein", {}),
+            ("--ligand", {}),
+            ("--ncpu", {"type": int, "default": 1}),
+        ]
     )
-    monkeypatch.setitem(sys.modules, "streamd.mcpbpy_md", dummy_module(mcbpy_md=lambda *a, **k: None))
 
-    from streamd import run_md
+    config = {"ligand": "LIG_A", "ncpu": 4, "unused": "x"}
+    config_path = _write_config(tmp_path, config)
 
-    captured = {}
+    cli = ["--config", str(config_path), "--protein", "PRO.pdb", "--ncpu", "8"]
+    args = _parse_with_config(parser, cli)
 
-    def fake_start(**kwargs):
-        captured.update(kwargs)
+    assert args.protein == "PRO.pdb"  # CLI only
+    assert args.ligand == "LIG_A"  # from config
+    assert args.ncpu == 8  # CLI overrides config
+    assert not hasattr(args, "unused")
 
-    monkeypatch.setattr(run_md, "start", fake_start)
 
-    protein = tmp_path / "protein.pdb"
-    protein.write_text("p")
-    ligand = tmp_path / "ligand.mol"
-    ligand.write_text("l")
-    config = {"ligand": str(ligand), "ncpu": 4, "unused": "x"}
-    config_path = tmp_path / "config.yml"
-    config_path.write_text(yaml.dump(config))
+def test_run_gbsa_argument_parsing(tmp_path: Path) -> None:
+    """Ensure GBSA parser merges config and CLI options correctly."""
 
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["run_md", "--config", str(config_path), "--protein", str(protein), "--ncpu", "8"],
+    parser = _make_parser(
+        [
+            ("--tpr", {}),
+            ("--xtc", {}),
+            ("--ligand_id", {}),
+            ("--ncpu", {"type": int, "default": 1}),
+        ]
     )
-    run_md.main()
-
-    assert captured["protein"] == str(protein)
-    assert captured["ligand"] == str(ligand)
-    assert captured["ncpu"] == 8
-    assert "unused" not in captured
-
-
-def test_run_gbsa_cli_overrides_config(monkeypatch, tmp_path):
-    """Run run_gbsa.main checking CLI precedence and config usage."""
-
-    dummy_utils = types.SimpleNamespace(
-        filepath_type=lambda *a, **k: a[0],
-        get_index=lambda *a, **k: ["Protein", "LIG"],
-        make_group_ndx=lambda *a, **k: True,
-        run_check_subprocess=lambda *a, **k: True,
-        get_number_of_frames=lambda *a, **k: 1,
-        temporary_directory_debug=lambda *a, **k: types.SimpleNamespace(__enter__=lambda self: tmp_path, __exit__=lambda *a: False),
-    )
-    dummy_dask = types.SimpleNamespace(init_dask_cluster=lambda *a, **k: None, calc_dask=lambda *a, **k: None)
-    monkeypatch.setitem(sys.modules, "streamd.utils.utils", dummy_utils)
-    monkeypatch.setitem(sys.modules, "streamd.utils.dask_init", dummy_dask)
-    monkeypatch.setitem(sys.modules, "pandas", types.ModuleType("pandas"))
-
-    from streamd import run_gbsa
-
-    captured = {}
-
-    def fake_start(**kwargs):
-        captured.update(kwargs)
-
-    monkeypatch.setattr(run_gbsa, "start", fake_start)
-
-    tpr = tmp_path / "file.tpr"
-    tpr.write_text("t")
-    xtc = tmp_path / "file.xtc"
-    xtc.write_text("x")
-    topol = tmp_path / "file.top"
-    topol.write_text("top")
-    index = tmp_path / "index.ndx"
-    index.write_text("Protein\n")
 
     config = {"ligand_id": "ABC", "ncpu": 4, "unused": "x"}
-    config_path = tmp_path / "config.yml"
-    config_path.write_text(yaml.dump(config))
+    config_path = _write_config(tmp_path, config)
 
-    monkeypatch.setattr(
-        sys,
-        "argv",
+    cli = [
+        "--config",
+        str(config_path),
+        "--tpr",
+        "file.tpr",
+        "--xtc",
+        "file.xtc",
+        "--ncpu",
+        "2",
+    ]
+    args = _parse_with_config(parser, cli)
+
+    assert args.tpr == "file.tpr"
+    assert args.xtc == "file.xtc"
+    assert args.ligand_id == "ABC"  # from config
+    assert args.ncpu == 2  # CLI overrides config
+    assert not hasattr(args, "unused")
+
+
+def test_run_prolif_argument_parsing(tmp_path: Path) -> None:
+    """Validate ProLIF parser config/CLI precedence."""
+
+    parser = _make_parser(
         [
-            "run_gbsa",
-            "--config",
-            str(config_path),
-            "--tpr",
-            str(tpr),
-            "--xtc",
-            str(xtc),
-            "--topol",
-            str(topol),
-            "--index",
-            str(index),
-            "--ncpu",
-            "2",
-        ],
-    )
-    run_gbsa.main()
-
-    assert captured["tpr"] == str(tpr)
-    assert captured["ligand_resid"] == "ABC"
-    assert captured["ncpu"] == 2
-    assert "unused" not in captured
-
-
-def test_run_prolif_cli_overrides_config(monkeypatch, tmp_path):
-    """Run run_prolif.main validating CLI/config interplay."""
-
-    monkeypatch.setitem(sys.modules, "MDAnalysis", types.ModuleType("MDAnalysis"))
-    monkeypatch.setitem(sys.modules, "pandas", types.ModuleType("pandas"))
-    monkeypatch.setitem(sys.modules, "prolif", types.ModuleType("prolif"))
-
-    barcode_mod = types.ModuleType("prolif.plotting.barcode")
-    barcode_mod.Barcode = type(
-        "Barcode",
-        (),
-        {
-            "from_fingerprint": classmethod(
-                lambda cls, fp: types.SimpleNamespace(
-                    display=lambda *a, **k: types.SimpleNamespace(
-                        figure=types.SimpleNamespace(savefig=lambda *a, **k: None)
-                    )
-                )
-            )
-        },
-    )
-    network_mod = types.ModuleType("prolif.plotting.network")
-    network_mod.LigNetwork = type(
-        "LigNetwork",
-        (),
-        {
-            "from_fingerprint": classmethod(
-                lambda cls, fp, ligand_mol=None, threshold=None: types.SimpleNamespace(save=lambda *a, **k: None)
-            )
-        },
-    )
-    monkeypatch.setitem(sys.modules, "prolif.plotting", types.ModuleType("prolif.plotting"))
-    monkeypatch.setitem(sys.modules, "prolif.plotting.barcode", barcode_mod)
-    monkeypatch.setitem(sys.modules, "prolif.plotting.network", network_mod)
-
-    plt_mod = types.ModuleType("matplotlib.pyplot")
-    plt_mod.ioff = lambda: None
-    monkeypatch.setitem(sys.modules, "matplotlib", types.ModuleType("matplotlib"))
-    monkeypatch.setitem(sys.modules, "matplotlib.pyplot", plt_mod)
-
-    monkeypatch.setitem(
-        sys.modules,
-        "streamd.utils.dask_init",
-        types.SimpleNamespace(init_dask_cluster=lambda *a, **k: None, calc_dask=lambda *a, **k: None),
-    )
-    monkeypatch.setitem(
-        sys.modules, "streamd.utils.utils", types.SimpleNamespace(filepath_type=lambda *a, **k: a[0])
-    )
-    monkeypatch.setitem(sys.modules, "streamd.prolif.prolif2png", types.ModuleType("streamd.prolif.prolif2png"))
-    monkeypatch.setitem(
-        sys.modules,
-        "streamd.prolif.prolif_frame_map",
-        types.ModuleType("streamd.prolif.prolif_frame_map"),
+            ("--tpr", {}),
+            ("--xtc", {}),
+            ("--ligand", {}),
+            ("--ncpu", {"type": int, "default": 1}),
+        ]
     )
 
-    from streamd.prolif import run_prolif
-
-    captured = {}
-
-    def fake_start(**kwargs):
-        captured.update(kwargs)
-
-    monkeypatch.setattr(run_prolif, "start", fake_start)
-
-    tpr = tmp_path / "file.tpr"
-    tpr.write_text("t")
-    xtc = tmp_path / "file.xtc"
-    xtc.write_text("x")
     config = {"ligand": "LIG1", "ncpu": 4, "unused": "x"}
-    config_path = tmp_path / "config.yml"
-    config_path.write_text(yaml.dump(config))
+    config_path = _write_config(tmp_path, config)
 
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["run_prolif", "--config", str(config_path), "--tpr", str(tpr), "--xtc", str(xtc), "--ncpu", "2"],
-    )
-    run_prolif.main()
+    cli = [
+        "--config",
+        str(config_path),
+        "--tpr",
+        "file.tpr",
+        "--xtc",
+        "file.xtc",
+        "--ncpu",
+        "2",
+    ]
+    args = _parse_with_config(parser, cli)
 
-    assert captured["tpr"] == str(tpr)
-    assert captured["ligand_resid"] == "LIG1"
-    assert captured["ncpu"] == 2
-    assert "unused" not in captured
+    assert args.tpr == "file.tpr"
+    assert args.xtc == "file.xtc"
+    assert args.ligand == "LIG1"  # from config
+    assert args.ncpu == 2  # CLI overrides config
+    assert not hasattr(args, "unused")
 

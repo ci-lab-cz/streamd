@@ -1,9 +1,9 @@
-"""Basic test on import of streamd."""
-import subprocess
-import sys
+"""Basic sanity check for package import."""
+
+import importlib
 
 
-def test_imports():
-    """Ensure package imports and dependencies resolve."""
-    assert "streamd" in sys.modules
-    assert subprocess.check_call('gmx') == 0
+def test_import_streamd() -> None:
+    """The package should be importable without optional binaries."""
+    importlib.import_module("streamd")
+

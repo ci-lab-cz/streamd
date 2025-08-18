@@ -9,8 +9,60 @@ import shutil
 import sys
 import types
 
-# Stub heavy optional dependencies for tests
+# Stub heavy optional dependencies for tests so that modules importing them
+# during test collection do not fail.  Only lightweight placeholders are
+# provided – the tests that require real functionality are skipped unless
+# corresponding command-line flags are supplied.
 sys.modules.setdefault("MDAnalysis", types.ModuleType("MDAnalysis"))
+
+# ProLIF-related stubs
+sys.modules.setdefault("prolif", types.ModuleType("prolif"))
+sys.modules.setdefault("prolif.plotting", types.ModuleType("prolif.plotting"))
+barcode_mod = types.ModuleType("prolif.plotting.barcode")
+barcode_mod.Barcode = type("Barcode", (), {})
+network_mod = types.ModuleType("prolif.plotting.network")
+network_mod.LigNetwork = type("LigNetwork", (), {})
+sys.modules.setdefault("prolif.plotting.barcode", barcode_mod)
+sys.modules.setdefault("prolif.plotting.network", network_mod)
+
+plt_mod = types.ModuleType("matplotlib.pyplot")
+plt_mod.ioff = lambda: None
+mat_mod = types.ModuleType("matplotlib")
+mat_mod.rcParams = {}
+sys.modules.setdefault("matplotlib", mat_mod)
+sys.modules.setdefault("matplotlib.pyplot", plt_mod)
+
+conv_mod = types.ModuleType("streamd.prolif.prolif2png")
+conv_mod.convertprolif2png = lambda *a, **k: None
+frame_mod = types.ModuleType("streamd.prolif.prolif_frame_map")
+frame_mod.create_framemap = lambda *a, **k: None
+frame_mod.convertplifbyframe2png = lambda *a, **k: None
+sys.modules.setdefault("streamd.prolif.prolif2png", conv_mod)
+sys.modules.setdefault("streamd.prolif.prolif_frame_map", frame_mod)
+
+# Other optional libraries
+sys.modules.setdefault("dask", types.ModuleType("dask"))
+sys.modules.setdefault("dask.distributed", types.ModuleType("dask.distributed"))
+sys.modules["dask.distributed"].Client = type("Client", (), {})
+sys.modules["dask.distributed"].SSHCluster = type("SSHCluster", (), {})
+
+mda_analysis = types.ModuleType("MDAnalysis.analysis")
+mda_analysis.rms = object()
+sys.modules.setdefault("MDAnalysis.analysis", mda_analysis)
+
+sns_mod = types.ModuleType("seaborn")
+sns_mod.set_context = lambda *a, **k: None
+sys.modules.setdefault("seaborn", sns_mod)
+plotly_mod = types.ModuleType("plotly")
+plotly_mod.__path__ = []
+sys.modules.setdefault("plotly", plotly_mod)
+sys.modules.setdefault("plotly.offline", types.ModuleType("plotly.offline"))
+sys.modules.setdefault("plotly.express", types.ModuleType("plotly.express"))
+
+sys.modules.setdefault("parmed", types.ModuleType("parmed"))
+sys.modules.setdefault("rdkit", types.ModuleType("rdkit"))
+sys.modules.setdefault("rdkit.Chem", types.ModuleType("rdkit.Chem"))
+sys.modules.setdefault("rdkit.Chem.rdmolops", types.ModuleType("rdkit.Chem.rdmolops"))
 
 import pytest
 from streamd.utils.utils import temporary_directory_debug
