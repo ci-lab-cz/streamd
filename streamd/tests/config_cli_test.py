@@ -82,7 +82,7 @@ def _make_parser(options: Iterable[Tuple[str, dict]]) -> argparse.ArgumentParser
             ],
             {"ligand": "LIG1", "ncpu": 4, "unused": "x", "verbose": True},
             ["--tpr", "file.tpr", "--xtc", "file.xtc"],
-            {   "xtc": "file.xtc"
+            {   "xtc": "file.xtc",
                 "tpr": "file.tpr",
                 "occupancy": 0.6,
                 "verbose": True,
