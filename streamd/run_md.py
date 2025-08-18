@@ -22,6 +22,7 @@ from functools import partial
 from glob import glob
 import json
 import re
+import yaml
 
 from streamd.analysis.md_system_analysis import run_md_analysis
 from streamd.analysis.run_analysis import run_rmsd_analysis
@@ -625,6 +626,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 def main():
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
     Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple) ''')
+    parser.add_argument('--config', metavar='FILENAME', required=False,
+                        type=partial(filepath_type, ext=("yml", "yaml")),
+                        help='Path to YAML configuration file with default arguments')
     parser1 = parser.add_argument_group('Standard Molecular Dynamics Simulation Run')
     parser1.add_argument('-p', '--protein', metavar='FILENAME', required=False,
                         type=partial(filepath_type, ext=('pdb', 'gro'), check_exist=True),
@@ -770,6 +774,23 @@ def main():
                              'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up, '
                              'otherwise standard gmx2pdb procedure will be run')
 
+    config_args = {}
+    args, _ = parser.parse_known_args()
+    if args.config:
+        with open(args.config) as fh:
+            config_args = yaml.safe_load(fh) or {}
+        if not isinstance(config_args, dict):
+            raise ValueError('Config file must contain key-value pairs')
+        valid_keys = {action.dest for action in parser._actions}
+        cli_dests = {
+            action.dest
+            for action in parser._actions
+            if any(opt in sys.argv[1:] for opt in action.option_strings)
+        }
+        config_args = {
+            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
+        }
+        parser.set_defaults(**config_args)
     args = parser.parse_args()
 
     if args.wdir is None:
@@ -787,13 +808,13 @@ def main():
 
     # check if user explicitly specified md, nvt or npt time and if so change user-defined mdp files
     explicit_args = []
-    if '--nvt_time' in sys.argv:
+    if '--nvt_time' in sys.argv or 'nvt_time' in config_args:
         explicit_args.append('nvt.mdp')
-    if '--npt_time' in sys.argv:
+    if '--npt_time' in sys.argv or 'npt_time' in config_args:
         explicit_args.append('npt.mdp')
-    if '--md_time' in sys.argv:
+    if '--md_time' in sys.argv or 'md_time' in config_args:
         explicit_args.append('md.mdp')
-    if '--seed' in sys.argv:
+    if '--seed' in sys.argv or 'seed' in config_args:
         explicit_args.append('seed')
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'

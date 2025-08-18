@@ -21,6 +21,7 @@ import subprocess
 from datetime import datetime
 from functools import partial
 from multiprocessing import Pool
+import yaml
 
 import pandas as pd
 
@@ -474,6 +475,9 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
 def main():
     """CLI entry point for GBSA calculations."""
     parser = argparse.ArgumentParser(description='''Run MM-GBSA/MM-PBSA calculation using gmx_MMPBSA tool''')
+    parser.add_argument('--config', metavar='FILENAME', required=False,
+                        type=partial(filepath_type, ext=("yml", "yaml")),
+                        help='Path to YAML configuration file with default arguments')
     parser.add_argument('-i', '--wdir_to_run', metavar='DIRNAME', required=False, default=None, nargs='+',
                         type=partial(filepath_type, exist_type='dir'),
                         help='''single or multiple directories for simulations.
@@ -512,7 +516,23 @@ def main():
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
-
+    config_args = {}
+    args, _ = parser.parse_known_args()
+    if args.config:
+        with open(args.config) as fh:
+            config_args = yaml.safe_load(fh) or {}
+        if not isinstance(config_args, dict):
+            raise ValueError('Config file must contain key-value pairs')
+        valid_keys = {action.dest for action in parser._actions}
+        cli_dests = {
+            action.dest
+            for action in parser._actions
+            if any(opt in sys.argv[1:] for opt in action.option_strings)
+        }
+        config_args = {
+            k: v for k, v in config_args.items() if k in valid_keys and k not in cli_dests
+        }
+        parser.set_defaults(**config_args)
     args = parser.parse_args()
 
     if args.wdir is None:
