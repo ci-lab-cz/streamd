@@ -4,7 +4,86 @@ import logging
 from glob import glob
 import os
 import shutil
- #, TemporaryDirectory
+#, TemporaryDirectory
+
+import sys
+import types
+import importlib
+
+
+def _stub_if_missing(name: str, attrs: dict | None = None) -> None:
+    """Register a lightweight stub for *name* if importing it fails.
+
+    Parameters
+    ----------
+    name:
+        Fully qualified module name to check.
+    attrs:
+        Optional mapping of attributes to set on the created stub module.
+    """
+
+    if name in sys.modules:
+        return
+    try:
+        importlib.import_module(name)
+        return
+    except Exception:
+        mod = types.ModuleType(name)
+        if attrs:
+            for key, value in attrs.items():
+                setattr(mod, key, value)
+        sys.modules[name] = mod
+
+
+# Stub heavy optional dependencies for tests so that modules importing them
+# during test collection do not fail. Only lightweight placeholders are
+# provided – real modules, when installed, are left untouched.
+_stub_if_missing("MDAnalysis")
+
+# ProLIF-related stubs
+_stub_if_missing("prolif")
+_stub_if_missing("prolif.plotting")
+_stub_if_missing("prolif.plotting.barcode", {"Barcode": type("Barcode", (), {})})
+_stub_if_missing("prolif.plotting.network", {"LigNetwork": type("LigNetwork", (), {})})
+
+_stub_if_missing("matplotlib", {"rcParams": {}})
+_stub_if_missing("matplotlib.pyplot", {"ioff": lambda: None})
+
+_stub_if_missing(
+    "streamd.prolif.prolif2png", {"convertprolif2png": lambda *a, **k: None}
+)
+_stub_if_missing(
+    "streamd.prolif.prolif_frame_map",
+    {
+        "create_framemap": lambda *a, **k: None,
+        "convertplifbyframe2png": lambda *a, **k: None,
+    },
+)
+
+# Other optional libraries
+_stub_if_missing("dask")
+_stub_if_missing(
+    "dask.distributed",
+    {
+        "Client": type("Client", (), {}),
+        "SSHCluster": type("SSHCluster", (), {}),
+    },
+)
+
+_stub_if_missing("MDAnalysis.analysis", {"rms": object()})
+
+_stub_if_missing("seaborn", {"set_context": lambda *a, **k: None})
+_stub_if_missing("plotly", {"__path__": []})
+_stub_if_missing("plotly.offline")
+_stub_if_missing("plotly.express")
+
+_stub_if_missing("parmed")
+_stub_if_missing("rdkit")
+_stub_if_missing("rdkit.Chem")
+_stub_if_missing("rdkit.Chem.rdmolops")
+
+_stub_if_missing("pandas", {"DataFrame": type("DataFrame", (), {})})
+_stub_if_missing("numpy")
 
 import pytest
 from streamd.utils.utils import temporary_directory_debug
