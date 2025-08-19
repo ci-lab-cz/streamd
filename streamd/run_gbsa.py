@@ -328,9 +328,11 @@ def parse_gmxMMPBSA_results(fname):
     """Parse final energy terms from ``gmx_MMPBSA_ana`` CSV output.
 
     The ``FINAL_RESULTS_MMPBSA`` files contain multiple tables describing the
-    energy contributions of the complex, receptor, ligand and their deltas. This
-    helper converts such a file into a tidy :class:`pandas.DataFrame` with a
-    ``Region`` column indicating the source table.
+    energy contributions of the complex, receptor, ligand and their deltas.  The
+    file may report results for different solvation models (e.g. ``GENERALIZED
+    BORN`` and ``POISSON BOLTZMANN``).  This helper converts such a file into a
+    tidy :class:`pandas.DataFrame` with ``Region`` and ``Method`` columns
+    indicating the source table and the employed solvation model.
 
     Parameters
     ----------
@@ -350,15 +352,26 @@ def parse_gmxMMPBSA_results(fname):
         "Ligand Energy Terms": "Ligand",
         "Delta Energy Terms": "Delta",
     }
+    methods = {
+        "GENERALIZED BORN:": "GB",
+        "POISSON BOLTZMANN:": "PB",
+    }
 
     data = []
     region = None
+    method = None
     header = None
 
     with open(fname) as fh:
         for line in fh:
             stripped = line.strip()
-            if not stripped or stripped == "GENERALIZED BORN:":
+            if not stripped:
+                continue
+
+            if stripped in methods:
+                method = methods[stripped]
+                region = None
+                header = None
                 continue
 
             if stripped in sections:
@@ -371,18 +384,19 @@ def parse_gmxMMPBSA_results(fname):
                 header[0] = "Frame"
                 continue
 
-            if header and region:
+            if header and region and method:
                 parts = [p.strip() for p in stripped.split(",")]
                 if len(parts) == len(header):
                     row = dict(zip(header, parts))
                     row["Region"] = region
+                    row["Method"] = method
                     data.append(row)
 
     df = pd.DataFrame(data)
     if df.empty:
         return df
 
-    numeric_cols = [c for c in df.columns if c not in {"Region"}]
+    numeric_cols = [c for c in df.columns if c not in {"Region", "Method"}]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
