@@ -59,7 +59,15 @@ def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) 
                 continue
             value = config_args[dest]
 
-            if action.nargs not in (None, '?'):
+            # ``argparse`` represents ``store_true``/``store_false`` actions with
+            # ``nargs`` set to ``0``.  These flags are inherently scalar booleans
+            # and should not be treated as multi-value options.  Previously, the
+            # ``nargs`` check considered any value other than ``None`` or ``?`` as
+            # indicating a list-like argument, which converted config-provided
+            # booleans into single-item lists (e.g. ``debug: True`` became
+            # ``[True]``).  Excluding ``0`` from this branch keeps such flags as
+            # plain booleans.
+            if action.nargs not in (None, '?', 0):
                 if isinstance(value, str):
                     value = value.split()
                 elif not isinstance(value, (list, tuple)):

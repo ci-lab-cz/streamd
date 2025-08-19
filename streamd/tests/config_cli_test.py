@@ -130,3 +130,16 @@ def test_list_argument_from_config(tmp_path: Path) -> None:
     )
     assert args.steps == [3, 4]
 
+
+def test_store_true_from_config(tmp_path: Path) -> None:
+    """Boolean ``store_true`` options from YAML stay boolean."""
+
+    parser = _make_parser([
+        ("--debug", {"action": "store_true", "default": False}),
+    ])
+
+    config_path = _write_config(tmp_path, {"debug": True})
+
+    args, _ = parse_with_config(parser, ["--config", str(config_path)])
+    assert args.debug is True
+
