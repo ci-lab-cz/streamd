@@ -753,11 +753,21 @@ def start(
                         df.insert(0, "Name", pathlib.PurePath(f).parent.name)
                         result_dfs.append(df)
             if result_dfs:
-                pd.concat(result_dfs, ignore_index=True).to_csv(
-                    os.path.join(out_wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.csv"),
-                    sep="\t",
-                    index=False,
-                )
+                all_frames = pd.concat(result_dfs, ignore_index=True)
+                gb_frames = all_frames[all_frames["Method"] == "GB"]
+                if not gb_frames.empty:
+                    gb_frames.to_csv(
+                        os.path.join(out_wdir, f"GBSA_frames_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
+                pb_frames = all_frames[all_frames["Method"] == "PB"]
+                if not pb_frames.empty:
+                    pb_frames.to_csv(
+                        os.path.join(out_wdir, f"PBSA_frames_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
 
         if decomp and decomp_csv_files:
             decomp_dfs = []
@@ -768,11 +778,21 @@ def start(
                         df.insert(0, "Name", pathlib.PurePath(f).parent.name)
                         decomp_dfs.append(df)
             if decomp_dfs:
-                pd.concat(decomp_dfs, ignore_index=True).to_csv(
-                    os.path.join(out_wdir, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv"),
-                    sep="\t",
-                    index=False,
-                )
+                all_decomp = pd.concat(decomp_dfs, ignore_index=True)
+                gb_decomp = all_decomp[all_decomp["Method"] == "GB"]
+                if not gb_decomp.empty:
+                    gb_decomp.to_csv(
+                        os.path.join(out_wdir, f"GBSA_decomp_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
+                pb_decomp = all_decomp[all_decomp["Method"] == "PB"]
+                if not pb_decomp.empty:
+                    pb_decomp.to_csv(
+                        os.path.join(out_wdir, f"PBSA_decomp_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
 
         finished_complexes_file = os.path.join(out_wdir, f"finished_gbsa_files_{unique_id}.txt")
         with open(finished_complexes_file, "w") as output:
