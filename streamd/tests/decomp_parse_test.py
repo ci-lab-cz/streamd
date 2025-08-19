@@ -16,6 +16,12 @@ Receptor:
 Backbone Decomposition Contribution (BDC)
 Frame #,Residue,Internal,van der Waals,Electrostatic,Polar Solvation,Non-Polar Solv.,TOTAL
 1,R:A:ALA:1,0.7,0.8,0.9,1.0,1.1,1.2
+
+Poisson Boltzmann Decomposition Energies
+Complex:
+Total Decomposition Contribution (TDC)
+Frame #,Residue,Internal,van der Waals,Electrostatic,Polar Solvation,Non-Polar Solv.,TOTAL
+1,R:A:ALA:1,10,20,30,40,50,60
 """
     f = tmp_path / "FINAL_DECOMP_MMPBSA_test.csv"
     f.write_text(content)
@@ -31,9 +37,12 @@ Frame #,Residue,Internal,van der Waals,Electrostatic,Polar Solvation,Non-Polar S
         "TOTAL",
         "Region",
         "Contribution",
+        "Method",
     }
-    assert len(df) == 3
-    complex_tdc = df[(df["Region"] == "Complex") & (df["Contribution"] == "TDC")].iloc[0]
+    assert len(df) == 4
+    complex_tdc = df[(df["Region"] == "Complex") & (df["Contribution"] == "TDC") & (df["Method"] == "GB")].iloc[0]
     assert complex_tdc["Internal"] == 1.0
     receptor_bdc = df[(df["Region"] == "Receptor") & (df["Contribution"] == "BDC")].iloc[0]
     assert receptor_bdc["TOTAL"] == 1.2
+    pb_row = df[(df["Region"] == "Complex") & (df["Method"] == "PB")].iloc[0]
+    assert pb_row["Electrostatic"] == 30
