@@ -324,6 +324,71 @@ def parse_gmxMMPBSA_output(fname):
     return out_res
 
 
+def parse_gmxMMPBSA_results(fname):
+    """Parse final energy terms from ``gmx_MMPBSA_ana`` CSV output.
+
+    The ``FINAL_RESULTS_MMPBSA`` files contain multiple tables describing the
+    energy contributions of the complex, receptor, ligand and their deltas. This
+    helper converts such a file into a tidy :class:`pandas.DataFrame` with a
+    ``Region`` column indicating the source table.
+
+    Parameters
+    ----------
+    fname : str | os.PathLike
+        Path to ``FINAL_RESULTS_MMPBSA`` CSV output.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Parsed energy terms.  If the file cannot be parsed an empty DataFrame
+        is returned.
+    """
+
+    sections = {
+        "Complex Energy Terms": "Complex",
+        "Receptor Energy Terms": "Receptor",
+        "Ligand Energy Terms": "Ligand",
+        "Delta Energy Terms": "Delta",
+    }
+
+    data = []
+    region = None
+    header = None
+
+    with open(fname) as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped or stripped == "GENERALIZED BORN:":
+                continue
+
+            if stripped in sections:
+                region = sections[stripped]
+                header = None
+                continue
+
+            if stripped.startswith("Frame #"):
+                header = [h.strip() for h in stripped.split(",")]
+                header[0] = "Frame"
+                continue
+
+            if header and region:
+                parts = [p.strip() for p in stripped.split(",")]
+                if len(parts) == len(header):
+                    row = dict(zip(header, parts))
+                    row["Region"] = region
+                    data.append(row)
+
+    df = pd.DataFrame(data)
+    if df.empty:
+        return df
+
+    numeric_cols = [c for c in df.columns if c not in {"Region"}]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
+
+
 def parse_gmxMMPBSA_decomp(fname):
     """Parse residue decomposition outputs from gmx_MMPBSA_ana.
 
@@ -652,18 +717,16 @@ def start(
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{unique_id}.csv'), sep='\t', index=False)
 
         if frame_csv_files:
-            frame_dfs = []
+            result_dfs = []
             for f in frame_csv_files:
                 if os.path.isfile(f):
-                    try:
-                        df = pd.read_csv(f)
-                    except Exception:
-                        df = pd.read_csv(f, sep="\t")
-                    df.insert(0, "Name", pathlib.PurePath(f).parent.name)
-                    frame_dfs.append(df)
-            if frame_dfs:
-                pd.concat(frame_dfs, ignore_index=True).to_csv(
-                    os.path.join(out_wdir, f"GBSA_frames_{unique_id}.csv"),
+                    df = parse_gmxMMPBSA_results(f)
+                    if not df.empty:
+                        df.insert(0, "Name", pathlib.PurePath(f).parent.name)
+                        result_dfs.append(df)
+            if result_dfs:
+                pd.concat(result_dfs, ignore_index=True).to_csv(
+                    os.path.join(out_wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.csv"),
                     sep="\t",
                     index=False,
                 )
