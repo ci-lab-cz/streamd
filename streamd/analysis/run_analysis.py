@@ -12,7 +12,20 @@ from streamd.utils.utils import filepath_type
 
 
 def merge_rmsd_csv(csv_files, out):
-    """Concatenate multiple RMSD CSV files into one DataFrame."""
+    """Concatenate multiple RMSD CSV files into one DataFrame.
+
+    Parameters
+    ----------
+    csv_files : list[str]
+        Paths to the CSV files with RMSD data to merge.
+    out : str | os.PathLike
+        Destination path where the merged table will be written.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Combined DataFrame containing data from all ``csv_files``.
+    """
     all_data_list = []
     csv_files.sort()
     for i in csv_files:
@@ -25,7 +38,24 @@ def merge_rmsd_csv(csv_files, out):
 
 
 def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone', system_cols=['ligand_name','system']):
-    """Return mean and standard deviation of RMSD per time range."""
+    """Return mean and standard deviation of RMSD per time range.
+
+    Parameters
+    ----------
+    rmsd_data : pandas.DataFrame
+        Table with at least ``time(ns)`` and RMSD columns.
+    time_ranges : list[tuple[float, float]]
+        Time intervals (in ns) over which to compute statistics.
+    rmsd_system : str, optional
+        Column name containing RMSD values to analyse.
+    system_cols : list[str], optional
+        Columns identifying unique systems in ``rmsd_data``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Mean and standard deviation of RMSD for each time range.
+    """
     res_list = []
     for start, end in time_ranges:
         key = f'{start}-{end}ns'
@@ -44,7 +74,20 @@ def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone',
 
 
 def make_lower_case(df, cols):
-    """Lower-case specified columns and warn on missing values."""
+    """Lower-case specified columns and warn on missing values.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input table whose columns will be normalised.
+    cols : list[str]
+        Column names to convert to lower case.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The modified DataFrame.
+    """
     for col in cols:
         if df[col].isna().any():
             logging.warning(f'The RMSD DataFrame column {col} contains the None value, '
@@ -57,7 +100,30 @@ def make_lower_case(df, cols):
 def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
                       rmsd_type_list=['backbone', 'ligand'], paint_by_fname=None,
                       title=None):
-    """Execute RMSD analysis workflow and write summary files."""
+    """Execute RMSD analysis workflow and write summary files.
+
+    Parameters
+    ----------
+    rmsd_files : list[str]
+        Paths to input RMSD tables.
+    wdir : str | os.PathLike
+        Output directory for analysis results.
+    unique_id : str
+        Identifier appended to generated file names.
+    time_ranges : list[tuple[float, float]] | None, optional
+        Optional list of time intervals in nanoseconds.
+    rmsd_type_list : list[str], optional
+        RMSD column names to process from the input files.
+    paint_by_fname : str | None, optional
+        Optional CSV file defining colouring for the interactive plot.
+    title : str | None, optional
+        Custom title for the generated HTML plot.
+
+    Returns
+    -------
+    None
+        The function writes output files to ``wdir`` and returns ``None``.
+    """
     if len(rmsd_files) > 1:
         rmsd_merged_data = merge_rmsd_csv(rmsd_files, os.path.join(wdir, f'rmsd_all_systems_{unique_id}.csv'))
     else:
@@ -129,7 +195,12 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
 #                        out_name=out_name)
 
 def main():
-    """CLI entry point for RMSD analysis."""
+    """CLI entry point for RMSD analysis.
+
+    Parameters
+    ----------
+    None
+    """
     parser = argparse.ArgumentParser(description='''Run rmsd analysis for StreaMD output files''')
     parser.add_argument('-i', '--input', metavar='FILENAME', required=False, nargs='+',
                         help='input file(s) with rmsd. Supported formats: *.csv. Required columns: '

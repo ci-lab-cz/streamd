@@ -267,6 +267,12 @@ run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 1 --ncpu 128
 
 ```
 
+##### Using a configuration file
+```
+run_md --config config.yml 
+```
+[Read More](#configuration-file)
+
 ##### **Simulations with boron-containing compounds**  
 *Gaussian Software* should be available.  
 Gaussian optimization and charge calculation will be run only for molecules with boron atoms, other molecules will be processed by regular procedure by Antechamber.

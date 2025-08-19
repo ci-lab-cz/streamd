@@ -59,8 +59,9 @@ def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) 
                 continue
             value = config_args[dest]
 
-            # ``argparse`` uses ``nargs=0`` for boolean flags (e.g. ``store_true``).
+            # argparse uses nargs=0 for boolean flags (e.g. store_true).
             # Treat such flags like single-value options rather than lists.
+
             if action.nargs not in (None, '?', 0):
                 if isinstance(value, str):
                     value = value.split()
