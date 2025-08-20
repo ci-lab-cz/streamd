@@ -500,6 +500,118 @@ def parse_gmxMMPBSA_decomp(fname):
 
     return df
 
+
+def parse_gmxMMPBSA_decomp_dat(fname):
+    """Parse averaged residue decomposition from gmx_MMPBSA ``.dat`` files.
+
+    ``gmx_MMPBSA`` produces ``FINAL_DECOMP_MMPBSA`` text files containing
+    averaged per-residue energy contributions for the complex, receptor, ligand
+    and their deltas.  Each section also distinguishes between total, sidechain
+    and backbone contributions and may report values for both Generalized Born
+    and Poisson Boltzmann models.  This helper converts such a file into a tidy
+    :class:`pandas.DataFrame` with columns combining the energy term and
+    statistical measure, e.g. ``Internal Avg.`` or ``Electrostatic Std. Dev.``.
+
+    Parameters
+    ----------
+    fname : str | os.PathLike
+        Path to ``FINAL_DECOMP_MMPBSA`` ``.dat`` output.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Parsed residue contributions.  If the file cannot be parsed an empty
+        DataFrame is returned.
+    """
+
+    sections = {"Complex", "Receptor", "Ligand", "DELTAS"}
+    contributions = {
+        "Total Energy Decomposition": "Total",
+        "Sidechain Energy Decomposition": "Sidechain",
+        "Backbone Energy Decomposition": "Backbone",
+    }
+
+    data = []
+    region = None
+    contrib = None
+    header_top = None
+    header_sub = None
+    method = None
+
+    with open(fname) as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            if stripped.startswith("Energy Decomposition Analysis"):
+                if "Generalized Born" in stripped:
+                    method = "GB"
+                elif "Poisson Boltzmann" in stripped:
+                    method = "PB"
+                region = None
+                contrib = None
+                header_top = None
+                header_sub = None
+                continue
+
+            if stripped.endswith(":") and stripped[:-1] in sections:
+                region = stripped[:-1]
+                contrib = None
+                header_top = None
+                header_sub = None
+                continue
+
+            key = stripped.rstrip(":")
+            if key in contributions:
+                contrib = contributions[key]
+                header_top = None
+                header_sub = None
+                continue
+
+            if contrib and header_top is None:
+                header_top = [h.strip() for h in stripped.split(",")]
+                continue
+
+            if contrib and header_sub is None:
+                header_sub = [h.strip() for h in stripped.split(",")]
+                header = []
+                current = None
+                for top, sub in zip(header_top, header_sub):
+                    if top:
+                        current = top
+                    if current == "Residue":
+                        header.append("Residue")
+                        continue
+                    name = current
+                    if sub:
+                        name = f"{current} {sub}"
+                    header.append(name)
+                continue
+
+            if header_sub and region and contrib and method:
+                parts = [p.strip() for p in stripped.split(",")]
+                if len(parts) == len(header):
+                    row = dict(zip(header, parts))
+                    row["Region"] = region
+                    row["Contribution"] = contrib
+                    row["Method"] = method
+                    data.append(row)
+
+    df = pd.DataFrame(data)
+    if df.empty:
+        return df
+
+    numeric_cols = [
+        c
+        for c in df.columns
+        if c not in {"Residue", "Region", "Contribution", "Method"}
+    ]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
+
 def run_get_frames_from_wdir(wdir, xtc, env):
     """Return number of trajectory frames for a working directory.
 
@@ -611,6 +723,7 @@ def start(
     var_gbsa_out_files = []
     frame_csv_files = []
     decomp_csv_files = []
+    decomp_dat_files = []
     if gmxmmpbsa_out_files is None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
         if not mmpbsa:
@@ -671,8 +784,12 @@ def start(
                             os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
                         )
                         if decomp:
+                            base = os.path.dirname(res)
                             decomp_csv_files.append(
-                                os.path.join(os.path.dirname(res), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                                os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                            )
+                            decomp_dat_files.append(
+                                os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                             )
             finally:
                 if dask_client:
@@ -711,8 +828,12 @@ def start(
                 os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
             )
             if decomp:
+                base = os.path.dirname(res)
                 decomp_csv_files.append(
-                    os.path.join(os.path.dirname(res), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                    os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                )
+                decomp_dat_files.append(
+                    os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                 )
 
     else:
@@ -724,6 +845,10 @@ def start(
         if decomp:
             decomp_csv_files = [
                 os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                for f in var_gbsa_out_files
+            ]
+            decomp_dat_files = [
+                os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                 for f in var_gbsa_out_files
             ]
 
@@ -790,6 +915,31 @@ def start(
                 if not pb_decomp.empty:
                     pb_decomp.to_csv(
                         os.path.join(out_wdir, f"PBSA_decomp_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
+
+        if decomp and decomp_dat_files:
+            decomp_dat_dfs = []
+            for f in decomp_dat_files:
+                if os.path.isfile(f):
+                    df = parse_gmxMMPBSA_decomp_dat(f)
+                    if not df.empty:
+                        df.insert(0, "Name", pathlib.PurePath(f).parent.name)
+                        decomp_dat_dfs.append(df)
+            if decomp_dat_dfs:
+                all_decomp_dat = pd.concat(decomp_dat_dfs, ignore_index=True)
+                gb_decomp_dat = all_decomp_dat[all_decomp_dat["Method"] == "GB"]
+                if not gb_decomp_dat.empty:
+                    gb_decomp_dat.to_csv(
+                        os.path.join(out_wdir, f"GBSA_decomp_avg_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
+                pb_decomp_dat = all_decomp_dat[all_decomp_dat["Method"] == "PB"]
+                if not pb_decomp_dat.empty:
+                    pb_decomp_dat.to_csv(
+                        os.path.join(out_wdir, f"PBSA_decomp_avg_{unique_id}.csv"),
                         sep="\t",
                         index=False,
                     )
