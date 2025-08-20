@@ -529,6 +529,26 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_re
     dask_client, cluster, pool = None, None, None
     var_gbsa_out_files = []
     decomp_dat_files = []
+
+    # Automatically enable decomposition if the mmpbsa input defines a
+    # ``&decomp`` block. If present, decomposition is enabled without the
+    # need for an explicit flag.
+    if mmpbsa and os.path.isfile(mmpbsa) and not decomp:
+        try:
+            with open(mmpbsa) as inp:
+                for line in inp:
+                    stripped = line.strip().lower()
+                    if stripped.startswith('#'):
+                        continue
+                    if stripped.startswith('&decomp'):
+                        decomp = True
+                        logging.info(
+                            "Detected '&decomp' section in %s; enabling per-residue decomposition.",
+                            mmpbsa,
+                        )
+                        break
+        except OSError as err:
+            logging.warning("Could not inspect %s for '&decomp': %s", mmpbsa, err)
     if gmxmmpbsa_out_files is None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
         if not mmpbsa:
@@ -706,8 +726,6 @@ def main():
                         help=' Clean previous temporary gmxMMPBSA files')
     parser.add_argument('--debug', action='store_true', default=False,
                         help=' Save all temporary gmxMMPBSA files')
-    parser.add_argument('--decomp', action='store_true', default=False,
-                        help='Perform per-residue decomposition analysis')
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
                              'Unique suffix is used to separate outputs from different runs.')
@@ -754,7 +772,6 @@ def main():
               gmxmmpbsa_out_files=args.out_files, ligand_resid=args.ligand_id,
               append_protein_selection=args.append_protein_selection,
               hostfile=args.hostfile, bash_log=bash_log,
-              clean_previous=args.clean_previous, debug=args.debug,
-              decomp=args.decomp)
+              clean_previous=args.clean_previous, debug=args.debug)
     finally:
         logging.shutdown()
