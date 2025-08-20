@@ -723,6 +723,7 @@ def start(
     var_gbsa_out_files = []
     frame_csv_files = []
     decomp_csv_files = []
+    decomp_dat_files = []
     if gmxmmpbsa_out_files is None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
         if not mmpbsa:
@@ -783,8 +784,12 @@ def start(
                             os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
                         )
                         if decomp:
+                            base = os.path.dirname(res)
                             decomp_csv_files.append(
-                                os.path.join(os.path.dirname(res), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                                os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                            )
+                            decomp_dat_files.append(
+                                os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                             )
             finally:
                 if dask_client:
@@ -823,8 +828,12 @@ def start(
                 os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
             )
             if decomp:
+                base = os.path.dirname(res)
                 decomp_csv_files.append(
-                    os.path.join(os.path.dirname(res), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                    os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                )
+                decomp_dat_files.append(
+                    os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                 )
 
     else:
@@ -836,6 +845,10 @@ def start(
         if decomp:
             decomp_csv_files = [
                 os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                for f in var_gbsa_out_files
+            ]
+            decomp_dat_files = [
+                os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                 for f in var_gbsa_out_files
             ]
 
@@ -902,6 +915,31 @@ def start(
                 if not pb_decomp.empty:
                     pb_decomp.to_csv(
                         os.path.join(out_wdir, f"PBSA_decomp_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
+
+        if decomp and decomp_dat_files:
+            decomp_dat_dfs = []
+            for f in decomp_dat_files:
+                if os.path.isfile(f):
+                    df = parse_gmxMMPBSA_decomp_dat(f)
+                    if not df.empty:
+                        df.insert(0, "Name", pathlib.PurePath(f).parent.name)
+                        decomp_dat_dfs.append(df)
+            if decomp_dat_dfs:
+                all_decomp_dat = pd.concat(decomp_dat_dfs, ignore_index=True)
+                gb_decomp_dat = all_decomp_dat[all_decomp_dat["Method"] == "GB"]
+                if not gb_decomp_dat.empty:
+                    gb_decomp_dat.to_csv(
+                        os.path.join(out_wdir, f"GBSA_decomp_avg_{unique_id}.csv"),
+                        sep="\t",
+                        index=False,
+                    )
+                pb_decomp_dat = all_decomp_dat[all_decomp_dat["Method"] == "PB"]
+                if not pb_decomp_dat.empty:
+                    pb_decomp_dat.to_csv(
+                        os.path.join(out_wdir, f"PBSA_decomp_avg_{unique_id}.csv"),
                         sep="\t",
                         index=False,
                     )
