@@ -500,6 +500,118 @@ def parse_gmxMMPBSA_decomp(fname):
 
     return df
 
+
+def parse_gmxMMPBSA_decomp_dat(fname):
+    """Parse averaged residue decomposition from gmx_MMPBSA ``.dat`` files.
+
+    ``gmx_MMPBSA`` produces ``FINAL_DECOMP_MMPBSA`` text files containing
+    averaged per-residue energy contributions for the complex, receptor, ligand
+    and their deltas.  Each section also distinguishes between total, sidechain
+    and backbone contributions and may report values for both Generalized Born
+    and Poisson Boltzmann models.  This helper converts such a file into a tidy
+    :class:`pandas.DataFrame` with columns combining the energy term and
+    statistical measure, e.g. ``Internal Avg.`` or ``Electrostatic Std. Dev.``.
+
+    Parameters
+    ----------
+    fname : str | os.PathLike
+        Path to ``FINAL_DECOMP_MMPBSA`` ``.dat`` output.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Parsed residue contributions.  If the file cannot be parsed an empty
+        DataFrame is returned.
+    """
+
+    sections = {"Complex", "Receptor", "Ligand", "DELTAS"}
+    contributions = {
+        "Total Energy Decomposition": "Total",
+        "Sidechain Energy Decomposition": "Sidechain",
+        "Backbone Energy Decomposition": "Backbone",
+    }
+
+    data = []
+    region = None
+    contrib = None
+    header_top = None
+    header_sub = None
+    method = None
+
+    with open(fname) as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            if stripped.startswith("Energy Decomposition Analysis"):
+                if "Generalized Born" in stripped:
+                    method = "GB"
+                elif "Poisson Boltzmann" in stripped:
+                    method = "PB"
+                region = None
+                contrib = None
+                header_top = None
+                header_sub = None
+                continue
+
+            if stripped.endswith(":") and stripped[:-1] in sections:
+                region = stripped[:-1]
+                contrib = None
+                header_top = None
+                header_sub = None
+                continue
+
+            key = stripped.rstrip(":")
+            if key in contributions:
+                contrib = contributions[key]
+                header_top = None
+                header_sub = None
+                continue
+
+            if contrib and header_top is None:
+                header_top = [h.strip() for h in stripped.split(",")]
+                continue
+
+            if contrib and header_sub is None:
+                header_sub = [h.strip() for h in stripped.split(",")]
+                header = []
+                current = None
+                for top, sub in zip(header_top, header_sub):
+                    if top:
+                        current = top
+                    if current == "Residue":
+                        header.append("Residue")
+                        continue
+                    name = current
+                    if sub:
+                        name = f"{current} {sub}"
+                    header.append(name)
+                continue
+
+            if header_sub and region and contrib and method:
+                parts = [p.strip() for p in stripped.split(",")]
+                if len(parts) == len(header):
+                    row = dict(zip(header, parts))
+                    row["Region"] = region
+                    row["Contribution"] = contrib
+                    row["Method"] = method
+                    data.append(row)
+
+    df = pd.DataFrame(data)
+    if df.empty:
+        return df
+
+    numeric_cols = [
+        c
+        for c in df.columns
+        if c not in {"Residue", "Region", "Contribution", "Method"}
+    ]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
+
 def run_get_frames_from_wdir(wdir, xtc, env):
     """Return number of trajectory frames for a working directory.
 
