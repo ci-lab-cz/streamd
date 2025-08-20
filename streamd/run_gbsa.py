@@ -25,16 +25,13 @@ import sys
 
 import pandas as pd
 
-from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.utils.utils import (
-    get_index,
-    make_group_ndx,
-    filepath_type,
-    run_check_subprocess,
-    get_number_of_frames,
-    temporary_directory_debug,
-    parse_with_config,
-)
+# ``init_dask_cluster`` and ``calc_dask`` pull in heavy optional
+# dependencies (e.g. RDKit).  Importing them lazily allows lightweight
+# utilities like :func:`parse_gmxMMPBSA_output` to be used without those
+# packages being installed.
+# Import helpers from ``streamd.utils.utils`` lazily to avoid importing
+# heavy optional dependencies (e.g. MDAnalysis) when only the parsing
+# utilities of this module are needed.
 logging.getLogger('distributed').setLevel('CRITICAL')
 logging.getLogger('asyncssh').setLevel('CRITICAL')
 logging.getLogger('distributed.worker').setLevel('CRITICAL')
@@ -114,6 +111,15 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
     if not os.path.isfile(tpr) or not os.path.isfile(xtc) or not os.path.isfile(topol) or not os.path.isfile(index):
         logging.warning(f'{wdir} cannot run gbsa. Check if there are missing files: {tpr} {xtc} {topol} {index}')
         return None
+
+    # Import here to avoid mandatory heavy dependencies when this module is
+    # used only for parsing existing output files.
+    from streamd.utils.utils import (
+        get_index,
+        make_group_ndx,
+        run_check_subprocess,
+        temporary_directory_debug,
+    )
 
     index_list = get_index(index, env=env)
     if append_protein_selection is None:
@@ -620,6 +626,8 @@ def run_get_frames_from_wdir(wdir, xtc, env):
     :param env: Optional environment variables for subprocess calls.
     :return: Tuple of frame count and timestep or ``None``.
     """
+    from streamd.utils.utils import get_number_of_frames
+
     return get_number_of_frames(os.path.join(wdir, xtc), env=env)
 
 
@@ -719,13 +727,23 @@ def start(
     list[str] | None
         Paths to generated GBSA output files or ``None`` on failure.
     """
+    from streamd.utils.utils import get_number_of_frames
+
     dask_client, cluster, pool = None, None, None
     var_gbsa_out_files = []
     frame_csv_files = []
     decomp_csv_files = []
     decomp_dat_files = []
     if gmxmmpbsa_out_files is None:
-        # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
+        # ``init_dask_cluster`` and ``calc_dask`` require optional heavy
+        # dependencies.  Import them lazily only when we actually run new
+        # calculations to allow light-weight parsing utilities to work
+        # without those packages.
+        from streamd.utils.dask_init import init_dask_cluster, calc_dask
+
+        # gmx_mmpbsa requires that the run must have at least as many frames
+        # as processors. Thus we get and use the minimum number of used frames
+        # as NP
         if not mmpbsa:
             mmpbsa = os.path.join(out_wdir, f'mmpbsa_{unique_id}.in')
             project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -956,6 +974,7 @@ def start(
 
 def main():
     """CLI entry point for GBSA calculations."""
+    from streamd.utils.utils import filepath_type, parse_with_config
     parser = argparse.ArgumentParser(description='''Run MM-GBSA/MM-PBSA calculation using gmx_MMPBSA tool''')
     parser.add_argument('--config', metavar='FILENAME', required=False,
                         type=partial(filepath_type, ext=("yml", "yaml")),
