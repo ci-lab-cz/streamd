@@ -324,181 +324,181 @@ def parse_gmxMMPBSA_output(fname):
     return out_res
 
 
-def parse_gmxMMPBSA_results(fname):
-    """Parse final energy terms from ``gmx_MMPBSA_ana`` CSV output.
+# def parse_gmxMMPBSA_results(fname):
+#     """Parse final energy terms from ``gmx_MMPBSA_ana`` CSV output.
+#
+#     The ``FINAL_RESULTS_MMPBSA`` files contain multiple tables describing the
+#     energy contributions of the complex, receptor, ligand and their deltas.  The
+#     file may report results for different solvation models (e.g. ``GENERALIZED
+#     BORN`` and ``POISSON BOLTZMANN``).  This helper converts such a file into a
+#     tidy :class:`pandas.DataFrame` with ``Region`` and ``Method`` columns
+#     indicating the source table and the employed solvation model.
+#
+#     Parameters
+#     ----------
+#     fname : str | os.PathLike
+#         Path to ``FINAL_RESULTS_MMPBSA`` CSV output.
+#
+#     Returns
+#     -------
+#     pandas.DataFrame
+#         Parsed energy terms.  If the file cannot be parsed an empty DataFrame
+#         is returned.
+#     """
+#
+#     sections = {
+#         "Complex Energy Terms": "Complex",
+#         "Receptor Energy Terms": "Receptor",
+#         "Ligand Energy Terms": "Ligand",
+#         "Delta Energy Terms": "Delta",
+#     }
+#     methods = {
+#         "GENERALIZED BORN:": "GB",
+#         "POISSON BOLTZMANN:": "PB",
+#     }
+#
+#     data = []
+#     region = None
+#     method = None
+#     header = None
+#
+#     with open(fname) as fh:
+#         for line in fh:
+#             stripped = line.strip()
+#             if not stripped:
+#                 continue
+#
+#             if stripped in methods:
+#                 method = methods[stripped]
+#                 region = None
+#                 header = None
+#                 continue
+#
+#             if stripped in sections:
+#                 region = sections[stripped]
+#                 header = None
+#                 continue
+#
+#             if stripped.startswith("Frame #"):
+#                 header = [h.strip() for h in stripped.split(",")]
+#                 header[0] = "Frame"
+#                 continue
+#
+#             if header and region and method:
+#                 parts = [p.strip() for p in stripped.split(",")]
+#                 if len(parts) == len(header):
+#                     row = dict(zip(header, parts))
+#                     row["Region"] = region
+#                     row["Method"] = method
+#                     data.append(row)
+#
+#     df = pd.DataFrame(data)
+#     if df.empty:
+#         return df
+#
+#     numeric_cols = [c for c in df.columns if c not in {"Region", "Method"}]
+#     for col in numeric_cols:
+#         df[col] = pd.to_numeric(df[col], errors="coerce")
+#
+#     return df
 
-    The ``FINAL_RESULTS_MMPBSA`` files contain multiple tables describing the
-    energy contributions of the complex, receptor, ligand and their deltas.  The
-    file may report results for different solvation models (e.g. ``GENERALIZED
-    BORN`` and ``POISSON BOLTZMANN``).  This helper converts such a file into a
-    tidy :class:`pandas.DataFrame` with ``Region`` and ``Method`` columns
-    indicating the source table and the employed solvation model.
 
-    Parameters
-    ----------
-    fname : str | os.PathLike
-        Path to ``FINAL_RESULTS_MMPBSA`` CSV output.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Parsed energy terms.  If the file cannot be parsed an empty DataFrame
-        is returned.
-    """
-
-    sections = {
-        "Complex Energy Terms": "Complex",
-        "Receptor Energy Terms": "Receptor",
-        "Ligand Energy Terms": "Ligand",
-        "Delta Energy Terms": "Delta",
-    }
-    methods = {
-        "GENERALIZED BORN:": "GB",
-        "POISSON BOLTZMANN:": "PB",
-    }
-
-    data = []
-    region = None
-    method = None
-    header = None
-
-    with open(fname) as fh:
-        for line in fh:
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            if stripped in methods:
-                method = methods[stripped]
-                region = None
-                header = None
-                continue
-
-            if stripped in sections:
-                region = sections[stripped]
-                header = None
-                continue
-
-            if stripped.startswith("Frame #"):
-                header = [h.strip() for h in stripped.split(",")]
-                header[0] = "Frame"
-                continue
-
-            if header and region and method:
-                parts = [p.strip() for p in stripped.split(",")]
-                if len(parts) == len(header):
-                    row = dict(zip(header, parts))
-                    row["Region"] = region
-                    row["Method"] = method
-                    data.append(row)
-
-    df = pd.DataFrame(data)
-    if df.empty:
-        return df
-
-    numeric_cols = [c for c in df.columns if c not in {"Region", "Method"}]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    return df
-
-
-def parse_gmxMMPBSA_decomp(fname):
-    """Parse residue decomposition outputs from gmx_MMPBSA_ana.
-
-    The ``FINAL_DECOMP_MMPBSA`` files generated by ``gmx_MMPBSA``/``gmx_MMPBSA_ana``
-    contain several text blocks describing per-residue energy contributions for the
-    complex, receptor, ligand and their deltas.  Each block also distinguishes
-    between total (TDC), sidechain (SDC) and backbone (BDC) contributions.  Files
-    may contain sections for both Generalized Born and Poisson Boltzmann methods.
-    This helper converts such a file into a tidy :class:`pandas.DataFrame` with the
-    following columns::
-
-        Frame, Residue, Internal, van der Waals, Electrostatic,
-        Polar Solvation, Non-Polar Solv., TOTAL, Region, Contribution, Method
-
-    Parameters
-    ----------
-    fname : str | os.PathLike
-        Path to ``FINAL_DECOMP_MMPBSA`` text output.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Parsed residue contributions.  If the file cannot be parsed an empty
-        DataFrame is returned.
-    """
-
-    sections = {"Complex", "Receptor", "Ligand", "DELTAS"}
-    methods = {
-        "Generalized Born Decomposition Energies": "GB",
-        "Poisson Boltzmann Decomposition Energies": "PB",
-    }
-    contributions = {
-        "Total Decomposition Contribution (TDC)": "TDC",
-        "Sidechain Decomposition Contribution (SDC)": "SDC",
-        "Backbone Decomposition Contribution (BDC)": "BDC",
-    }
-
-    data = []
-    region = None
-    contrib = None
-    header = None
-    method = None
-
-    with open(fname) as fh:
-        for line in fh:
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            if stripped in methods:
-                method = methods[stripped]
-                region = None
-                contrib = None
-                header = None
-                continue
-
-            if stripped.endswith(":") and stripped[:-1] in sections:
-                region = stripped[:-1]
-                contrib = None
-                header = None
-                continue
-
-            if stripped in contributions:
-                contrib = contributions[stripped]
-                header = None
-                continue
-
-            if contrib and stripped.startswith("Frame #"):
-                header = [h.strip() for h in stripped.split(",")]
-                # normalise column name
-                header[0] = "Frame"
-                continue
-
-            if header and region and contrib and method:
-                parts = [p.strip() for p in stripped.split(",")]
-                if len(parts) == len(header):
-                    row = dict(zip(header, parts))
-                    row["Region"] = region
-                    row["Contribution"] = contrib
-                    row["Method"] = method
-                    data.append(row)
-
-    df = pd.DataFrame(data)
-    if df.empty:
-        return df
-
-    # convert numeric columns when possible
-    numeric_cols = [
-        c
-        for c in df.columns
-        if c not in {"Residue", "Region", "Contribution", "Method"}
-    ]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    return df
+# def parse_gmxMMPBSA_decomp(fname):
+#     """Parse residue decomposition outputs from gmx_MMPBSA_ana.
+#
+#     The ``FINAL_DECOMP_MMPBSA`` files generated by ``gmx_MMPBSA``/``gmx_MMPBSA_ana``
+#     contain several text blocks describing per-residue energy contributions for the
+#     complex, receptor, ligand and their deltas.  Each block also distinguishes
+#     between total (TDC), sidechain (SDC) and backbone (BDC) contributions.  Files
+#     may contain sections for both Generalized Born and Poisson Boltzmann methods.
+#     This helper converts such a file into a tidy :class:`pandas.DataFrame` with the
+#     following columns::
+#
+#         Frame, Residue, Internal, van der Waals, Electrostatic,
+#         Polar Solvation, Non-Polar Solv., TOTAL, Region, Contribution, Method
+#
+#     Parameters
+#     ----------
+#     fname : str | os.PathLike
+#         Path to ``FINAL_DECOMP_MMPBSA`` text output.
+#
+#     Returns
+#     -------
+#     pandas.DataFrame
+#         Parsed residue contributions.  If the file cannot be parsed an empty
+#         DataFrame is returned.
+#     """
+#
+#     sections = {"Complex", "Receptor", "Ligand", "DELTAS"}
+#     methods = {
+#         "Generalized Born Decomposition Energies": "GB",
+#         "Poisson Boltzmann Decomposition Energies": "PB",
+#     }
+#     contributions = {
+#         "Total Decomposition Contribution (TDC)": "TDC",
+#         "Sidechain Decomposition Contribution (SDC)": "SDC",
+#         "Backbone Decomposition Contribution (BDC)": "BDC",
+#     }
+#
+#     data = []
+#     region = None
+#     contrib = None
+#     header = None
+#     method = None
+#
+#     with open(fname) as fh:
+#         for line in fh:
+#             stripped = line.strip()
+#             if not stripped:
+#                 continue
+#
+#             if stripped in methods:
+#                 method = methods[stripped]
+#                 region = None
+#                 contrib = None
+#                 header = None
+#                 continue
+#
+#             if stripped.endswith(":") and stripped[:-1] in sections:
+#                 region = stripped[:-1]
+#                 contrib = None
+#                 header = None
+#                 continue
+#
+#             if stripped in contributions:
+#                 contrib = contributions[stripped]
+#                 header = None
+#                 continue
+#
+#             if contrib and stripped.startswith("Frame #"):
+#                 header = [h.strip() for h in stripped.split(",")]
+#                 # normalise column name
+#                 header[0] = "Frame"
+#                 continue
+#
+#             if header and region and contrib and method:
+#                 parts = [p.strip() for p in stripped.split(",")]
+#                 if len(parts) == len(header):
+#                     row = dict(zip(header, parts))
+#                     row["Region"] = region
+#                     row["Contribution"] = contrib
+#                     row["Method"] = method
+#                     data.append(row)
+#
+#     df = pd.DataFrame(data)
+#     if df.empty:
+#         return df
+#
+#     # convert numeric columns when possible
+#     numeric_cols = [
+#         c
+#         for c in df.columns
+#         if c not in {"Residue", "Region", "Contribution", "Method"}
+#     ]
+#     for col in numeric_cols:
+#         df[col] = pd.to_numeric(df[col], errors="coerce")
+#
+#     return df
 
 
 def parse_gmxMMPBSA_decomp_dat(fname):
@@ -662,25 +662,9 @@ def get_used_number_of_frames(var_number_of_frames, startframe, endframe, interv
     """
     return math.ceil((min(min(var_number_of_frames), endframe) - (startframe - 1)) / interval)
 
-def start(
-    wdir_to_run,
-    tpr,
-    xtc,
-    topol,
-    index,
-    out_wdir,
-    mmpbsa,
-    ncpu,
-    ligand_resid,
-    append_protein_selection,
-    hostfile,
-    unique_id,
-    bash_log,
-    gmxmmpbsa_out_files=None,
-    clean_previous=False,
-    debug=False,
-    decomp=False,
-):
+def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa, ncpu, ligand_resid,
+          append_protein_selection, hostfile, unique_id, bash_log,
+          gmxmmpbsa_out_files=None, clean_previous=False, debug=False, decomp=False):
     """Start GBSA calculations and aggregate resulting energies.
 
     Parameters
@@ -721,8 +705,7 @@ def start(
     """
     dask_client, cluster, pool = None, None, None
     var_gbsa_out_files = []
-    frame_csv_files = []
-    decomp_csv_files = []
+    # frame_csv_files, decomp_csv_files = [], []
     decomp_dat_files = []
     if gmxmmpbsa_out_files is None:
         # gmx_mmpbsa requires that the run must have at least as many frames as processors. Thus we get and use the min number of used frames as NP
@@ -759,35 +742,24 @@ def start(
                 dask_client, cluster = init_dask_cluster(hostfile=hostfile, n_tasks_per_node=n_tasks_per_node,
                                                          ncpu=ncpu)
                 var_gbsa_out_files = []
-                for res in calc_dask(
-                    run_gbsa_from_wdir,
-                    wdir_to_run,
-                    dask_client=dask_client,
-                    tpr=tpr,
-                    xtc=xtc,
-                    topol=topol,
-                    index=index,
-                    mmpbsa=mmpbsa,
-                    np=min(ncpu, used_number_of_frames),
-                    ligand_resid=ligand_resid,
-                    append_protein_selection=append_protein_selection,
-                    unique_id=unique_id,
-                    env=os.environ.copy(),
-                    bash_log=bash_log,
-                    clean_previous=clean_previous,
-                    debug=debug,
-                    decomp=decomp,
-                ):
+                for res in calc_dask(run_gbsa_from_wdir, wdir_to_run, dask_client=dask_client,
+                                     tpr=tpr, xtc=xtc, topol=topol, index=index,
+                                     mmpbsa=mmpbsa, np=min(ncpu, used_number_of_frames),
+                                     ligand_resid=ligand_resid,
+                                     append_protein_selection=append_protein_selection,
+                                     unique_id=unique_id, env=os.environ.copy(),
+                                     bash_log=bash_log, clean_previous=clean_previous,
+                                     debug=debug, decomp=decomp):
                     if res:
                         var_gbsa_out_files.append(res)
-                        frame_csv_files.append(
-                            os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
-                        )
+                        # frame_csv_files.append(
+                        #     os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
+                        # )
                         if decomp:
                             base = os.path.dirname(res)
-                            decomp_csv_files.append(
-                                os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
-                            )
+                            # decomp_csv_files.append(
+                            #     os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                            # )
                             decomp_dat_files.append(
                                 os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                             )
@@ -806,47 +778,34 @@ def start(
             if used_number_of_frames <= 0:
                 logging.error('Used number of frames are less or equal than 0. Run will be interrupted')
                 raise ValueError
-            res = run_gbsa_task(
-                wdir=os.path.dirname(xtc),
-                tpr=tpr,
-                xtc=xtc,
-                topol=topol,
-                index=index,
-                mmpbsa=mmpbsa,
-                np=min(ncpu, used_number_of_frames),
-                ligand_resid=ligand_resid,
-                append_protein_selection=append_protein_selection,
-                unique_id=unique_id,
-                env=os.environ.copy(),
-                bash_log=bash_log,
-                clean_previous=clean_previous,
-                debug=debug,
-                decomp=decomp,
-            )
+            res = run_gbsa_task(wdir=os.path.dirname(xtc), tpr=tpr, xtc=xtc, topol=topol, index=index, mmpbsa=mmpbsa,
+                          np=min(ncpu, used_number_of_frames), ligand_resid=ligand_resid, append_protein_selection=append_protein_selection,
+                          unique_id=unique_id, env=os.environ.copy(), bash_log=bash_log,
+                          clean_previous=clean_previous, debug=debug, decomp=decomp)
             var_gbsa_out_files.append(res)
-            frame_csv_files.append(
-                os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
-            )
+            # frame_csv_files.append(
+            #     os.path.join(os.path.dirname(res), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
+            # )
             if decomp:
                 base = os.path.dirname(res)
-                decomp_csv_files.append(
-                    os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
-                )
+                # decomp_csv_files.append(
+                #     os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+                # )
                 decomp_dat_files.append(
                     os.path.join(base, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                 )
 
     else:
         var_gbsa_out_files = gmxmmpbsa_out_files
-        frame_csv_files = [
-            os.path.join(os.path.dirname(f), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
-            for f in var_gbsa_out_files
-        ]
+        # frame_csv_files = [
+        #     os.path.join(os.path.dirname(f), f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")
+        #     for f in var_gbsa_out_files
+        # ]
         if decomp:
-            decomp_csv_files = [
-                os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
-                for f in var_gbsa_out_files
-            ]
+            # decomp_csv_files = [
+            #     os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.csv")
+            #     for f in var_gbsa_out_files
+            # ]
             decomp_dat_files = [
                 os.path.join(os.path.dirname(f), f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                 for f in var_gbsa_out_files
@@ -869,55 +828,55 @@ def start(
         if list(pd_pbsa.columns) != ['Name']:
             pd_pbsa.to_csv(os.path.join(out_wdir, f'PBSA_output_{unique_id}.csv'), sep='\t', index=False)
 
-        if frame_csv_files:
-            result_dfs = []
-            for f in frame_csv_files:
-                if os.path.isfile(f):
-                    df = parse_gmxMMPBSA_results(f)
-                    if not df.empty:
-                        df.insert(0, "Name", pathlib.PurePath(f).parent.name)
-                        result_dfs.append(df)
-            if result_dfs:
-                all_frames = pd.concat(result_dfs, ignore_index=True)
-                gb_frames = all_frames[all_frames["Method"] == "GB"]
-                if not gb_frames.empty:
-                    gb_frames.to_csv(
-                        os.path.join(out_wdir, f"GBSA_frames_{unique_id}.csv"),
-                        sep="\t",
-                        index=False,
-                    )
-                pb_frames = all_frames[all_frames["Method"] == "PB"]
-                if not pb_frames.empty:
-                    pb_frames.to_csv(
-                        os.path.join(out_wdir, f"PBSA_frames_{unique_id}.csv"),
-                        sep="\t",
-                        index=False,
-                    )
+        # if frame_csv_files:
+        #     result_dfs = []
+        #     for f in frame_csv_files:
+        #         if os.path.isfile(f):
+        #             df = parse_gmxMMPBSA_results(f)
+        #             if not df.empty:
+        #                 df.insert(0, "Name", pathlib.PurePath(f).parent.name)
+        #                 result_dfs.append(df)
+        #     if result_dfs:
+        #         all_frames = pd.concat(result_dfs, ignore_index=True)
+        #         gb_frames = all_frames[all_frames["Method"] == "GB"]
+        #         if not gb_frames.empty:
+        #             gb_frames.to_csv(
+        #                 os.path.join(out_wdir, f"GBSA_frames_{unique_id}.csv"),
+        #                 sep="\t",
+        #                 index=False,
+        #             )
+        #         pb_frames = all_frames[all_frames["Method"] == "PB"]
+        #         if not pb_frames.empty:
+        #             pb_frames.to_csv(
+        #                 os.path.join(out_wdir, f"PBSA_frames_{unique_id}.csv"),
+        #                 sep="\t",
+        #                 index=False,
+        #             )
 
-        if decomp and decomp_csv_files:
-            decomp_dfs = []
-            for f in decomp_csv_files:
-                if os.path.isfile(f):
-                    df = parse_gmxMMPBSA_decomp(f)
-                    if not df.empty:
-                        df.insert(0, "Name", pathlib.PurePath(f).parent.name)
-                        decomp_dfs.append(df)
-            if decomp_dfs:
-                all_decomp = pd.concat(decomp_dfs, ignore_index=True)
-                gb_decomp = all_decomp[all_decomp["Method"] == "GB"]
-                if not gb_decomp.empty:
-                    gb_decomp.to_csv(
-                        os.path.join(out_wdir, f"GBSA_decomp_{unique_id}.csv"),
-                        sep="\t",
-                        index=False,
-                    )
-                pb_decomp = all_decomp[all_decomp["Method"] == "PB"]
-                if not pb_decomp.empty:
-                    pb_decomp.to_csv(
-                        os.path.join(out_wdir, f"PBSA_decomp_{unique_id}.csv"),
-                        sep="\t",
-                        index=False,
-                    )
+        # if decomp and decomp_csv_files:
+        #     decomp_dfs = []
+        #     for f in decomp_csv_files:
+        #         if os.path.isfile(f):
+        #             df = parse_gmxMMPBSA_decomp(f)
+        #             if not df.empty:
+        #                 df.insert(0, "Name", pathlib.PurePath(f).parent.name)
+        #                 decomp_dfs.append(df)
+        #     if decomp_dfs:
+        #         all_decomp = pd.concat(decomp_dfs, ignore_index=True)
+        #         gb_decomp = all_decomp[all_decomp["Method"] == "GB"]
+        #         if not gb_decomp.empty:
+        #             gb_decomp.to_csv(
+        #                 os.path.join(out_wdir, f"GBSA_decomp_{unique_id}.csv"),
+        #                 sep="\t",
+        #                 index=False,
+        #             )
+        #         pb_decomp = all_decomp[all_decomp["Method"] == "PB"]
+        #         if not pb_decomp.empty:
+        #             pb_decomp.to_csv(
+        #                 os.path.join(out_wdir, f"PBSA_decomp_{unique_id}.csv"),
+        #                 sep="\t",
+        #                 index=False,
+        #             )
 
         if decomp and decomp_dat_files:
             decomp_dat_dfs = []
