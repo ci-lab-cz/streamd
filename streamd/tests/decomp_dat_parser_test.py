@@ -58,6 +58,8 @@ def test_start_aggregates_decomp_dat(tmp_path):
         "Frame #,Residue,Internal,van der Waals,Electrostatic,Polar Solvation,Non-Polar Solv.,TOTAL\n"
         "1,R:A:ALA:1,1,2,3,4,5,6\n"
     )
+    mmpbsa_in = tmp_path / "mmpbsa.in"
+    mmpbsa_in.write_text("&general\n/\n&decomp\n/\n")
     start(
         wdir_to_run=None,
         tpr=None,
@@ -65,7 +67,7 @@ def test_start_aggregates_decomp_dat(tmp_path):
         topol=None,
         index=None,
         out_wdir=tmp_path,
-        mmpbsa=None,
+        mmpbsa=str(mmpbsa_in),
         ncpu=1,
         ligand_resid="UNL",
         append_protein_selection=None,
@@ -75,7 +77,6 @@ def test_start_aggregates_decomp_dat(tmp_path):
         gmxmmpbsa_out_files=[str(results_dat)],
         clean_previous=False,
         debug=False,
-        decomp=True,
     )
     assert (tmp_path / "GBSA_decomp_avg_test.csv").is_file()
     assert (tmp_path / "PBSA_decomp_avg_test.csv").is_file()
