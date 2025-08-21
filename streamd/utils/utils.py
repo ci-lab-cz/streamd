@@ -60,6 +60,7 @@ def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) 
             value = config_args[dest]
 
             #argparse represents store_true/store_false actions with nargs set to 0
+
             if action.nargs not in (None, '?', 0):
                 if isinstance(value, str):
                     value = value.split()

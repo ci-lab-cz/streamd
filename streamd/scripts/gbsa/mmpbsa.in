@@ -13,7 +13,10 @@ igb=5, saltcon=0.150, intdiel=4
 #&pb
 #istrng=0.15, fillratio=4.0, radiopt=0, indi=4, exdi=80.0
 #/
-
+#&decomp
+#idecomp=2, dec_verbose=3,
+#print_res="within 4"
+#/
 
 
 

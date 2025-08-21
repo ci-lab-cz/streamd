@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import pytest
 
-from streamd.run_gbsa import start, get_number_of_frames, get_used_number_of_frames, get_mmpbsa_start_end_interval
+from streamd.run_gbsa import start, get_number_of_frames, get_used_number_of_frames, get_mmpbsa_params
 #,get_mmpbsa_start_end_interval, run_get_frames_from_wdir, \
 #    parse_gmxMMPBSA_output, run_gbsa_task)
 
@@ -24,7 +24,9 @@ def test_get_frames(dir_with_streamd_output_for_gbsa):
     """Validate frame counting utilities."""
     wdir = dir_with_streamd_output_for_gbsa
 
-    startframe, endframe, interval = get_mmpbsa_start_end_interval(os.path.join(wdir, 'mmpbsa.in'))
+    startframe, endframe, interval, decomp = get_mmpbsa_params(os.path.join(wdir, 'mmpbsa.in'))
+
+    assert decomp is False
     assert startframe == 1
     assert endframe == 100
     assert interval == 1
@@ -59,14 +61,14 @@ def test_run_gbsa_full_pipline(dir_with_streamd_output_for_gbsa):
           topol='topol.top',
           index='index.ndx',
           out_wdir=wdir,
-          mmpbsa=os.path.join(wdir, 'mmpbsa.in'),
+          mmpbsa_file=os.path.join(wdir, 'mmpbsa.in'),
           ncpu=len(os.sched_getaffinity(0)),
           ligand_resid='UNL',
           append_protein_selection=None,
           hostfile=None,
           unique_id='test',
           bash_log='bash.log',
-          gmxmmpbsa_out_files=None, clean_previous=False)
+          gmxmmpbsa_dat_files=None, clean_previous=False)
 
     assert os.path.isfile(os.path.join(wdir, f"finished_gbsa_files_test.txt"))
     assert os.path.isfile(os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.dat"))
@@ -95,19 +97,19 @@ def test_run_gbsa_full_pipline_from_files(dir_with_streamd_output_for_gbsa):
     assert not os.path.isfile(os.path.join(wdir, f'PBSA_output_test.csv'))
 
     start(wdir_to_run=None,
-              tpr=os.path.join(wdir, 'md_out.tpr'),
-              xtc=os.path.join(wdir, 'md_fit.xtc'),
-              topol=os.path.join(wdir, 'topol.top'),
-              index=os.path.join(wdir, 'index.ndx'),
-              out_wdir=wdir,
-              mmpbsa=os.path.join(wdir, 'mmpbsa.in'),
-              ncpu=len(os.sched_getaffinity(0)),
-              ligand_resid='UNL',
-              append_protein_selection=None,
-              hostfile=None,
-              unique_id='test',
-              bash_log='bash.log',
-              gmxmmpbsa_out_files=None, clean_previous=False)
+          tpr=os.path.join(wdir, 'md_out.tpr'),
+          xtc=os.path.join(wdir, 'md_fit.xtc'),
+          topol=os.path.join(wdir, 'topol.top'),
+          index=os.path.join(wdir, 'index.ndx'),
+          out_wdir=wdir,
+          mmpbsa_file=os.path.join(wdir, 'mmpbsa.in'),
+          ncpu=len(os.sched_getaffinity(0)),
+          ligand_resid='UNL',
+          append_protein_selection=None,
+          hostfile=None,
+          unique_id='test',
+          bash_log='bash.log',
+          gmxmmpbsa_dat_files=None, clean_previous=False)
 
     assert os.path.isfile(os.path.join(wdir, f"finished_gbsa_files_test.txt"))
     assert os.path.isfile(os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.dat"))

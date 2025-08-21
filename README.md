@@ -35,6 +35,7 @@
   - [Examples](#examples)
     - [Protein-ligand system](#protein-ligand-system)
     - [Protein-ligand-cofactors system](#protein-ligand-cofactors-system)
+  - [Per-residue decomposition analysis](#per-residue-decomposition-analysis)
   - [Output](#output-1)
 - [ProLIF Protein-Ligand Interaction Fingerprints](#prolif-protein-ligand-interaction-fingerprints)
   - [Usage](#usage-2)
@@ -381,7 +382,6 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
    
 [Return to the Table Of Contents](#table-of-contents)<br>  
 
-
 #### **Output**   
 *each run creates in the working directory (or in the current directory if wdir argument was not set up):*
  1) a unique streaMD log file which name contains name of the protein, ligand file, cofactor file and time of run.  
@@ -543,6 +543,13 @@ To calculate binding free energy between the protein system and the cofactor, us
 run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_*  --append_protein_selection MG --ligand_id GTP
 ```
 
+#### Per-residue decomposition analysis
+Add a `&decomp` section and coressponding [decomposition parameters](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/examples/Decomposition_analysis/) to the `mmpbsa.in` file to compute per-residue energy contributions.
+`run_gbsa` automatically detects this block and runs gmx_MMPBSA in decomposition mode,
+producing `FINAL_DECOMP_MMPBSA_<unique-suffix>.dat` and corresponding `.csv` files for each
+processed simulation. Aggregated contributions across all systems are written to
+`GBSA_decomp_avg_<unique-suffix>.csv` (and `PBSA_decomp_avg_<unique-suffix>.csv` for PBSA) in
+the working directory.
 
 #### **Output**   
 *each run creates in the working directory (or in the current directory if wdir argument was not set up):*
@@ -721,7 +728,6 @@ run_md  --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 md_files/md_ru
 by the script itself:
 ```
 run_rmsd_analysis -i rmsd_all_systems.csv --rmsd_type "backbone" "ligand" "ActiveSite5.0A" --paint_by exp_data.csv -o protein --title "Protein. RMSD Mean vs RMSD Std" --time_ranges 0-1 0-2 0-10 5-10 9-10
-
 ```
 #### **Output**
 1) csv output file containing output data  
