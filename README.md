@@ -544,7 +544,7 @@ run_gbsa  --wdir_to_run md_files/md_run/protein_H_HIS_ligand_*  --append_protein
 ```
 
 #### Per-residue decomposition analysis
-Add a `&decomp` section to the `mmpbsa.in` file to compute per-residue energy contributions.
+Add a `&decomp` section and coressponding [decomposition parameters](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/examples/Decomposition_analysis/) to the `mmpbsa.in` file to compute per-residue energy contributions.
 `run_gbsa` automatically detects this block and runs gmx_MMPBSA in decomposition mode,
 producing `FINAL_DECOMP_MMPBSA_<unique-suffix>.dat` and corresponding `.csv` files for each
 processed simulation. Aggregated contributions across all systems are written to
