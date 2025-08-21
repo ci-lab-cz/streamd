@@ -38,4 +38,5 @@
 **future version 0.3.1 (the latest version from github)**
 - allow to keep all gmx_MMPBSA temporary files for debugging or for `gmx_MMPBSA_ana` usage (`--debug argument`)
 - allow to provide arguments through config.yml for run_md, run_prolif, run_gbsa
-- fix minor bug with steps - allow to run run_md steps 2,3,4 without --wdir_to_continue if step 1 is also provided 
+- fix minor bug with steps - allow to run run_md steps 2,3,4 without --wdir_to_continue if step 1 is also provided
+- added gmx_MMPBSA residue decomposition analysis feature
