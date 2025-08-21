@@ -18,7 +18,17 @@ plt.ioff()
 
 
 def plot_rmsd(rmsd_df, system_name, out):
-    """Plot RMSD over time and save to disk."""
+    """Plot RMSD over time and save to disk.
+
+    Parameters
+    ----------
+    rmsd_df : pandas.DataFrame
+        Table containing an RMSD column and a ``time(ns)`` column.
+    system_name : str
+        Name of the analysed MD system used in the plot title.
+    out : str | os.PathLike
+        Path where the PNG plot will be written.
+    """
     plot = rmsd_df.set_index('time(ns)').plot(title=f"RMSD of {system_name}")
     plt.ylabel("RMSD (Å)")
     plt.xlabel("Time (ns)")
@@ -28,7 +38,21 @@ def plot_rmsd(rmsd_df, system_name, out):
     plt.close('all')
 
 def plot_rmsd_mean_std(data, paint_by_col, show_legend, out_name, title=None):
-    """Render RMSD mean vs. standard deviation scatter plots."""
+    """Render RMSD mean vs. standard deviation scatter plots.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Precomputed table with ``RMSD_mean`` and ``RMSD_std`` columns.
+    paint_by_col : str
+        Column name used to colour markers in the plot.
+    show_legend : bool
+        If ``True`` display a legend for the coloured markers.
+    out_name : str | os.PathLike
+        Path to the output HTML file containing the interactive plot.
+    title : str, optional
+        Optional plot title; defaults to ``"RMSD Mean vs RMSD Std"``.
+    """
     #pd.DataFrame.iteritems = pd.DataFrame.items
     # df = pd.read_csv(rmsd_mean_std_fname, sep='\t')
     # g = sns.FacetGrid(df, row='rmsd_system', col='time',
