@@ -638,9 +638,9 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa_file, ncpu, liga
         with Pool(ncpu) as pool:
             for res in pool.imap_unordered(parse_gmxMMPBSA_output, var_gbsa_dat_files):
                 if res:
-                    if not res['GBSA']:
+                    if res['GBSA']:
                         GBSA_output_res.append(res['GBSA'])
-                    if not res['PBSA']:
+                    if res['PBSA']:
                         PBSA_output_res.append(res['PBSA'])
 
         if GBSA_output_res:

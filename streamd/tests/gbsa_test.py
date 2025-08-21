@@ -51,8 +51,7 @@ def test_run_gbsa_full_pipline(dir_with_streamd_output_for_gbsa):
 
     assert not os.path.isfile( os.path.join(wdir, f"finished_gbsa_files_test.txt"))
     assert not os.path.isfile( os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.dat"))
-    assert not os.path.isfile(os.path.join(wdir, f"GBSA_frames_test.csv"))
-    assert not os.path.isfile(os.path.join(wdir, f"PBSA_frames_test.csv"))
+    assert not os.path.isfile( os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.csv"))
     assert not os.path.isfile(os.path.join(wdir, f'GBSA_output_test.csv'))
     assert not os.path.isfile(os.path.join(wdir, f'PBSA_output_test.csv'))
 
@@ -73,8 +72,7 @@ def test_run_gbsa_full_pipline(dir_with_streamd_output_for_gbsa):
 
     assert os.path.isfile(os.path.join(wdir, f"finished_gbsa_files_test.txt"))
     assert os.path.isfile(os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.dat"))
-    assert os.path.isfile(os.path.join(wdir, f"GBSA_frames_test.csv"))
-    assert os.path.isfile(os.path.join(wdir, f"PBSA_frames_test.csv"))
+    assert os.path.isfile(os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.csv"))
     assert os.path.isfile(os.path.join(wdir, f'GBSA_output_test.csv'))
     assert os.path.isfile(os.path.join(wdir, f'PBSA_output_test.csv'))
 
@@ -94,8 +92,7 @@ def test_run_gbsa_full_pipline_from_files(dir_with_streamd_output_for_gbsa):
 
     assert not os.path.isfile( os.path.join(wdir, f"finished_gbsa_files_test.txt"))
     assert not os.path.isfile( os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.dat"))
-    assert not os.path.isfile(os.path.join(wdir, f"GBSA_frames_test.csv"))
-    assert not os.path.isfile(os.path.join(wdir, f"PBSA_frames_test.csv"))
+    assert not os.path.isfile( os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.csv"))
     assert not os.path.isfile(os.path.join(wdir, f'GBSA_output_test.csv'))
     assert not os.path.isfile(os.path.join(wdir, f'PBSA_output_test.csv'))
 
@@ -116,8 +113,7 @@ def test_run_gbsa_full_pipline_from_files(dir_with_streamd_output_for_gbsa):
 
     assert os.path.isfile(os.path.join(wdir, f"finished_gbsa_files_test.txt"))
     assert os.path.isfile(os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.dat"))
-    assert os.path.isfile(os.path.join(wdir, f"GBSA_frames_test.csv"))
-    assert os.path.isfile(os.path.join(wdir, f"PBSA_frames_test.csv"))
+    assert os.path.isfile(os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_test.csv"))
     assert os.path.isfile(os.path.join(wdir, f'GBSA_output_test.csv'))
     assert os.path.isfile(os.path.join(wdir, f'PBSA_output_test.csv'))
 
