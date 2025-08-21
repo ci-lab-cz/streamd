@@ -74,7 +74,7 @@ def test_start_aggregates_decomp_dat(tmp_path):
         hostfile=None,
         unique_id="test",
         bash_log="bash.log",
-        gmxmmpbsa_out_files=[str(results_dat)],
+        gmxmmpbsa_dat_files=[str(results_dat)],
         clean_previous=False,
         debug=False,
     )
