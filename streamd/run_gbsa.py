@@ -88,7 +88,7 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
         :return: Path to the generated results file or ``None`` on failure.
         """
         output_file = os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.dat")
-        output_decomp = os.path.join(wdir, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
+        output_decomp = None
         with temporary_directory_debug(dir=wdir, remove=not debug, suffix=f'_gbsa_{unique_id}') as tmpdirname:
             logging.info(f'tmp intermediate dir: {tmpdirname}')
             cmd = (
@@ -98,6 +98,7 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
                 f'-eo {os.path.join(wdir, f"FINAL_RESULTS_MMPBSA_{unique_id}.csv")} '
             )
             if decomp:
+                output_decomp = os.path.join(wdir, f"FINAL_DECOMP_MMPBSA_{unique_id}.dat")
                 logging.info('Run Decomposition Analysis')
                 cmd += (
                     f'-do {output_decomp} '
@@ -593,9 +594,9 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa_file, ncpu, liga
                                      bash_log=bash_log, clean_previous=clean_previous,
                                      debug=debug, decomp=decomp):
                     if res:
-                        if res.get('out', None):
+                        if res.get('out', None) is not None:
                             var_gbsa_dat_files.append(res['out'])
-                        if res.get('out_decomp', None):
+                        if res.get('out_decomp', None) is not None:
                             decomp_dat_files.append(res['out_decomp'])
             finally:
                 if dask_client:
@@ -683,7 +684,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa_file, ncpu, liga
                     index=False,
                 )
 
-    logging.info(f"gmxMMPBSA energy calculation of {len(var_gbsa_dat_files)} were successfully finished.\n")
+    logging.info(f"gmxMMPBSA energy calculation of {len(var_gbsa_dat_files)} complexes were successfully finished.\n")
 
     finished_gbsa_dat_file = os.path.join(out_wdir, f"finished_gbsa_files_{unique_id}.txt")
     if var_gbsa_dat_files:
@@ -692,7 +693,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa_file, ncpu, liga
         logging.info(f"Successfully finished complexes have been saved in {finished_gbsa_dat_file} file")
 
     if decomp_dat_files:
-        logging.info(f"gmxMMPBSA Decomposition Analysis of {len(decomp_dat_files)} were successfully finished.\n")
+        logging.info(f"gmxMMPBSA decomposition analysis of {len(decomp_dat_files)} complexes were successfully finished.\n")
         finished_decomp_dat_file = os.path.join(out_wdir, f"finished_decomp_files_{unique_id}.txt")
         with open(finished_decomp_dat_file, "w") as output:
             output.write("\n".join(decomp_dat_files))
