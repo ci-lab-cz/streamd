@@ -48,16 +48,16 @@ def test_start_aggregates_decomp_dat(tmp_path):
         ",Avg.,Std. Dev.,Std. Err. of Mean,Avg.,Std. Dev.,Std. Err. of Mean,Avg.,Std. Dev.,Std. Err. of Mean,Avg.,Std. Dev.,Std. Err. of Mean,Avg.,Std. Dev.,Std. Err. of Mean,Avg.,Std. Dev.,Std. Err. of Mean\n"
         "R:A:LEU:83,10,1,0.1,20,2,0.2,30,3,0.3,40,4,0.4,50,5,0.5,60,6,0.6\n"
     )
-    results_dat = tmp_path / "FINAL_RESULTS_MMPBSA_test.dat"
-    results_dat.write_text("dummy")
+    # results_dat = tmp_path / "FINAL_RESULTS_MMPBSA_test.dat"
+    # results_dat.write_text("dummy")
     decomp_dat = tmp_path / "FINAL_DECOMP_MMPBSA_test.dat"
     decomp_dat.write_text(gb_pb_content)
-    decomp_csv = tmp_path / "FINAL_DECOMP_MMPBSA_test.csv"
-    decomp_csv.write_text(
-        "Generalized Born Decomposition Energies\nComplex:\nTotal Decomposition Contribution (TDC)\n"
-        "Frame #,Residue,Internal,van der Waals,Electrostatic,Polar Solvation,Non-Polar Solv.,TOTAL\n"
-        "1,R:A:ALA:1,1,2,3,4,5,6\n"
-    )
+    # decomp_csv = tmp_path / "FINAL_DECOMP_MMPBSA_test.csv"
+    # decomp_csv.write_text(
+    #     "Generalized Born Decomposition Energies\nComplex:\nTotal Decomposition Contribution (TDC)\n"
+    #     "Frame #,Residue,Internal,van der Waals,Electrostatic,Polar Solvation,Non-Polar Solv.,TOTAL\n"
+    #     "1,R:A:ALA:1,1,2,3,4,5,6\n"
+    # )
     mmpbsa_in = tmp_path / "mmpbsa.in"
     mmpbsa_in.write_text("&general\n/\n&decomp\n/\n")
     start(
@@ -67,14 +67,14 @@ def test_start_aggregates_decomp_dat(tmp_path):
         topol=None,
         index=None,
         out_wdir=tmp_path,
-        mmpbsa=str(mmpbsa_in),
+        mmpbsa_file=str(mmpbsa_in),
         ncpu=1,
         ligand_resid="UNL",
         append_protein_selection=None,
         hostfile=None,
         unique_id="test",
         bash_log="bash.log",
-        gmxmmpbsa_dat_files=[str(results_dat)],
+        gmxmmpbsa_decomp_dat_files=[str(decomp_dat)],
         clean_previous=False,
         debug=False,
     )

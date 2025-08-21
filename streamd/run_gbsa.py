@@ -15,7 +15,6 @@ import math
 import os
 import pathlib
 import re
-import tempfile
 import shutil
 import subprocess
 from datetime import datetime
@@ -440,6 +439,7 @@ def parse_gmxMMPBSA_decomp_dat(fname):
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
+
     return df
 
 
@@ -626,8 +626,11 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa_file, ncpu, liga
                     decomp_dat_files.append(res['out_decomp'])
 
     else:
-        var_gbsa_dat_files = gmxmmpbsa_dat_files
-        decomp_dat_files = gmxmmpbsa_decomp_dat_files
+        print('work')
+        if gmxmmpbsa_dat_files is not None:
+            var_gbsa_dat_files = gmxmmpbsa_dat_files
+        if gmxmmpbsa_decomp_dat_files is not None:
+            decomp_dat_files = gmxmmpbsa_decomp_dat_files
 
     # collect energies
     if var_gbsa_dat_files:
@@ -683,6 +686,7 @@ def start(wdir_to_run, tpr, xtc, topol, index, out_wdir, mmpbsa_file, ncpu, liga
                     sep="\t",
                     index=False,
                 )
+
 
     logging.info(f"gmxMMPBSA energy calculation of {len(var_gbsa_dat_files)} complexes were successfully finished.\n")
 
