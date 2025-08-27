@@ -43,3 +43,4 @@
 - add support for running replicate simulations of the same complexes
 - improved replicate handling: retain existing directories and add
   `system_replicas_original` template
+- respect random seed (-1) for all replicas and log per-replica seeds

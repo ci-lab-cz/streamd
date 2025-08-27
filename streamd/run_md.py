@@ -547,11 +547,13 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                         copy_missing(orig_dir, replica_dir)
                     else:
                         shutil.copytree(orig_dir, replica_dir)
+                    r_seed = seed if seed == -1 else seed + r
                     edit_mdp(
                         os.path.join(replica_dir, 'nvt.mdp'),
                         pattern='gen_seed',
-                        replace=f'gen_seed                = {seed + r}        ;',
+                        replace=f'gen_seed                = {r_seed}        ;',
                     )
+                    logging.info("Replica %d seed: %d", r, r_seed)
                     replicated_dirs.append(replica_dir)
             var_complex_prepared_dirs = replicated_dirs
 
