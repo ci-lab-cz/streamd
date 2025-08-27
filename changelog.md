@@ -40,3 +40,4 @@
 - allow to provide arguments through config.yml for run_md, run_prolif, run_gbsa
 - fix minor bug with steps - allow to run run_md steps 2,3,4 without --wdir_to_continue if step 1 is also provided
 - added gmx_MMPBSA residue decomposition analysis feature
+- add support for running replicate simulations of the same complexes

@@ -28,6 +28,7 @@ from streamd.analysis.run_analysis import run_rmsd_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
+from streamd.preparation.md_files_preparation import edit_mdp
 from streamd.utils.utils import (
     filepath_type,
     run_check_subprocess,
@@ -220,7 +221,7 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
             # md_out_cont.part0002.xtc and md_out_cont.tpr
             deffnm_part = os.path.basename(part_xtc).split('.part')[0]
             logging.info(deffnm_part)
-            if re.findall(f'\.part[0-9]*\.xtc', part_xtc):
+            if re.findall(r'\.part[0-9]*\.xtc', part_xtc):
                 # not merged part
                 new_xtc = os.path.join(wdir_to_continue, f'{deffnm_part}.xtc')
                 merge_parts_of_simulation(start_xtc=xtc,
@@ -282,7 +283,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           activate_gaussian, gaussian_exe, gaussian_basis, gaussian_memory,
           metal_resnames, metal_charges, mcpbpy_cut_off,
           seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
-          not_clean_backup_files, unique_id,
+          not_clean_backup_files, unique_id, replicas=1,
           active_site_dist=5.0, save_traj_without_water=False,
           explicit_args=(), mdp_dir=None, bash_log=None):
     """Run StreaMD pipeline.
@@ -324,6 +325,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param gpu_ids: Optional list of GPU IDs.
     :param ntmpi_per_gpu: Number of thread-MPI ranks per GPU.
     :param unique_id: Unique identifier for run artifacts.
+    :param replicas: Number of replicate simulations to run per complex.
     :param bash_log: Name of log file capturing shell output.
     :param mdp_dir: Directory containing MDP files.
     :param explicit_args: Tuple of additional command-line arguments.
@@ -389,7 +391,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                               f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir_protein, bash_log)} 2>&1'
                         if not run_check_subprocess(cmd, protein, log=os.path.join(wdir_protein, bash_log), env=os.environ.copy()):
                             return None
-                        logging.info(f'Successfully finished protein preparation\n')
+                        logging.info('Successfully finished protein preparation\n')
                     else:
                         target_path = os.path.join(wdir_protein, os.path.basename(protein))
                         if not os.path.isfile(target_path):
@@ -515,6 +517,21 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
         else:
             var_complex_prepared_dirs = wdir_to_continue_list
+        if replicas > 1 and wdir_to_continue_list is None:
+            replicated_dirs = []
+            for d in var_complex_prepared_dirs:
+                for r in range(1, replicas + 1):
+                    replica_dir = f"{d}_replica_{r}"
+                    if os.path.isdir(replica_dir):
+                        shutil.rmtree(replica_dir)
+                    shutil.copytree(d, replica_dir)
+                    edit_mdp(
+                        os.path.join(replica_dir, 'nvt.mdp'),
+                        pattern='gen_seed',
+                        replace=f'gen_seed                = {seed + r}        ;',
+                    )
+                    replicated_dirs.append(replica_dir)
+            var_complex_prepared_dirs = replicated_dirs
 
         # Part 3. Equilibration and MD simulation. Run on all cpu
         var_eq_dirs = []
@@ -694,6 +711,8 @@ def main():
                         help='Time of NVT equilibration in ps. Default: 1000 ps.')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
+    parser1.add_argument('--replicas', metavar='INTEGER', required=False, default=1,
+                        type=int, help='Number of replicate simulations to run per complex')
     parser1.add_argument('--no_dr', action='store_true', default=False,
                          help='Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file '
                               'in the next attempt if the regular antechamber run for ligand preparation fails (ligand_mol2prep.sh script related issues). '
@@ -787,7 +806,7 @@ def main():
     if args.steps is not None:
         if not all([i in [1, 2, 3, 4] for i in args.steps]):
             raise ValueError(f'--steps {args.steps} argument is not valid. Please choose the combination from: 1, 2, 3, 4')
-        if not 1 in args.steps and any([i in [2, 3, 4] for i in args.steps]) and args.wdir_to_continue is None:
+        if 1 not in args.steps and any([i in [2, 3, 4] for i in args.steps]) and args.wdir_to_continue is None:
             raise ValueError(f'--wdir_to_continue argument is not valid. '
                          f'If you set up --step {args.steps} you need to provide directories containing md files'
                          f' created by previous steps')
@@ -839,7 +858,7 @@ def main():
               activate_gaussian=args.activate_gaussian, gaussian_exe=args.gaussian_exe,
               gaussian_basis=args.gaussian_basis, gaussian_memory=args.gaussian_memory,
               hostfile=args.hostfile, ncpu=ncpu, mdrun_per_node=args.mdrun_per_node, compute_device=args.device,
-              gpu_ids=args.gpu_ids, ntmpi_per_gpu=args.ntmpi_per_gpu, wdir=wdir, seed=args.seed, steps=args.steps,
+              gpu_ids=args.gpu_ids, ntmpi_per_gpu=args.ntmpi_per_gpu, wdir=wdir, seed=args.seed, replicas=args.replicas, steps=args.steps,
               clean_previous=args.clean_previous_md, not_clean_backup_files=args.not_clean_backup_files,
               metal_resnames=args.metal_resnames, metal_charges=args.metal_charges,
               mcpbpy_cut_off=args.metal_cutoff, unique_id=unique_id,
