@@ -125,8 +125,18 @@ def test_run_md_replicas(dir_with_input_for_preparation):
           save_traj_without_water=False,
           mdp_dir=None, bash_log='bash.log')
 
+    base_dir = os.path.join(
+        wdir,
+        'md_files',
+        'md_preparation',
+        'system_replicas_original',
+        'protein_HIS_1ke7_LS3',
+    )
+    assert os.path.isdir(base_dir)
     for idx in (1, 2):
-        rep_dir = os.path.join(wdir, 'md_files', 'md_run', f'protein_HIS_1ke7_LS3_replica_{idx}')
+        rep_dir = os.path.join(
+            wdir, 'md_files', 'md_run', f'protein_HIS_1ke7_LS3_replica{idx}'
+        )
         assert os.path.isdir(rep_dir)
         with open(os.path.join(rep_dir, 'nvt.mdp')) as inp:
             data = inp.read()

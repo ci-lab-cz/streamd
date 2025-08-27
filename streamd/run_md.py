@@ -343,6 +343,19 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
     dask_client, cluster = None, None
 
+    def copy_missing(src, dst):
+        for root, _, files in os.walk(src):
+            rel = os.path.relpath(root, src)
+            dest_root = os.path.join(dst, rel) if rel != '.' else dst
+            os.makedirs(dest_root, exist_ok=True)
+            for f in files:
+                src_file = os.path.join(root, f)
+                dest_file = os.path.join(dest_root, f)
+                if not os.path.exists(dest_file):
+                    shutil.copy2(src_file, dest_file)
+                else:
+                    logging.warning(f'File {dest_file} exists and will be reused')
+
     # GPU calculations settings
     gpu_args = ''
     # To set where to execute (cpu or gpu) the interactions and update steps during gmx mdrun
@@ -520,11 +533,20 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
         if replicas > 1 and wdir_to_continue_list is None:
             replicated_dirs = []
             for d in var_complex_prepared_dirs:
+                prep_root = os.path.dirname(d)
+                orig_root = os.path.join(prep_root, 'system_replicas_original')
+                os.makedirs(orig_root, exist_ok=True)
+                orig_dir = os.path.join(orig_root, os.path.basename(d))
+                if os.path.isdir(orig_dir):
+                    copy_missing(d, orig_dir)
+                else:
+                    shutil.copytree(d, orig_dir)
                 for r in range(1, replicas + 1):
-                    replica_dir = f"{d}_replica_{r}"
+                    replica_dir = f"{d}_replica{r}"
                     if os.path.isdir(replica_dir):
-                        shutil.rmtree(replica_dir)
-                    shutil.copytree(d, replica_dir)
+                        copy_missing(orig_dir, replica_dir)
+                    else:
+                        shutil.copytree(orig_dir, replica_dir)
                     edit_mdp(
                         os.path.join(replica_dir, 'nvt.mdp'),
                         pattern='gen_seed',
