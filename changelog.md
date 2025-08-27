@@ -41,6 +41,5 @@
 - fix minor bug with steps - allow to run run_md steps 2,3,4 without --wdir_to_continue if step 1 is also provided
 - added gmx_MMPBSA residue decomposition analysis feature
 - add support for running replicate simulations of the same complexes
-- improved replicate handling: retain existing directories and add
-  `system_replicas_original` template
+- improved replicate handling: retain existing directories and move prepared systems into `md_preparation/system_replicas_original` for reuse
 - respect random seed (-1) for all replicas and log per-replica seeds

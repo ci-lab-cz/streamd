@@ -134,6 +134,9 @@ def test_run_md_replicas(dir_with_input_for_preparation):
         'protein_HIS_1ke7_LS3',
     )
     assert os.path.isdir(base_dir)
+    assert not os.path.isdir(
+        os.path.join(wdir, 'md_files', 'md_preparation', 'protein_HIS_1ke7_LS3')
+    )
     for idx in (1, 2):
         rep_dir = os.path.join(
             wdir, 'md_files', 'md_run', f'protein_HIS_1ke7_LS3_replica{idx}'

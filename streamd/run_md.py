@@ -539,8 +539,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                 orig_dir = os.path.join(orig_root, os.path.basename(d))
                 if os.path.isdir(orig_dir):
                     copy_missing(d, orig_dir)
+                    shutil.rmtree(d)
                 else:
-                    shutil.copytree(d, orig_dir)
+                    shutil.move(d, orig_dir)
                 for r in range(1, replicas + 1):
                     replica_dir = f"{d}_replica{r}"
                     if os.path.isdir(replica_dir):
