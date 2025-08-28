@@ -60,10 +60,10 @@ def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone',
     for start, end in time_ranges:
         key = f'{start}-{end}ns'
         mean = rmsd_data.loc[(start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), system_cols+[rmsd_system]].groupby(
-            system_cols).mean().reset_index().rename({rmsd_system: f'RMSD_mean'}, axis='columns').round(2)
+            system_cols).mean().reset_index().rename({rmsd_system: 'RMSD_mean'}, axis='columns').round(2)
         std = rmsd_data.loc[
             (start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), system_cols+ [rmsd_system]].groupby(
-            system_cols).std().reset_index().rename({rmsd_system: f'RMSD_std'}, axis='columns').round(2)
+            system_cols).std().reset_index().rename({rmsd_system: 'RMSD_std'}, axis='columns').round(2)
         res_tmp = pd.merge(mean, std, on=system_cols)
         res_tmp.loc[:, 'rmsd_system'] = rmsd_system
         res_tmp.loc[:, 'time_range'] = key
@@ -129,7 +129,8 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     else:
         rmsd_merged_data = pd.read_csv(rmsd_files[0], sep='\t')
 
-    system_cols = ['system'] if all(rmsd_merged_data['ligand_name'].isna()) else ['system', 'ligand_name']
+    base_cols = ['system', 'protein_name', 'replica']
+    system_cols = base_cols if all(rmsd_merged_data['ligand_name'].isna()) else base_cols + ['ligand_name']
 
     #Use directory column as system column in case of replicate runs where ligand_name and system columns are the same,
     # but working_directories are different
@@ -140,7 +141,8 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
         if max_num_unique_dirs > 1:
             system_cols.append('directory')
 
-    rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=system_cols)
+    lower_cols = [c for c in system_cols if c != 'replica']
+    rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=lower_cols)
 
     if time_ranges is None:
         start = rmsd_merged_data['time(ns)'].min()
@@ -172,7 +174,7 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
                 paint_by_col = 'rmsd_system'
                 show_legend = False
             else:
-                paint_by_data = make_lower_case(paint_by_data, cols=system_cols)
+                paint_by_data = make_lower_case(paint_by_data, cols=[c for c in system_cols if c != 'replica'])
                 paint_by_col = [i for i in paint_by_data.columns if i not in system_cols][0]
                 df_mean_std = pd.merge(df_mean_std, paint_by_data.loc[:,
                                                     system_cols+[paint_by_col]], on=system_cols)

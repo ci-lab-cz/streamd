@@ -3,14 +3,14 @@
 import logging
 from glob import glob
 import os
-import shutil
+import re
 import pandas as pd
 import numpy as np
 import MDAnalysis as mda
 from MDAnalysis.analysis import rms
 from streamd.analysis.xvg2png import convertxvg2png
 from streamd.analysis.plot_build import plot_rmsd
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, backup_prev_files
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
 
 
 def rmsd_for_atomgroups(universe, selection1, selection2=None):
@@ -42,6 +42,13 @@ def rmsd_for_atomgroups(universe, selection1, selection2=None):
     rmsd_df['time(ns)'] = rmsd_df['frame'] / 100
     rmsd_df = rmsd_df.drop('frame', axis='columns')
     return rmsd_df
+
+
+def _parse_system_name(system: str) -> tuple[str, int]:
+    match = re.match(r"(.*)_replica(\d+)$", system)
+    if match:
+        return match.group(1), int(match.group(2))
+    return system, 1
 
 
 def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
@@ -99,7 +106,11 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
     plot_rmsd(rmsd_df=rmsd_df, system_name=system_name, out=os.path.join(wdir_out_analysis, f'rmsd_{system_name}.png'))
 
     rmsd_df.loc[:, 'ligand_name'] = ligand_name
-    rmsd_df.loc[:, 'system'] = system_name.replace(f'_{ligand_name}', '') if ligand_name else system_name
+    base_system = system_name.replace(f'_{ligand_name}', '') if ligand_name else system_name
+    protein_name, replica = _parse_system_name(base_system)
+    rmsd_df.loc[:, 'system'] = base_system
+    rmsd_df.loc[:, 'replica'] = replica
+    rmsd_df.loc[:, 'protein_name'] = protein_name
     rmsd_df.loc[:, 'directory'] = wdir_out_analysis
 
     rmsd_df.to_csv(rmsd_out_file, sep='\t', index=False)
@@ -212,8 +223,8 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
 
     rmsd_out_file = md_rmsd_analysis(
         tpr=os.path.join(wdir, 'md_out_nowater.tpr'),
-        xtc=os.path.join(wdir, f'md_fit_nowater.xtc'),
-        # tpr=os.path.join(wdir, 'md_out.tpr'), xtc=os.path.join(wdir, f'md_fit.xtc'),
+        xtc=os.path.join(wdir, 'md_fit_nowater.xtc'),
+        # tpr=os.path.join(wdir, 'md_out.tpr'), xtc=os.path.join(wdir, 'md_fit.xtc'),
                      wdir_out_analysis=wdir_out_analysis,
                      system_name=system_name,
                      ligand_resid=ligand_resid,
@@ -221,7 +232,7 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                      active_site_dist=active_site_dist)
     if not save_traj_without_water:
         os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
-        os.remove(os.path.join(wdir, f'md_fit_nowater.xtc'))
+        os.remove(os.path.join(wdir, 'md_fit_nowater.xtc'))
 
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, system_name=system_name, transform_nm_to_A=True)
