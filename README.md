@@ -147,7 +147,7 @@ run_md -h
 usage: run_md [-h] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER] [--mdrun_per_node INTEGER]
               [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
-              [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--no_dr] [--not_clean_backup_files]
+              [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--seed int] [--box_type cubic] [--box_distance nm] [--no_dr] [--not_clean_backup_files]
               [--steps [STEPS ...]] [--mdp_dir Path to a directory with specific mdp files] [--wdir_to_continue DIRNAME [DIRNAME ...]] [-o OUT_SUFFIX]
               [--save_traj_without_water] [--deffnm preffix for md files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME] [--ligand_list_file all_ligand_resid.txt]
               [--ligand_id UNL] [--activate_gaussian module load Gaussian/09-d01] [--gaussian_exe g09 or /apps/all/Gaussian/09-d01/g09/g09]
@@ -195,6 +195,8 @@ Standard Molecular Dynamics Simulation Run:
   --npt_time ps         Time of NPT equilibration in ps
   --nvt_time ps         Time of NVT equilibration in ps
   --seed int            seed
+  --box_type cubic      Box shape for solvation
+  --box_distance nm     Distance in nm between solute and box edge
   --no_dr               Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt if the regular antechamber run for
                         ligand preparation fails (ligand_mol2prep.sh script related issues). Use this argument carefully and ensure that you provide valid structures
   --not_clean_backup_files

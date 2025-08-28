@@ -4,7 +4,9 @@
 
 >&2 echo 'Script running:***************************** Solvation step *********************************'
 cd $wdir
-gmx editconf -f complex.gro -o newbox.gro -c -d 1.0 -bt cubic || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
+box_type=${box_type:-cubic}
+box_distance=${box_distance:-1.0}
+gmx editconf -f complex.gro -o newbox.gro -c -d "$box_distance" -bt "$box_type" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 #gmx editconf -f complex.gro -o newbox.gro -bt dodecahedron -d 1.2 #Warning about bad box - wrong number of atoms (https://gromacs.org-gmx-users.maillist.sys.kth.narkive.com/q4NXMAoY/bad-box-error) Lena version
 gmx solvate -cp newbox.gro -cs spc216.gro -p topol.top -o solv.gro || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 
