@@ -43,3 +43,4 @@
 - add support for running replicate simulations of the same complexes
 - improved replicate handling: prepare templates under `md_preparation/complex` and copy to `md_files/md_run/<complex>_replicaN` even for a single replica
 - respect random seed (-1) for all replicas and log per-replica seeds
+- deterministic replicate seeds start from the user-provided seed

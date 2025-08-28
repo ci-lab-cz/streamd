@@ -535,8 +535,11 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
         if wdir_to_continue_list is None:
             replicated_dirs = []
             for d in var_complex_prepared_dirs:
-                for r in range(1, replicas + 1):
-                    replica_dir = os.path.join(wdir_md, f"{os.path.basename(d)}_replica{r}")
+                for r in range(replicas):
+                    replica_idx = r + 1
+                    replica_dir = os.path.join(
+                        wdir_md, f"{os.path.basename(d)}_replica{replica_idx}"
+                    )
                     if os.path.isdir(replica_dir):
                         copy_missing(d, replica_dir)
                     else:
@@ -550,7 +553,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                         pattern='gen_seed',
                         replace=f'gen_seed                = {r_seed}        ;',
                     )
-                    logging.info("Replica %d seed: %d", r, r_seed)
+                    logging.info("Replica %d seed: %d", replica_idx, r_seed)
                     replicated_dirs.append(replica_dir)
             var_complex_prepared_dirs = replicated_dirs
 
