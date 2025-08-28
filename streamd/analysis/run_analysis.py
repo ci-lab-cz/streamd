@@ -6,9 +6,25 @@ from functools import partial
 import os
 import pandas as pd
 import logging
+import re
 
 from streamd.analysis.plot_build import plot_rmsd_mean_std
 from streamd.utils.utils import filepath_type
+
+
+def _parse_system_name(system: str) -> tuple[str, int]:
+    match = re.match(r"(.*)_replica(\d+)$", system)
+    if match:
+        return match.group(1), int(match.group(2))
+    return system, 1
+
+
+def _ensure_replica_cols(df: pd.DataFrame) -> pd.DataFrame:
+    if 'protein_name' not in df.columns or 'replica' not in df.columns:
+        protein_name, replica = _parse_system_name(str(df['system'].iloc[0]))
+        df.loc[:, 'protein_name'] = protein_name
+        df.loc[:, 'replica'] = replica
+    return df
 
 
 def merge_rmsd_csv(csv_files, out):
@@ -30,6 +46,7 @@ def merge_rmsd_csv(csv_files, out):
     csv_files.sort()
     for i in csv_files:
         data = pd.read_csv(i, sep='\t')
+        data = _ensure_replica_cols(data)
         all_data_list.append(data)
 
     merged_data = pd.concat(all_data_list)
@@ -127,7 +144,7 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     if len(rmsd_files) > 1:
         rmsd_merged_data = merge_rmsd_csv(rmsd_files, os.path.join(wdir, f'rmsd_all_systems_{unique_id}.csv'))
     else:
-        rmsd_merged_data = pd.read_csv(rmsd_files[0], sep='\t')
+        rmsd_merged_data = _ensure_replica_cols(pd.read_csv(rmsd_files[0], sep='\t'))
 
     base_cols = ['system', 'protein_name', 'replica']
     system_cols = base_cols if all(rmsd_merged_data['ligand_name'].isna()) else base_cols + ['ligand_name']

@@ -45,3 +45,4 @@
 - respect random seed (-1) for all replicas and log per-replica seeds
 - deterministic replicate seeds start from the user-provided seed
 - add replica and protein_name columns to RMSD analysis outputs
+- fill missing replica and protein_name columns when analysing legacy RMSD files
