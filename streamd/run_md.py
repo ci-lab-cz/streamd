@@ -339,10 +339,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     script_mdp_path = os.path.join(script_path, 'mdp')
 
     wdir_md = os.path.join(wdir, 'md_files', 'md_run')
-    if replicas > 1:
-        prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'system_replicas')
-    else:
-        prep_root = wdir_md
+    prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'complex')
     analysis_dirname = 'md_analysis'
 
     dask_client, cluster = None, None
@@ -392,6 +389,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
             wdir_metal = os.path.join(wdir, 'md_files', 'md_preparation', 'metals', pname)
 
             os.makedirs(wdir_md, exist_ok=True)
+            os.makedirs(prep_root, exist_ok=True)
             os.makedirs(wdir_protein, exist_ok=True)
             os.makedirs(wdir_ligand, exist_ok=True)
             os.makedirs(wdir_system_ligand, exist_ok=True)
@@ -534,7 +532,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
         else:
             var_complex_prepared_dirs = wdir_to_continue_list
-        if replicas > 1 and wdir_to_continue_list is None:
+        if wdir_to_continue_list is None:
             replicated_dirs = []
             for d in var_complex_prepared_dirs:
                 for r in range(1, replicas + 1):
@@ -543,7 +541,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                         copy_missing(d, replica_dir)
                     else:
                         shutil.copytree(d, replica_dir)
-                    r_seed = seed if seed == -1 else seed + r
+                    if seed == -1 or replicas == 1:
+                        r_seed = seed
+                    else:
+                        r_seed = seed + r
                     edit_mdp(
                         os.path.join(replica_dir, 'nvt.mdp'),
                         pattern='gen_seed',

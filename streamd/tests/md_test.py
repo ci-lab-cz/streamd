@@ -28,7 +28,7 @@ def test_run_md_full_pipline(dir_with_input_for_preparation):
 
     assert not os.path.isfile(os.path.join(wdir, "finished_complexes_test.txt"))
     assert not os.path.isdir(os.path.join(wdir, 'md_files', 'md_preparation'))
-    assert not os.path.isdir(os.path.join(wdir, 'md_files', 'md_run', 'protein_HIS_1ke7_LS3'))
+    assert not os.path.isdir(os.path.join(wdir, 'md_files', 'md_run', 'protein_HIS_1ke7_LS3_replica1'))
 
     start(wdir=wdir ,
           protein=os.path.join(wdir, 'protein_HIS.pdb'), lfile=os.path.join(wdir,'ligand.mol'),
@@ -70,8 +70,8 @@ def test_run_md_full_pipline(dir_with_input_for_preparation):
 
     assert os.path.isdir(os.path.join(wdir,'md_files', 'md_preparation','protein'))
     assert os.path.isdir(os.path.join(wdir,'md_files', 'md_preparation','ligands'))
-    assert os.path.isdir(os.path.join(wdir, 'md_files','md_run','protein_HIS_1ke7_LS3'))
-    assert os.path.isdir(os.path.join(wdir, 'md_files','md_run','protein_HIS_1ke7_LS3', 'md_analysis'))
+    assert os.path.isdir(os.path.join(wdir, 'md_files','md_run','protein_HIS_1ke7_LS3_replica1'))
+    assert os.path.isdir(os.path.join(wdir, 'md_files','md_run','protein_HIS_1ke7_LS3_replica1', 'md_analysis'))
 
 
     assert os.path.getsize(os.path.join(wdir, "finished_complexes_test.txt")) > 0
@@ -79,9 +79,9 @@ def test_run_md_full_pipline(dir_with_input_for_preparation):
     assert os.path.getsize(os.path.join(wdir, "rmsd_mean_std_time-ranges_test.html")) > 0
 
     for f in expected_output_files:
-        assert os.path.isfile(os.path.join(wdir, 'md_files', 'md_run', 'protein_HIS_1ke7_LS3', f))
+        assert os.path.isfile(os.path.join(wdir, 'md_files', 'md_run', 'protein_HIS_1ke7_LS3_replica1', f))
 
-    with open(os.path.join(wdir, 'md_files','md_run','protein_HIS_1ke7_LS3', 'md_out.log')) as inp:
+    with open(os.path.join(wdir, 'md_files','md_run','protein_HIS_1ke7_LS3_replica1', 'md_out.log')) as inp:
         data = inp.readlines()
         assert 'Finished mdrun' in data[-2]
 
@@ -130,7 +130,7 @@ def test_run_md_replicas(dir_with_input_for_preparation):
         wdir,
         'md_files',
         'md_preparation',
-        'system_replicas',
+        'complex',
         'protein_HIS_1ke7_LS3',
     )
     assert os.path.isdir(base_dir)
@@ -147,6 +147,7 @@ def test_run_md_replicas(dir_with_input_for_preparation):
         assert f'gen_seed                = {120 + idx}' in data
 
 
+@md_test
 def test_run_md_replicas_random_seed(dir_with_input_for_preparation, caplog):
     """All replicas share -1 seed and log the assignments."""
     wdir = dir_with_input_for_preparation
@@ -155,7 +156,7 @@ def test_run_md_replicas_random_seed(dir_with_input_for_preparation, caplog):
         start(
             wdir=wdir,
             protein=os.path.join(wdir, 'protein_HIS.pdb'),
-            lfile=os.path.join(wdir, 'ligand.mol'),
+            lfile=None,
             system_lfile=None,
             noignh=False,
             no_dr=False,
@@ -198,10 +199,10 @@ def test_run_md_replicas_random_seed(dir_with_input_for_preparation, caplog):
             bash_log='bash.log',
         )
 
+    run_dir = os.path.join(wdir, 'md_files', 'md_run')
+    base = os.listdir(run_dir)[0].rsplit('_replica', 1)[0]
     for idx in (1, 2):
-        rep_dir = os.path.join(
-            wdir, 'md_files', 'md_run', f'protein_HIS_1ke7_LS3_replica{idx}'
-        )
+        rep_dir = os.path.join(run_dir, f'{base}_replica{idx}')
         with open(os.path.join(rep_dir, 'nvt.mdp')) as inp:
             data = inp.read()
         assert 'gen_seed                = -1' in data
