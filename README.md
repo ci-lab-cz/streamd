@@ -16,8 +16,9 @@
       - [Protein-cofactors](#protein---cofactors)
       - [Boron-containing compounds](#simulations-with-boron-containing-compounds)
       - [Ligand Binding Metalloprotein with MCPB.py](#simulations-of-ligand-binding-metalloprotein-with-mcpbpy)
+    - [Replicas of the same complex](#replicas-of-the-same-complex)
     - [Multiple servers](#simulations-using-multiple-servers)
-    - [Continue the interrupted simulations](#continue-the-interrupted-simulations) 
+    - [Continue the interrupted simulations](#continue-the-interrupted-simulations)
     - [Extend the simulation](#extend-the-simulation)
     - [GPU usage](#gpu-usage)
       - [Single GPU](#run-using-single-gpu)
@@ -78,6 +79,7 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 
 ## Features:  
 - Run of multiple simultaneous molecular dynamics simulations
+- Launch multiple replicas of the same system in a single command
 - Simulation for different systems:  
     - Protein in Water;  
     - Protein - Ligand;  
@@ -290,7 +292,16 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 1 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
 
 ```
-[Return to the Table Of Contents](#table-of-contents)<br>  
+[Return to the Table Of Contents](#table-of-contents)<br>
+
+#### **Replicas of the same complex**
+Run several independent simulations of one prepared system by specifying the `--replicas` option. The complex is prepared once and copied for each replica into directories such as `md_files/md_run/<complex>_replica1`, `md_files/md_run/<complex>_replica2`, and so on. Replica seeds increment from the value passed via `--seed`; if `--seed -1` is provided, all replicas keep `-1` and the chosen seeds are reported in the log.
+
+```
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --replicas 3 --seed 1024
+```
+
+[Return to the Table Of Contents](#table-of-contents)<br>
 
 #### **Simulations using multiple servers**
 ```
