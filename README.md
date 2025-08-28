@@ -297,6 +297,8 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 #### **Replicas of the same complex**
 Run several independent simulations of one prepared system by specifying the `--replicas` option. The complex is prepared once and copied for each replica into directories such as `md_files/md_run/<complex>_replica1`, `md_files/md_run/<complex>_replica2`, and so on. Replica seeds increment from the value passed via `--seed`; if `--seed -1` is provided, all replicas keep `-1` and the chosen seeds are reported in the log.
 
+If a replica directory already exists, StreaMD reuses any files already present and copies only the missing ones, printing a warning for reused files. Running a later command with a higher `--replicas` count adds only the new replicas—for example, after completing two replicas you may rerun with `--replicas 3` to produce `replica3` while `replica1` and `replica2` are left intact.
+
 ```
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --replicas 3 --seed 1024
 ```
