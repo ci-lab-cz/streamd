@@ -338,7 +338,12 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     script_path = os.path.join(project_dir, 'scripts')
     script_mdp_path = os.path.join(script_path, 'mdp')
 
-    wdir_md = os.path.join(wdir, 'md_files', 'md_run')
+    if replicas > 1:
+        wdir_md = os.path.join(wdir, 'md_files')
+        prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'system_replicas')
+    else:
+        wdir_md = os.path.join(wdir, 'md_files', 'md_run')
+        prep_root = wdir_md
     analysis_dirname = 'md_analysis'
 
     dask_client, cluster = None, None
@@ -494,7 +499,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                   protein_name=pname, protein_file=protein,
                                   metal_resnames=metal_resnames, metal_charges=metal_charges,
                                   wdir_metal=wdir_metal, system_lig_wdirs=system_lig_wdirs,
-                                  wdir_md=wdir_md, script_path=script_path, ncpu=ncpu,
+                                  wdir_md=prep_root, script_path=script_path, ncpu=ncpu,
                                   activate_gaussian=activate_gaussian, gaussian_version=gaussian_exe,
                                   gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                   bash_log=bash_log, seed=seed, nvt_time_ps=nvt_time_ps, npt_time_ps=npt_time_ps,
@@ -511,7 +516,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                     for res in calc_dask(run_complex_preparation, var_lig_wdirs, dask_client,
                                          wdir_system_ligand_list=system_lig_wdirs,
                                          protein_name=pname, wdir_protein=wdir_protein,
-                                         clean_previous=clean_previous, wdir_md=wdir_md,
+                                         clean_previous=clean_previous, wdir_md=prep_root,
                                          script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
                                          npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps,
                                          mdp_dir=mdp_dir, explicit_args=explicit_args,
@@ -533,21 +538,12 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
         if replicas > 1 and wdir_to_continue_list is None:
             replicated_dirs = []
             for d in var_complex_prepared_dirs:
-                prep_root = os.path.dirname(d)
-                orig_root = os.path.join(prep_root, 'system_replicas_original')
-                os.makedirs(orig_root, exist_ok=True)
-                orig_dir = os.path.join(orig_root, os.path.basename(d))
-                if os.path.isdir(orig_dir):
-                    copy_missing(d, orig_dir)
-                    shutil.rmtree(d)
-                else:
-                    shutil.move(d, orig_dir)
                 for r in range(1, replicas + 1):
-                    replica_dir = f"{d}_replica{r}"
+                    replica_dir = os.path.join(wdir_md, f"{os.path.basename(d)}_replica{r}")
                     if os.path.isdir(replica_dir):
-                        copy_missing(orig_dir, replica_dir)
+                        copy_missing(d, replica_dir)
                     else:
-                        shutil.copytree(orig_dir, replica_dir)
+                        shutil.copytree(d, replica_dir)
                     r_seed = seed if seed == -1 else seed + r
                     edit_mdp(
                         os.path.join(replica_dir, 'nvt.mdp'),

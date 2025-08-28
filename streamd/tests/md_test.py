@@ -130,7 +130,7 @@ def test_run_md_replicas(dir_with_input_for_preparation):
         wdir,
         'md_files',
         'md_preparation',
-        'system_replicas_original',
+        'system_replicas',
         'protein_HIS_1ke7_LS3',
     )
     assert os.path.isdir(base_dir)
@@ -139,7 +139,7 @@ def test_run_md_replicas(dir_with_input_for_preparation):
     )
     for idx in (1, 2):
         rep_dir = os.path.join(
-            wdir, 'md_files', 'md_run', f'protein_HIS_1ke7_LS3_replica{idx}'
+            wdir, 'md_files', f'protein_HIS_1ke7_LS3_replica{idx}'
         )
         assert os.path.isdir(rep_dir)
         with open(os.path.join(rep_dir, 'nvt.mdp')) as inp:
@@ -200,7 +200,7 @@ def test_run_md_replicas_random_seed(dir_with_input_for_preparation, caplog):
 
     for idx in (1, 2):
         rep_dir = os.path.join(
-            wdir, 'md_files', 'md_run', f'protein_HIS_1ke7_LS3_replica{idx}'
+            wdir, 'md_files', f'protein_HIS_1ke7_LS3_replica{idx}'
         )
         with open(os.path.join(rep_dir, 'nvt.mdp')) as inp:
             data = inp.read()
