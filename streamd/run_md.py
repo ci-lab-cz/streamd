@@ -44,6 +44,8 @@ logging.getLogger('distributed').setLevel('WARNING')
 logging.getLogger('asyncssh').setLevel('WARNING')
 logging.getLogger('MDAnalysis').setLevel('CRITICAL')
 logging.getLogger('bockeh').setLevel('WARNING')
+logging.getLogger("distributed.active_memory_manager").setLevel('CRITICAL')
+logging.getLogger("distributed.scheduler").setLevel('CRITICAL')
 
 
 class RawTextArgumentDefaultsHelpFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
