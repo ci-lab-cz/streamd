@@ -79,7 +79,7 @@ def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) 
     return parser.parse_args(cli_args), config_args
 
 
-def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=False):
+def filepath_type(x: str, ext=None, check_exist=True, exist_type='file', create_dir=False):
     """Validate file paths and optionally ensure existence and extension.
 
     :param x: Path to validate.
@@ -89,7 +89,8 @@ def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=F
     :param create_dir: Create the directory if it does not exist and ``x`` is a directory path.
     :return: Absolute path to the validated file or directory.
     """
-    value = os.path.abspath(x) if x else x
+    # str - parse config arguments when used numbers
+    value = os.path.abspath(str(x)) if x else x
     if create_dir:
         os.makedirs(value, exist_ok=True)
     if check_exist:
