@@ -10,7 +10,7 @@ import MDAnalysis as mda
 from MDAnalysis.analysis import rms
 from streamd.analysis.xvg2png import convertxvg2png
 from streamd.analysis.plot_build import plot_rmsd
-from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess
+from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, create_last_frame_file
 
 
 def rmsd_for_atomgroups(universe, selection1, selection2=None):
@@ -236,4 +236,10 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
 
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, system_name=system_name, transform_nm_to_A=True)
+
+    create_last_frame_file(wdir=wdir_out_analysis,
+                           tpr=tpr, xtc=xtc,
+                           out_file=os.path.join(wdir_out_analysis, 'last_frame.pdb'),
+                           bash_log=bash_log, env=env)
+
     return rmsd_out_file, wdir_out_analysis, wdir
