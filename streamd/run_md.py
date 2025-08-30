@@ -227,6 +227,13 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
                                copy=True)
         return wdir_to_continue
 
+    # check for non-StreaMD files. Check input and output files
+    if os.path.isfile(os.path.join(wdir_to_continue, f'{deffnm}.xtc')):
+        logging.warning(f'xtc output file already exists: {os.path.join(wdir_to_continue, f"{deffnm}.xtc")}.')
+        if not check_to_continue_simulation_time(xtc=os.path.join(wdir_to_continue, f'{deffnm}.xtc'), new_mdtime_ps=new_mdtime_ps, env=env):
+            return wdir_to_continue
+
+
     # check if can find unfinished or not merged continued trajectories {deffnm}_cont_
     found_already_continued_parts_simulations = glob(os.path.join(wdir_to_continue, f'{deffnm}_cont_*.xtc'))
     if found_already_continued_parts_simulations:
