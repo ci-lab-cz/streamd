@@ -211,15 +211,21 @@ def get_number_of_frames(xtc, env):
     :return: Tuple of ``(frames, timestep)`` or ``None`` if parsing fails.
     """
     res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
-    res_parsed = re.findall('Step[ ]*([0-9]*)[ ]*([0-9]*)\n', res.stderr.decode("utf-8"))
+
+    res_parsed = re.findall('Step\s*(\d*)\s*(\d*)\n', res.stderr.decode("utf-8"))
     if res_parsed:
         frames, timestep = res_parsed[0]
         # starts with 0
-        logging.info(f'{xtc} has {int(frames)} frames')
+        logging.info(f'{xtc} has {int(frames)} frames ({timestep} timestep)')
         return int(frames), int(timestep) if timestep else None
     else:
         logging.warning(f'Failed to read number of frames of {xtc} trajectory. {res}')
         return None
+
+def backup_and_replace(src_file, target_file):
+    backup_prev_files(target_file)
+    shutil.move(src_file, target_file)
+
 
 def backup_prev_files(file_to_backup, wdir=None, copy=False):
     """Rename or copy an existing file to avoid overwriting.
@@ -229,6 +235,8 @@ def backup_prev_files(file_to_backup, wdir=None, copy=False):
     :param copy: If ``True``, copy instead of moving the file.
     :return: ``None``.
     """
+    if not os.path.isfile(file_to_backup):
+        return None
     if wdir is None:
         wdir = os.path.dirname(file_to_backup)
     n = len(glob(os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.*#'))) + 1
@@ -250,7 +258,7 @@ def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
     current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
     if current_number_of_frames and timestep:
         time_ns = (current_number_of_frames*timestep-timestep)/1000
-        logging.info(f'The length of the found trajectory is {time_ns} ns. Should be continued until {new_mdtime_ps/1000} ns.')
+        logging.info(f'The length of the found trajectory is {time_ns} ns. Will be continued until {new_mdtime_ps/1000} ns.')
         if current_number_of_frames * timestep >= new_mdtime_ps:
             logging.warning(f'The desired length of the found simulation trajectory {xtc} has been already reached. '
                             f'Calculations will be interrupted.')
@@ -273,6 +281,14 @@ cd {wdir}
 gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,bash_log)} 2>&1
     '''
     run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)
+
+def create_last_frame_file(wdir, tpr, xtc, out_file, bash_log, env):
+    current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
+    cmd = f'''
+    cd {wdir}
+    gmx trjconv -s {tpr} -f {xtc} -o {out_file} -dump {current_number_of_frames} >> {os.path.join(wdir, bash_log)} 2>&1 <<< System
+        '''
+    run_check_subprocess(cmd, key=out_file, log=os.path.join(wdir, bash_log), env=env)
 
 @contextmanager
 def temporary_directory_debug(remove=True, suffix=None, dir=None):
