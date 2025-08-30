@@ -280,7 +280,7 @@ def merge_parts_of_simulation(start_xtc, part_xtc, new_xtc, wdir, bash_log, env=
 cd {wdir}
 gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,bash_log)} 2>&1
     '''
-    run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)
+    return run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)
 
 def create_last_frame_file(wdir, tpr, xtc, out_file, bash_log, env):
     current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)

@@ -888,6 +888,12 @@ def main():
     if '--seed' in sys.argv or 'seed' in config_args:
         explicit_args.append('seed')
 
+    tpr_cpt_xtc_args_flag = [i is not None for i in (args.tpr, args.cpt, args.xtc)]
+    if any(tpr_cpt_xtc_args_flag) and not all(tpr_cpt_xtc_args_flag):
+        logging.exception('Not all--tpr/--cpt/--xtc arguments were provided. '
+                          'Please provide all 3 arguments to continue with non-StreaMD simulation.')
+        return None
+
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
 
     if args.out_suffix:
