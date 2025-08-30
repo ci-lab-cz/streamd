@@ -261,7 +261,7 @@ def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
     current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
     if current_number_of_frames and timestep:
         time_ns = (current_number_of_frames*timestep-timestep)/1000
-        logging.info(f'The length of the found trajectory is {time_ns} ns. Will be continued until {new_mdtime_ps/1000} ns.')
+        logging.info(f'The length of the found trajectory is {time_ns} ns. The desired length is {new_mdtime_ps/1000} ns.')
         if current_number_of_frames * timestep >= new_mdtime_ps:
             logging.warning(f'The desired length of the found simulation trajectory {xtc} has been already reached. '
                             f'Calculations will be interrupted.')
