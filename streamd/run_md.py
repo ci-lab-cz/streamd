@@ -359,23 +359,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     script_mdp_path = os.path.join(script_path, 'mdp')
 
     wdir_md = os.path.join(wdir, 'md_files', 'md_run')
-    prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'complex')
+    prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'system')
     analysis_dirname = 'md_analysis'
 
     dask_client, cluster = None, None
-
-    def copy_missing(src, dst):
-        for root, _, files in os.walk(src):
-            rel = os.path.relpath(root, src)
-            dest_root = os.path.join(dst, rel) if rel != '.' else dst
-            os.makedirs(dest_root, exist_ok=True)
-            for f in files:
-                src_file = os.path.join(root, f)
-                dest_file = os.path.join(dest_root, f)
-                if not os.path.exists(dest_file):
-                    shutil.copy2(src_file, dest_file)
-                else:
-                    logging.warning(f'File {dest_file} exists and will be reused')
 
     # GPU calculations settings
     gpu_args = ''
@@ -400,6 +387,12 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     if tpr_prev is None or cpt_prev is None or xtc_prev is None:
         # preparation
         if (steps is None or 1 in steps) and wdir_to_continue_list is None:
+            if not os.path.isfile(protein):
+                logging.exception('StreaMD requires valid protein file to run new simulations. '
+                                  f'File was not found: {protein}. '
+                                  'Please provide --protein file or use --wdir_to_continue argument to continue MD for already prepared files.'
+                                  )
+                return None
             # create dirs
             ligand_resid = 'UNL'
             pname, p_ext = os.path.splitext(os.path.basename(protein))
@@ -830,7 +823,7 @@ def main():
     parser2.add_argument('--xtc', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='Use explicit xtc arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--ligand_list_file', metavar='all_ligand_resid.txt', default=None, type=filepath_type,
-                        help='''If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you should set ligand_list file. 
+                        help='''If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you need to set ligand_list file. 
                                  Format of the file (no headers): user_ligand_id\tgromacs_ligand_id. Example: my_ligand\tUNL.
                                  Can be set up or placed into --wdir_to_continue directory(ies)''')
     parser2.add_argument('--ligand_id', metavar='UNL', default='UNL', type=str,
