@@ -256,13 +256,21 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
             if re.findall(r'\.part[0-9]*\.xtc', part_xtc):
                 # not merged part
                 new_xtc = os.path.join(wdir_to_continue, f'{deffnm_part}.xtc')
-                merge_parts_of_simulation(start_xtc=xtc,
+                was_merged = merge_parts_of_simulation(start_xtc=xtc,
                                            part_xtc=part_xtc,
                                            new_xtc=new_xtc,
                                            wdir=wdir_to_continue,
                                            bash_log=bash_log,
                                            env=env)
                 backup_prev_files(file_to_backup=part_xtc, wdir=wdir_to_continue)
+
+                if not was_merged:
+                    logging.exception(f'Failed to concatenate the previous part of the trajectory: {part_xtc}'
+                                      f'Could be because of the corrupted file.'
+                                      f'No further concatenation will happen and other parts of the trajectory will be ignored.'
+                                      f'The simulation will be continued only from the correct part of the trajectory.')
+                    break
+
             # backup old part files - xtc, log, tpr, cpt, edr
             for cont_sim_file in glob(os.path.join(wdir_to_continue, f'{deffnm_part}*')):
                 ext = os.path.splitext(cont_sim_file)[1]
