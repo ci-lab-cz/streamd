@@ -344,9 +344,9 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 2
 ```
 or use explicit `--tpr`, `--cpt` and `--xtc` arguments to continue a non-StreaMD simulation
 ```
-run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/  --md_time 3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc
+run_md --wdir mdrun  --md_time 3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc --ligand_list_file protein_H_HIS_ligand_1/all_ligand_resid.txt
 ```
-in case you don't want to check/run all preparation steps with using non-StreaMD simulations you can use `--steps` argument 
+in case you don't want to check/run all preparation steps for your directory you can use `--steps` argument 
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 3 --steps 3 4
 ```

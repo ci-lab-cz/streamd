@@ -651,7 +651,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
     # continue from xtc_prev cpr_prev tpr_prev for non-StreaMD simulations
     elif tpr_prev is not None and cpt_prev is not None and xtc_prev is not None:
-        wdir_md = wdir
+        if wdir_to_continue_list is None:
+            wdir_md = wdir
+        else:
+            wdir_md = wdir_to_continue_list[0]
         if steps is None or 3 in steps:
             res = run_simulation(wdir=wdir_md, project_dir=project_dir,
                            bash_log=bash_log, mdtime_ns=mdtime_ns,
