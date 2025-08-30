@@ -214,11 +214,17 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
     if not check_to_continue_simulation_time(xtc=xtc, new_mdtime_ps=new_mdtime_ps, env=env):
         # can happen if non-StreaMD files are used with different output directory
         if os.path.dirname(xtc) != wdir_to_continue:
-            backup_and_replace(src_file=xtc, target_file=os.path.join(wdir_to_continue, f'{deffnm}.xtc'))
+            backup_and_replace(src_file=xtc,
+                               target_file=os.path.join(wdir_to_continue, f'{deffnm}.xtc'),
+                               copy=True)
         if os.path.dirname(tpr) != wdir_to_continue:
-            backup_and_replace(src_file=tpr, target_file=os.path.join(wdir_to_continue, f'{deffnm}.tpr'))
+            backup_and_replace(src_file=tpr,
+                               target_file=os.path.join(wdir_to_continue, f'{deffnm}.tpr'),
+                               copy=True)
         if os.path.dirname(cpt) != wdir_to_continue:
-            backup_and_replace(src_file=cpt, target_file=os.path.join(wdir_to_continue, f'{deffnm}.cpt'))
+            backup_and_replace(src_file=cpt,
+                               target_file=os.path.join(wdir_to_continue, f'{deffnm}.cpt'),
+                               copy=True)
         return wdir_to_continue
 
     # check if can find unfinished or not merged continued trajectories {deffnm}_cont_

@@ -222,9 +222,12 @@ def get_number_of_frames(xtc, env):
         logging.warning(f'Failed to read number of frames of {xtc} trajectory. {res}')
         return None
 
-def backup_and_replace(src_file, target_file):
+def backup_and_replace(src_file, target_file, copy=False):
     backup_prev_files(target_file)
-    shutil.move(src_file, target_file)
+    if not copy:
+        shutil.move(src_file, target_file)
+    else:
+        shutil.copy(src_file, target_file)
 
 
 def backup_prev_files(file_to_backup, wdir=None, copy=False):
