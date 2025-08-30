@@ -263,6 +263,15 @@ run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000 --ncpu 1
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --ncpu 128 
 ```
 
+
+StreaMD can run multiple simulations for a set of ligands (bound to the same protein).
+> [!Note] 
+> All ligands should have valid, aligned to the protein 3D coordinates.
+```
+run_md -p protein_H_HIS.pdb -l ligands.sdf 
+```
+
+
 ##### Protein - Cofactors
 All molecules should present in simulated system, so any problem with preparation of cofactors will interrupt the program. 
 ```
@@ -274,6 +283,7 @@ run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 1 --ncpu 128
 ```
 run_md --config config.yml 
 ```
+> Arguments passed via CLI take precedence over config.yml   
 [Read More](#configuration-file)
 
 ##### **Simulations with boron-containing compounds**  
