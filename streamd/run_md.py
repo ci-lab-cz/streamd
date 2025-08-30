@@ -558,16 +558,23 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                         copy_missing(d, replica_dir)
                     else:
                         shutil.copytree(d, replica_dir)
-                    if seed == -1 or replicas == 1:
-                        r_seed = seed
+
+                    replica_nvt_mdp = os.path.join(replica_dir, 'nvt.mdp')
+                    if not os.path.isfile(replica_nvt_mdp):
+                        if seed == -1 or replicas == 1:
+                            r_seed = seed
+                        else:
+                            r_seed = seed + r
+                        edit_mdp(
+                            replica_nvt_mdp,
+                            pattern='gen_seed',
+                            replace=f'gen_seed                = {r_seed}        ;',
+                        )
+                        logging.info("Replica %d nvt seed: %d", replica_idx, r_seed)
                     else:
-                        r_seed = seed + r
-                    edit_mdp(
-                        os.path.join(replica_dir, 'nvt.mdp'),
-                        pattern='gen_seed',
-                        replace=f'gen_seed                = {r_seed}        ;',
-                    )
-                    logging.info("Replica %d seed: %d", replica_idx, r_seed)
+                        logging.warning(f"Replica nvt.mdp file exists: {replica_nvt_mdp}. "
+                                        f"Original seed from nvt.mdp will be used")
+
                     replicated_dirs.append(replica_dir)
             var_complex_prepared_dirs = replicated_dirs
 
