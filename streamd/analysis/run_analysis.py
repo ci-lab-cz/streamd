@@ -6,9 +6,25 @@ from functools import partial
 import os
 import pandas as pd
 import logging
+import re
 
 from streamd.analysis.plot_build import plot_rmsd_mean_std
 from streamd.utils.utils import filepath_type
+
+
+def _parse_system_name(system: str) -> tuple[str, int]:
+    match = re.match(r"(.*)_replica(\d+)$", system)
+    if match:
+        return match.group(1), int(match.group(2))
+    return system, 1
+
+
+def _ensure_replica_cols(df: pd.DataFrame) -> pd.DataFrame:
+    if 'protein_name' not in df.columns or 'replica' not in df.columns:
+        protein_name, replica = _parse_system_name(str(df['system'].iloc[0]))
+        df.loc[:, 'protein_name'] = protein_name
+        df.loc[:, 'replica'] = replica
+    return df
 
 
 def merge_rmsd_csv(csv_files, out):
@@ -30,6 +46,7 @@ def merge_rmsd_csv(csv_files, out):
     csv_files.sort()
     for i in csv_files:
         data = pd.read_csv(i, sep='\t')
+        data = _ensure_replica_cols(data)
         all_data_list.append(data)
 
     merged_data = pd.concat(all_data_list)
@@ -60,10 +77,10 @@ def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone',
     for start, end in time_ranges:
         key = f'{start}-{end}ns'
         mean = rmsd_data.loc[(start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), system_cols+[rmsd_system]].groupby(
-            system_cols).mean().reset_index().rename({rmsd_system: f'RMSD_mean'}, axis='columns').round(2)
+            system_cols).mean().reset_index().rename({rmsd_system: 'RMSD_mean'}, axis='columns').round(2)
         std = rmsd_data.loc[
             (start <= rmsd_data['time(ns)']) & (rmsd_data['time(ns)'] <= end), system_cols+ [rmsd_system]].groupby(
-            system_cols).std().reset_index().rename({rmsd_system: f'RMSD_std'}, axis='columns').round(2)
+            system_cols).std().reset_index().rename({rmsd_system: 'RMSD_std'}, axis='columns').round(2)
         res_tmp = pd.merge(mean, std, on=system_cols)
         res_tmp.loc[:, 'rmsd_system'] = rmsd_system
         res_tmp.loc[:, 'time_range'] = key
@@ -127,9 +144,11 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     if len(rmsd_files) > 1:
         rmsd_merged_data = merge_rmsd_csv(rmsd_files, os.path.join(wdir, f'rmsd_all_systems_{unique_id}.csv'))
     else:
-        rmsd_merged_data = pd.read_csv(rmsd_files[0], sep='\t')
+        rmsd_merged_data = _ensure_replica_cols(pd.read_csv(rmsd_files[0], sep='\t'))
 
-    system_cols = ['system'] if all(rmsd_merged_data['ligand_name'].isna()) else ['system', 'ligand_name']
+    base_cols = ['system', 'protein_name', 'replica']
+    no_ligand = all(rmsd_merged_data['ligand_name'].isna())
+    system_cols = base_cols if no_ligand else base_cols + ['ligand_name']
 
     #Use directory column as system column in case of replicate runs where ligand_name and system columns are the same,
     # but working_directories are different
@@ -140,7 +159,8 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
         if max_num_unique_dirs > 1:
             system_cols.append('directory')
 
-    rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=system_cols)
+    lower_cols = [c for c in system_cols if c != 'replica']
+    rmsd_merged_data = make_lower_case(rmsd_merged_data, cols=lower_cols)
 
     if time_ranges is None:
         start = rmsd_merged_data['time(ns)'].min()
@@ -167,22 +187,24 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     if paint_by_fname:
         if os.path.isfile(paint_by_fname):
             paint_by_data = pd.read_csv(paint_by_fname, sep='\t')
-            if not all([i in paint_by_data.columns for i in system_cols]):
-                logging.warning(f'Cannot paint by custom column in html rmsd analysis. Missing columns: {system_cols} in {paint_by_fname}')
+            merge_cols = ['protein_name'] if no_ligand else ['protein_name', 'ligand_name']
+            if not all([i in paint_by_data.columns for i in merge_cols]):
+                logging.warning(f'Cannot paint by custom column in html rmsd analysis. Missing columns: {merge_cols} in {paint_by_fname}')
                 paint_by_col = 'rmsd_system'
                 show_legend = False
             else:
-                paint_by_data = make_lower_case(paint_by_data, cols=system_cols)
-                paint_by_col = [i for i in paint_by_data.columns if i not in system_cols][0]
+                paint_by_data = make_lower_case(paint_by_data, cols=merge_cols)
+                paint_by_col = [i for i in paint_by_data.columns if i not in merge_cols][0]
                 df_mean_std = pd.merge(df_mean_std, paint_by_data.loc[:,
-                                                    system_cols+[paint_by_col]], on=system_cols)
+                                                    merge_cols+[paint_by_col]], on=merge_cols)
                 show_legend = True
 
         else:
             raise FileNotFoundError(f'Cannot find file {paint_by_fname} for html painting')
     else:
-        paint_by_col = 'rmsd_system'
-        show_legend = False
+        paint_by_col = 'replica' if 'replica' in df_mean_std.columns else 'rmsd_system'
+        show_legend = False if paint_by_col == 'rmsd_system' else True
+        df_mean_std[paint_by_col] = df_mean_std[paint_by_col].astype(str)
 
     plot_rmsd_mean_std(data=df_mean_std, paint_by_col=paint_by_col, show_legend=show_legend,
                         out_name=os.path.join(wdir, f'rmsd_mean_std_time-ranges_{unique_id}.html'),
@@ -215,8 +237,8 @@ def main():
     parser.add_argument('--paint_by', default='',
                         help='File to paint by additional column. '
                              'Required columns: '
-                             '- Protein-ligand simulations: system\tligand_name.'
-                             '- Protein only in water simulations: system'
+                             '- Protein-ligand simulations: protein_name\tligand_name.'
+                             '- Protein only in water simulations: protein_name'
                              ' Sep: /\t. '
                              'The plot will be painted by any other than system and ligand_name column.')
     parser.add_argument('-o','--out_suffix', default=None,

@@ -1,6 +1,5 @@
 """Tests for plotting helpers."""
 
-import os
 import pytest
 import tempfile
 import pandas as pd
@@ -19,8 +18,8 @@ def rmsd_df():
     """Provide a small RMSD DataFrame."""
     return pd.DataFrame({
         'time(ns)': [0, 1, 2, 3, 4, 5],
-        'replica_1': [2.2, 2.1, 2.2, 2.0, 1.8, 1.75],
-        'replica_2': [0.55, 0.58, 0.65, 0.7, 0.68, 0.72]
+        'replica1': [2.2, 2.1, 2.2, 2.0, 1.8, 1.75],
+        'replica2': [0.55, 0.58, 0.65, 0.7, 0.68, 0.72]
     })
 
 
