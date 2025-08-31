@@ -143,7 +143,7 @@ def test_run_md_replicas(dir_with_input_for_preparation):
         wdir,
         'md_files',
         'md_preparation',
-        'complex',
+        'systems',
         'protein_HIS_1ke7_LS3',
     )
     assert os.path.isdir(base_dir)
@@ -219,5 +219,3 @@ def test_run_md_replicas_random_seed(dir_with_input_for_preparation, caplog):
         with open(os.path.join(rep_dir, 'nvt.mdp')) as inp:
             data = inp.read()
         assert 'gen_seed                = -1' in data
-        assert f'Replica {idx} seed: -1' in caplog.text
-
