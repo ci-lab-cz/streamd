@@ -717,6 +717,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
             for f in glob(os.path.join(wdir_md, '#*#')):
                 os.remove(f)
 
+        for f in glob(os.path.join(prep_root, '*', '#*#')):
+            os.remove(f)
+
         if wdir_to_continue_list is None:
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
                 # if '.tpr.' not in f and '.xtc.' not in f:
