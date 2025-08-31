@@ -16,7 +16,7 @@
       - [Protein-cofactors](#protein---cofactors)
       - [Boron-containing compounds](#simulations-with-boron-containing-compounds)
       - [Ligand Binding Metalloprotein with MCPB.py](#simulations-of-ligand-binding-metalloprotein-with-mcpbpy)
-    - [Replicas of the same complex](#replicas-of-the-same-complex)
+    - [Replicas simulations](#replicas-simulations)
     - [Multiple servers](#simulations-using-multiple-servers)
     - [Continue the interrupted simulations](#continue-the-interrupted-simulations)
     - [Extend the simulation](#extend-the-simulation)
@@ -78,8 +78,8 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 #### **Fully automated pipeline for molecular dynamics**
 
 ## Features:  
-- Run of multiple simultaneous molecular dynamics simulations
-- Launch multiple replicas of the same system in a single command
+- Run multiple simultaneous molecular dynamics simulations
+- Run multiple replicas of the same system for multiple complexes in a single command
 - Simulation for different systems:  
     - Protein in Water;  
     - Protein - Ligand;  
@@ -304,9 +304,9 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 ```
 [Return to the Table Of Contents](#table-of-contents)<br>
 
-#### **Replicas of the same complex**
-Run several independent simulations of one prepared system by specifying the `--replicas` option.
-The system complex is prepared once (`md_files/md_preparation/system`) and copied for each replica into directories such as `md_files/md_run/<complex>_replicaN`.
+#### **Replicas simulations**
+Run several independent simulations of the prepared systems by specifying the `--replicas` option.
+Each system complex is prepared once (`md_files/md_preparation/systems`) and copied for each replica into directories such as `md_files/md_run/<complex>_replicaN`.
 Replica seeds increment from the value passed via `--seed`; if `--seed -1` (default) is provided, all replicas keep `-1`.
 
 If a replica directory already exists, StreaMD reuses any files already present, printing a warning for reused files.
