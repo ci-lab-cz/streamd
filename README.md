@@ -1,7 +1,7 @@
 ![StreaMD Logo](./streamd_logo.png)
 # StreaMD: a tool to perform high-throughput automated molecular dynamics simulations
 
-Full documentation is available in the [docs](docs/) directory. A hosted version on Read the Docs will be available once the project is published.
+Full documentation is available in the [docs](docs/) directory.
 
 ## Table Of Contents
 - [Installation](#installation)
