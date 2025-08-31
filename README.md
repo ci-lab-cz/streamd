@@ -471,6 +471,14 @@ cofactor_2/
 ```
 
 ```
+md_files/md_preparation/systems/:
+protein_H_HIS_ligand_1.itp  complex.gro  ions.tpr   minim.mdp   nvt.mdp                     solv.gro                         topol.top
+all.itp                     index.ndx    md.mdp     newbox.gro  posre_protein_ligand_1.itp  solv_ions.gro
+all_ligand_resid.txt        ions.mdp     mdout.mdp  npt.mdp     posre.itp                   streamd_bash_protein_HIS_ligand_1_date.log
+
+```
+
+```
 md_files/md_run/protein_H_HIS_ligand_1_replica1/
 ligand_1.itp          em.trr       ions.tpr    md_out.edr         md_out.tpr             npt.cpt   npt.tpr  nvt.log    
 cofactor_1.itp        em.edr       frame.pdb   md_out.gro         md_out.xtc             npt.edr   npt.trr  nvt.mdp  topol.top

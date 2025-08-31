@@ -380,7 +380,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     script_mdp_path = os.path.join(script_path, 'mdp')
 
     wdir_md = os.path.join(wdir, 'md_files', 'md_run')
-    prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'system')
+    prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'systems')
     analysis_dirname = 'md_analysis'
 
     dask_client, cluster = None, None
