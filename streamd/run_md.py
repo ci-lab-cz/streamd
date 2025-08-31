@@ -28,7 +28,7 @@ from streamd.analysis.run_analysis import run_rmsd_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
 from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
-from streamd.preparation.md_files_preparation import edit_mdp
+from streamd.preparation.md_files_preparation import edit_mdp, copy_missing
 from streamd.utils.utils import (
     filepath_type,
     run_check_subprocess,
@@ -37,6 +37,8 @@ from streamd.utils.utils import (
     check_to_continue_simulation_time,
     merge_parts_of_simulation,
     parse_with_config,
+    create_last_frame_file,
+    backup_and_replace,
 )
 from streamd.mcpbpy_md import mcbpy_md
 
@@ -120,6 +122,13 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
          and os.path.isfile(os.path.join(wdir, f'{deffnm}.xtc'))) :
         logging.warning(f'{wdir}. {deffnm}.xtc and {deffnm}.tpr and  {deffnm}.cpt exist. '
                         f'MD simulation will be continued until the setup simulation steps are reached.')
+
+        if not os.path.isfile(os.path.join(wdir, f'{deffnm}.gro')):
+            logging.warning(f'Create {os.path.join(wdir, f"{deffnm}.gro")}')
+            create_last_frame_file(wdir=wdir, tpr=tpr, xtc=xtc,
+                                   out_file=os.path.join(wdir, f'{deffnm}.gro'),
+                                   bash_log=bash_log, env=env)
+
         if continue_md_from_dir(wdir_to_continue=wdir, tpr=tpr, cpt=cpt, xtc=xtc,
                                 deffnm=deffnm, deffnm_next=deffnm_next,
                                 mdtime_ns=mdtime_ns, project_dir=project_dir, bash_log=bash_log,
@@ -128,6 +137,7 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
             return None
 
         return (wdir, deffnm)
+
     cmd = (f'wdir={wdir} ncpu={ncpu} compute_device={compute_device} gpu_args={gpu_args} device_param={device_param} deffnm={deffnm} '
            f'bash {os.path.join(project_dir, "scripts/script_sh/md.sh")} >> {os.path.join(wdir, bash_log)} 2>&1')
     if not run_check_subprocess(cmd, wdir, log=os.path.join(wdir, bash_log), env=env):
@@ -202,7 +212,27 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
 
     # check calculated time
     if not check_to_continue_simulation_time(xtc=xtc, new_mdtime_ps=new_mdtime_ps, env=env):
+        # can happen if non-StreaMD files are used with different output directory
+        if os.path.dirname(xtc) != wdir_to_continue:
+            backup_and_replace(src_file=xtc,
+                               target_file=os.path.join(wdir_to_continue, f'{deffnm}.xtc'),
+                               copy=True)
+        if os.path.dirname(tpr) != wdir_to_continue:
+            backup_and_replace(src_file=tpr,
+                               target_file=os.path.join(wdir_to_continue, f'{deffnm}.tpr'),
+                               copy=True)
+        if os.path.dirname(cpt) != wdir_to_continue:
+            backup_and_replace(src_file=cpt,
+                               target_file=os.path.join(wdir_to_continue, f'{deffnm}.cpt'),
+                               copy=True)
         return wdir_to_continue
+
+    # check for non-StreaMD files. Check input and output files
+    if os.path.isfile(os.path.join(wdir_to_continue, f'{deffnm}.xtc')):
+        logging.warning(f'xtc output file already exists: {os.path.join(wdir_to_continue, f"{deffnm}.xtc")}.')
+        if not check_to_continue_simulation_time(xtc=os.path.join(wdir_to_continue, f'{deffnm}.xtc'), new_mdtime_ps=new_mdtime_ps, env=env):
+            return wdir_to_continue
+
 
     # check if can find unfinished or not merged continued trajectories {deffnm}_cont_
     found_already_continued_parts_simulations = glob(os.path.join(wdir_to_continue, f'{deffnm}_cont_*.xtc'))
@@ -226,17 +256,27 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
             if re.findall(r'\.part[0-9]*\.xtc', part_xtc):
                 # not merged part
                 new_xtc = os.path.join(wdir_to_continue, f'{deffnm_part}.xtc')
-                merge_parts_of_simulation(start_xtc=xtc,
+                was_merged = merge_parts_of_simulation(start_xtc=xtc,
                                            part_xtc=part_xtc,
                                            new_xtc=new_xtc,
                                            wdir=wdir_to_continue,
                                            bash_log=bash_log,
                                            env=env)
                 backup_prev_files(file_to_backup=part_xtc, wdir=wdir_to_continue)
+
+                if not was_merged:
+                    logging.exception(f'Failed to concatenate the previous part of the trajectory: {part_xtc}'
+                                      f'Could be because of the corrupted file.'
+                                      f'No further concatenation will happen and other parts of the trajectory will be ignored.'
+                                      f'The simulation will be continued only from the correct part of the trajectory.')
+                    break
+
             # backup old part files - xtc, log, tpr, cpt, edr
             for cont_sim_file in glob(os.path.join(wdir_to_continue, f'{deffnm_part}*')):
                 ext = os.path.splitext(cont_sim_file)[1]
                 # simulation start files
+                # replace the original files so if again interrupted and restarted,
+                # the first file would contain all previous run in the correct order
                 if ext == '.xtc':
                     user_file_to_replace = xtc
                 elif ext == '.cpt':
@@ -246,11 +286,10 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
                 else:
                     user_file_to_replace = os.path.join(wdir_to_continue, f'{deffnm}{ext}')
 
-                if os.path.isfile(user_file_to_replace):
-                    backup_prev_files(file_to_backup=user_file_to_replace, wdir=wdir_to_continue)
+                # if os.path.isfile(user_file_to_replace):
                     # replace start simulation file with new merged one
-                    backup_prev_files(file_to_backup=cont_sim_file, wdir=wdir_to_continue, copy=True)
-                    shutil.move(cont_sim_file, user_file_to_replace)
+                backup_prev_files(file_to_backup=cont_sim_file, wdir=wdir_to_continue, copy=True)
+                backup_and_replace(src_file=cont_sim_file, target_file=user_file_to_replace)
 
         # check new merged trajectory time
         logging.warning(f'{xtc} and {found_already_continued_parts_simulations} were merged successfully.')
@@ -264,17 +303,17 @@ def continue_md_from_dir(wdir_to_continue, tpr, cpt, xtc, deffnm, deffnm_next,
         # backup cont part files
         for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}.part*.*')):
             backup_prev_files(file_to_backup=f, wdir=wdir_to_continue)
-        #
+
+        #replace old files with new ones
         for f in glob(os.path.join(wdir_to_continue, f'{deffnm_next}.*')):
             # check previous existing files with the same name
-            if os.path.isfile(os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm))):
-                backup_prev_files(file_to_backup=os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)),
-                              wdir=wdir_to_continue)
-                backup_prev_files(file_to_backup=f, wdir=wdir_to_continue, copy=True)
-            # replace old file with continued one
-                shutil.move(f, os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm)))
+            output_file = os.path.join(wdir_to_continue, os.path.basename(f).replace(deffnm_next, deffnm))
+            backup_prev_files(file_to_backup=f, wdir=wdir_to_continue, copy=True)
+            backup_and_replace(src_file=f, target_file=output_file)
 
         return wdir_to_continue
+
+    return None
 
 
 def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
@@ -341,23 +380,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     script_mdp_path = os.path.join(script_path, 'mdp')
 
     wdir_md = os.path.join(wdir, 'md_files', 'md_run')
-    prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'complex')
+    prep_root = os.path.join(wdir, 'md_files', 'md_preparation', 'systems')
     analysis_dirname = 'md_analysis'
 
     dask_client, cluster = None, None
-
-    def copy_missing(src, dst):
-        for root, _, files in os.walk(src):
-            rel = os.path.relpath(root, src)
-            dest_root = os.path.join(dst, rel) if rel != '.' else dst
-            os.makedirs(dest_root, exist_ok=True)
-            for f in files:
-                src_file = os.path.join(root, f)
-                dest_file = os.path.join(dest_root, f)
-                if not os.path.exists(dest_file):
-                    shutil.copy2(src_file, dest_file)
-                else:
-                    logging.warning(f'File {dest_file} exists and will be reused')
 
     # GPU calculations settings
     gpu_args = ''
@@ -378,9 +404,16 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     device_param = f"'{device_param}'"
 
     # Start
+    var_md_dirs_deffnm = []
     if tpr_prev is None or cpt_prev is None or xtc_prev is None:
         # preparation
         if (steps is None or 1 in steps) and wdir_to_continue_list is None:
+            if not os.path.isfile(protein):
+                logging.exception('StreaMD requires valid protein file to run new simulations. '
+                                  f'File was not found: {protein}. '
+                                  'Please provide --protein file or use --wdir_to_continue argument to continue MD for already prepared files.'
+                                  )
+                return None
             # create dirs
             ligand_resid = 'UNL'
             pname, p_ext = os.path.splitext(os.path.basename(protein))
@@ -546,16 +579,21 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                         copy_missing(d, replica_dir)
                     else:
                         shutil.copytree(d, replica_dir)
-                    if seed == -1 or replicas == 1:
-                        r_seed = seed
-                    else:
-                        r_seed = seed + r
-                    edit_mdp(
-                        os.path.join(replica_dir, 'nvt.mdp'),
-                        pattern='gen_seed',
-                        replace=f'gen_seed                = {r_seed}        ;',
-                    )
-                    logging.info("Replica %d seed: %d", replica_idx, r_seed)
+
+                    replica_nvt_mdp = os.path.join(replica_dir, 'nvt.mdp')
+                    if r > 0:  # for the 1st replica use original seed from systems/protein-ligand/nvt.mdp
+                        # for the 2nd and further replicas always change seed
+                        if seed == -1:
+                            r_seed = seed
+                        else:
+                            r_seed = seed + r
+                        edit_mdp(
+                            replica_nvt_mdp,
+                            pattern='gen_seed',
+                            replace=f'gen_seed                = {r_seed}        ;',
+                        )
+                        logging.info("Replica %d nvt seed: %d", replica_idx, r_seed)
+
                     replicated_dirs.append(replica_dir)
             var_complex_prepared_dirs = replicated_dirs
 
@@ -609,7 +647,27 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
         elif 4 in steps:
             var_md_dirs_deffnm = [(i, deffnm) for i in wdir_to_continue_list]
 
-    # Part 3. MD Analysis. Run on each cpu
+    # continue from xtc_prev cpr_prev tpr_prev for non-StreaMD simulations
+    elif tpr_prev is not None and cpt_prev is not None and xtc_prev is not None:
+        if wdir_to_continue_list is None:
+            wdir_md = wdir
+        else:
+            wdir_md = wdir_to_continue_list[0]
+        if steps is None or 3 in steps:
+            res = run_simulation(wdir=wdir_md, project_dir=project_dir,
+                           bash_log=bash_log, mdtime_ns=mdtime_ns,
+                           tpr=tpr_prev, cpt=cpt_prev, xtc=xtc_prev, deffnm=deffnm, deffnm_next=f'{deffnm}_cont_{unique_id}',
+                           ncpu=ncpu, compute_device=compute_device, device_param=device_param,
+                           gpu_args=gpu_args, env=os.environ.copy())
+            if res:
+                var_md_dirs_deffnm.append(res)
+            logging.info(
+                f'Simulation of {len(var_md_dirs_deffnm)} not-Streamd complexes were successfully finished\nFinished: {var_md_dirs_deffnm}\n')
+        else:
+            var_md_dirs_deffnm.append((wdir_md, deffnm))
+
+
+    # Part 4. MD Analysis. Run on each cpu
     if (steps is None or 4 in steps) and var_md_dirs_deffnm:
         logging.info('Start Analysis of the simulations')
         var_md_analysis_res = []
@@ -653,6 +711,13 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
             f'\nSuccessfully finished complexes have been saved in {finished_complexes_file} file')
 
     if not not_clean_backup_files:
+        if tpr_prev is not None and cpt_prev is not None and xtc_prev is not None:
+            for f in glob(os.path.join(wdir_md, '#*#')):
+                os.remove(f)
+
+        for f in glob(os.path.join(prep_root, '*', '#*#')):
+            os.remove(f)
+
         if wdir_to_continue_list is None:
             for f in glob(os.path.join(wdir_md, '*', '#*#')):
                 # if '.tpr.' not in f and '.xtc.' not in f:
@@ -770,7 +835,7 @@ def main():
                               'for more memory efficient analysis.')
     parser1.add_argument('--wdir_to_continue', metavar='DIRNAME', required=False, default=None, nargs='+',
                          type=partial(filepath_type, exist_type='dir'),
-                         help='''Single or multiple directories contain simulations created by the tool.
+                         help='''Single or multiple directories contain simulations created by the  Streamd tool.
                             Use with steps 2,3,4 to continue run.\n'
                                     Should consist of: tpr, cpt, xtc and all_ligand_resid.txt files. 
                                     File all_ligand_resid.txt is optional and used to run md analysis for the ligands.\n
@@ -790,7 +855,7 @@ def main():
     parser2.add_argument('--xtc', metavar='FILENAME', required=False, default=None, type=filepath_type,
                         help='Use explicit xtc arguments to continue a non-StreaMD simulation')
     parser2.add_argument('--ligand_list_file', metavar='all_ligand_resid.txt', default=None, type=filepath_type,
-                        help='''If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you should set ligand_list file. 
+                        help='''If you want automatic md analysis for ligands was run after continue of non-StreaMD simulation you need to set ligand_list file. 
                                  Format of the file (no headers): user_ligand_id\tgromacs_ligand_id. Example: my_ligand\tUNL.
                                  Can be set up or placed into --wdir_to_continue directory(ies)''')
     parser2.add_argument('--ligand_id', metavar='UNL', default='UNL', type=str,
@@ -847,6 +912,12 @@ def main():
         explicit_args.append('md.mdp')
     if '--seed' in sys.argv or 'seed' in config_args:
         explicit_args.append('seed')
+
+    tpr_cpt_xtc_args_flag = [i is not None for i in (args.tpr, args.cpt, args.xtc)]
+    if any(tpr_cpt_xtc_args_flag) and not all(tpr_cpt_xtc_args_flag):
+        logging.exception('Not all--tpr/--cpt/--xtc arguments were provided. '
+                          'Please provide all 3 arguments to continue with non-StreaMD simulation.')
+        return None
 
     out_time = f'{datetime.now().strftime("%d-%m-%Y-%H-%M-%S")}'
 
