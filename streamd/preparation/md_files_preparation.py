@@ -280,3 +280,16 @@ def prepare_mdp_files(wdir_md_cur, all_resids, nvt_time_ps, npt_time_ps,
 
 
     return wdir_md_cur
+
+def copy_missing(src, dst):
+    for root, _, files in os.walk(src):
+        rel = os.path.relpath(root, src)
+        dest_root = os.path.join(dst, rel) if rel != '.' else dst
+        os.makedirs(dest_root, exist_ok=True)
+        for f in files:
+            src_file = os.path.join(root, f)
+            dest_file = os.path.join(dest_root, f)
+            if not os.path.exists(dest_file):
+                shutil.copy2(src_file, dest_file)
+            else:
+                logging.warning(f'File {dest_file} exists and will be reused')

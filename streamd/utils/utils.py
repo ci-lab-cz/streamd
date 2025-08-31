@@ -79,7 +79,7 @@ def parse_with_config(parser: argparse.ArgumentParser, cli_args: Iterable[str]) 
     return parser.parse_args(cli_args), config_args
 
 
-def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=False):
+def filepath_type(x: str, ext=None, check_exist=True, exist_type='file', create_dir=False):
     """Validate file paths and optionally ensure existence and extension.
 
     :param x: Path to validate.
@@ -89,7 +89,8 @@ def filepath_type(x, ext=None, check_exist=True, exist_type='file', create_dir=F
     :param create_dir: Create the directory if it does not exist and ``x`` is a directory path.
     :return: Absolute path to the validated file or directory.
     """
-    value = os.path.abspath(x) if x else x
+    # str - parse config arguments when used numbers
+    value = os.path.abspath(str(x)) if x else x
     if create_dir:
         os.makedirs(value, exist_ok=True)
     if check_exist:
@@ -210,15 +211,24 @@ def get_number_of_frames(xtc, env):
     :return: Tuple of ``(frames, timestep)`` or ``None`` if parsing fails.
     """
     res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
-    res_parsed = re.findall('Step[ ]*([0-9]*)[ ]*([0-9]*)\n', res.stderr.decode("utf-8"))
+
+    res_parsed = re.findall('Step\s*(\d*)\s*(\d*)\n', res.stderr.decode("utf-8"))
     if res_parsed:
         frames, timestep = res_parsed[0]
         # starts with 0
-        logging.info(f'{xtc} has {int(frames)} frames')
+        logging.info(f'{xtc} has {int(frames)} frames ({timestep} timestep)')
         return int(frames), int(timestep) if timestep else None
     else:
         logging.warning(f'Failed to read number of frames of {xtc} trajectory. {res}')
         return None
+
+def backup_and_replace(src_file, target_file, copy=False):
+    backup_prev_files(target_file)
+    if not copy:
+        shutil.move(src_file, target_file)
+    else:
+        shutil.copy(src_file, target_file)
+
 
 def backup_prev_files(file_to_backup, wdir=None, copy=False):
     """Rename or copy an existing file to avoid overwriting.
@@ -228,6 +238,8 @@ def backup_prev_files(file_to_backup, wdir=None, copy=False):
     :param copy: If ``True``, copy instead of moving the file.
     :return: ``None``.
     """
+    if not os.path.isfile(file_to_backup):
+        return None
     if wdir is None:
         wdir = os.path.dirname(file_to_backup)
     n = len(glob(os.path.join(wdir, f'#{os.path.basename(file_to_backup)}.*#'))) + 1
@@ -249,7 +261,7 @@ def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
     current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
     if current_number_of_frames and timestep:
         time_ns = (current_number_of_frames*timestep-timestep)/1000
-        logging.info(f'The length of the found trajectory is {time_ns} ns. Should be continued until {new_mdtime_ps/1000} ns.')
+        logging.info(f'The length of the found trajectory is {time_ns} ns. The desired length is {new_mdtime_ps/1000} ns.')
         if current_number_of_frames * timestep >= new_mdtime_ps:
             logging.warning(f'The desired length of the found simulation trajectory {xtc} has been already reached. '
                             f'Calculations will be interrupted.')
@@ -271,7 +283,15 @@ def merge_parts_of_simulation(start_xtc, part_xtc, new_xtc, wdir, bash_log, env=
 cd {wdir}
 gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,bash_log)} 2>&1
     '''
-    run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)
+    return run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)
+
+def create_last_frame_file(wdir, tpr, xtc, out_file, bash_log, env):
+    current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
+    cmd = f'''
+    cd {wdir}
+    gmx trjconv -s {tpr} -f {xtc} -o {out_file} -dump {current_number_of_frames} >> {os.path.join(wdir, bash_log)} 2>&1 <<< System
+        '''
+    run_check_subprocess(cmd, key=out_file, log=os.path.join(wdir, bash_log), env=env)
 
 @contextmanager
 def temporary_directory_debug(remove=True, suffix=None, dir=None):

@@ -83,6 +83,7 @@ def plot_rmsd_mean_std(data, paint_by_col, show_legend, out_name, title=None):
         title= title if title else 'RMSD Mean vs RMSD Std',
         labels={'RMSD_mean': 'RMSD Mean', 'RMSD_std': 'RMSD Std'},
         hover_data=hover_data,
+        symbol = 'replica' if 'replica' in data.columns else None
     )
 
     fig.add_hline(y=0.5, line_width=0.5, line_dash="dash", row='all', col='all')

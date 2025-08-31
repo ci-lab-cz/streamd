@@ -16,8 +16,9 @@
       - [Protein-cofactors](#protein---cofactors)
       - [Boron-containing compounds](#simulations-with-boron-containing-compounds)
       - [Ligand Binding Metalloprotein with MCPB.py](#simulations-of-ligand-binding-metalloprotein-with-mcpbpy)
+    - [Replicas of the same complex](#replicas-of-the-same-complex)
     - [Multiple servers](#simulations-using-multiple-servers)
-    - [Continue the interrupted simulations](#continue-the-interrupted-simulations) 
+    - [Continue the interrupted simulations](#continue-the-interrupted-simulations)
     - [Extend the simulation](#extend-the-simulation)
     - [GPU usage](#gpu-usage)
       - [Single GPU](#run-using-single-gpu)
@@ -78,6 +79,7 @@ pip install git+https://github.com/ci-lab-cz/streamd.git
 
 ## Features:  
 - Run of multiple simultaneous molecular dynamics simulations
+- Launch multiple replicas of the same system in a single command
 - Simulation for different systems:  
     - Protein in Water;  
     - Protein - Ligand;  
@@ -261,6 +263,15 @@ run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000 --ncpu 1
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --ncpu 128 
 ```
 
+
+StreaMD can run multiple simulations for a set of ligands (bound to the same protein).
+> [!Note] 
+> All ligands should have valid, aligned to the protein 3D coordinates.
+```
+run_md -p protein_H_HIS.pdb -l ligands.sdf 
+```
+
+
 ##### Protein - Cofactors
 All molecules should present in simulated system, so any problem with preparation of cofactors will interrupt the program. 
 ```
@@ -272,6 +283,7 @@ run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 1 --ncpu 128
 ```
 run_md --config config.yml 
 ```
+> Arguments passed via CLI take precedence over config.yml   
 [Read More](#configuration-file)
 
 ##### **Simulations with boron-containing compounds**  
@@ -290,7 +302,21 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 1 --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128 --metal_resnames ZN
 
 ```
-[Return to the Table Of Contents](#table-of-contents)<br>  
+[Return to the Table Of Contents](#table-of-contents)<br>
+
+#### **Replicas of the same complex**
+Run several independent simulations of one prepared system by specifying the `--replicas` option.
+The system complex is prepared once (`md_files/md_preparation/system`) and copied for each replica into directories such as `md_files/md_run/<complex>_replicaN`.
+Replica seeds increment from the value passed via `--seed`; if `--seed -1` (default) is provided, all replicas keep `-1`.
+
+If a replica directory already exists, StreaMD reuses any files already present, printing a warning for reused files.
+Running a later command with a higher `--replicas` count adds only the new replicas—for example, after completing two replicas you may rerun with `--replicas 3` to produce `replica3` while `replica1` and `replica2` are left intact.
+
+```
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --replicas 3 --seed 1024
+```
+
+[Return to the Table Of Contents](#table-of-contents)<br>
 
 #### **Simulations using multiple servers**
 ```
@@ -318,9 +344,9 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 2
 ```
 or use explicit `--tpr`, `--cpt` and `--xtc` arguments to continue a non-StreaMD simulation
 ```
-run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/  --md_time 3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc
+run_md --wdir mdrun  --md_time 3 --tpr protein_H_HIS_ligand_1/md_out.tpr --cpt protein_H_HIS_ligand_1/md_out.cpt --xtc protein_H_HIS_ligand_1/md_out.xtc --ligand_list_file protein_H_HIS_ligand_1/all_ligand_resid.txt
 ```
-in case you don't want to check/run all preparation steps with using non-StreaMD simulations you can use `--steps` argument 
+in case you don't want to check/run all preparation steps for your directory you can use `--steps` argument 
 ```
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1/ --md_time 3 --steps 3 4
 ```
@@ -445,7 +471,15 @@ cofactor_2/
 ```
 
 ```
-md_files/md_run/protein_H_HIS_ligand_1/
+md_files/md_preparation/systems/:
+protein_H_HIS_ligand_1.itp  complex.gro  ions.tpr   minim.mdp   nvt.mdp                     solv.gro                         topol.top
+all.itp                     index.ndx    md.mdp     newbox.gro  posre_protein_ligand_1.itp  solv_ions.gro
+all_ligand_resid.txt        ions.mdp     mdout.mdp  npt.mdp     posre.itp                   streamd_bash_protein_HIS_ligand_1_date.log
+
+```
+
+```
+md_files/md_run/protein_H_HIS_ligand_1_replica1/
 ligand_1.itp          em.trr       ions.tpr    md_out.edr         md_out.tpr             npt.cpt   npt.tpr  nvt.log    
 cofactor_1.itp        em.edr       frame.pdb   md_out.gro         md_out.xtc             npt.edr   npt.trr  nvt.mdp  topol.top
 all.itp               em.gro       md_fit.xtc  md_out.log         md_short_forcheck.xtc  npt.gro   nvt.cpt  nvt.tpr    
@@ -469,8 +503,8 @@ gyrate_protein_HIS_ligand_1.{csv, png, xtc} - radius of gyration
 ```
 md_fit.xtc - MD trajectory with removed PBC and fitted into Protein or Protein-Ligand group
 md_short_forcheck.xtc - short trajectory to check if simulation was valid
-frame.pdb - a frame for topology
-
+frame.pdb - a starting frame for the topology (the 11th frame - 0.1 ns)
+last_frame.pdb - a last frame of the trajectory
 ```
 
 [Return to the Table Of Contents](#table-of-contents)  

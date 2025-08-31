@@ -4,6 +4,7 @@ import logging
 from glob import glob
 import os
 import shutil
+# ruff: noqa: E402
 #, TemporaryDirectory
 
 import sys
@@ -62,10 +63,30 @@ _stub_if_missing(
 
 # Other optional libraries
 _stub_if_missing("dask")
+class _DummyClient:
+    def __init__(self, *a, **k):
+        pass
+
+    def forward_logging(self, *a, **k):
+        pass
+
+    def retire_workers(self, *a, **k):
+        pass
+
+    def shutdown(self):
+        pass
+
+    def scheduler_info(self):
+        return {'workers': {}}
+
+    def run(self, *a, **k):
+        pass
+
+
 _stub_if_missing(
     "dask.distributed",
     {
-        "Client": type("Client", (), {}),
+        "Client": _DummyClient,
         "SSHCluster": type("SSHCluster", (), {}),
     },
 )
@@ -77,9 +98,31 @@ _stub_if_missing("plotly", {"__path__": []})
 _stub_if_missing("plotly.offline")
 _stub_if_missing("plotly.express")
 
-_stub_if_missing("parmed")
+_stub_if_missing("parmed", {"Structure": type("Structure", (), {})})
+
+Mol = type(
+    "Mol",
+    (),
+    {
+        "__init__": lambda self: setattr(self, "props", {}),
+        "HasProp": lambda self, name: name in self.props,
+        "GetProp": lambda self, name: self.props.get(name, ""),
+        "SetProp": lambda self, name, value: self.props.__setitem__(name, value),
+    },
+)
+
 _stub_if_missing("rdkit")
-_stub_if_missing("rdkit.Chem")
+_stub_if_missing(
+    "rdkit.Chem",
+    {
+        "Mol": Mol,
+        "MolFromMolFile": lambda *a, **k: Mol(),
+        "SanitizeMol": lambda *a, **k: None,
+        "SDMolSupplier": lambda *a, **k: [],
+        "PropertyPickleOptions": type("PropertyPickleOptions", (), {"AllProps": 0}),
+        "SetDefaultPickleProperties": lambda *a, **k: None,
+    },
+)
 _stub_if_missing("rdkit.Chem.rdmolops")
 
 _stub_if_missing("pandas", {"DataFrame": type("DataFrame", (), {})})
