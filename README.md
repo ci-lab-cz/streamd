@@ -471,7 +471,7 @@ cofactor_2/
 ```
 
 ```
-md_files/md_run/protein_H_HIS_ligand_1/
+md_files/md_run/protein_H_HIS_ligand_1_replica1/
 ligand_1.itp          em.trr       ions.tpr    md_out.edr         md_out.tpr             npt.cpt   npt.tpr  nvt.log    
 cofactor_1.itp        em.edr       frame.pdb   md_out.gro         md_out.xtc             npt.edr   npt.trr  nvt.mdp  topol.top
 all.itp               em.gro       md_fit.xtc  md_out.log         md_short_forcheck.xtc  npt.gro   nvt.cpt  nvt.tpr    
@@ -495,8 +495,8 @@ gyrate_protein_HIS_ligand_1.{csv, png, xtc} - radius of gyration
 ```
 md_fit.xtc - MD trajectory with removed PBC and fitted into Protein or Protein-Ligand group
 md_short_forcheck.xtc - short trajectory to check if simulation was valid
-frame.pdb - a frame for topology
-
+frame.pdb - a starting frame for the topology (the 11th frame - 0.1 ns)
+last_frame.pdb - a last frame of the trajectory
 ```
 
 [Return to the Table Of Contents](#table-of-contents)  

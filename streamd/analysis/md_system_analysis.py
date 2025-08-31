@@ -237,9 +237,9 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, system_name=system_name, transform_nm_to_A=True)
 
-    create_last_frame_file(wdir=wdir_out_analysis,
+    create_last_frame_file(wdir=wdir,
                            tpr=tpr, xtc=xtc,
-                           out_file=os.path.join(wdir_out_analysis, 'last_frame.pdb'),
+                           out_file=os.path.join(wdir, 'last_frame.pdb'),
                            bash_log=bash_log, env=env)
 
     return rmsd_out_file, wdir_out_analysis, wdir
