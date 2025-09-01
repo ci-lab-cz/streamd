@@ -313,7 +313,7 @@ If a replica directory already exists, StreaMD reuses any files already present,
 Running a later command with a higher `--replicas` count adds only the new replicas—for example, after completing two replicas you may rerun with `--replicas 3` to produce `replica3` while `replica1` and `replica2` are left intact.
 
 ```
-run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --replicas 3 --seed 1024
+run_md -p protein_H_HIS.pdb -l ligands.sdf --md_time 1 --replicas 3 --seed 1024
 ```
 
 [Return to the Table Of Contents](#table-of-contents)<br>
