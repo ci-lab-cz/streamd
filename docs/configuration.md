@@ -18,4 +18,4 @@ run_md --config config.yml --ncpu 32
 
 Notes:
 - Use CLI flags to override specific settings.
-- Combine with `--steps` to skip preparation or analysis when continuing an existing run (see {doc}`running_md`).
+- Combine with `--steps` to skip preparation or rerun analysis when continuing an existing run (see {doc}`running_md`).

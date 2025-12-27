@@ -12,7 +12,6 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
   --activate_gaussian "module load Gaussian/09-d01" --gaussian_exe g09 --ncpu 128
 ```
 
-
 ## MCPB.py for Metalloproteins
 - Also requires Gaussian. MCPB.py runs when metal residue names and Gaussian options are provided; otherwise StreaMD falls back to standard `gmx2pdb`.
 - Key flags: `--metal_resnames`, `--metal_cutoff`, `--metal_charges` plus Gaussian flags above.
@@ -28,7 +27,7 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 run_md -p protein.pdb -l ligand.mol --mdp_dir custom_mdp/ --md_time 5
 ```
 
-## Step Control
+## StreaMD Step Control
 - `--steps` runs selected pipeline stages when continuing existing runs (`1` preparation, `2` equilibration, `3` production, `4` analysis).
 ```bash
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 --md_time 3 --steps 3 4

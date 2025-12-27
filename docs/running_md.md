@@ -135,7 +135,8 @@ MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and B
 
 ## Standard Workflows
 
-### Protein in Water (use all available CPUs, by default)
+### Protein in Water 
+use all available CPUs, by default
 ```bash
 run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000
 ```
@@ -158,7 +159,7 @@ All cofactor molecules must be present in a simulated system; if any cofactor pr
 run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 1
 ```
 
-## Configuration File
+### Configuration File
 Arguments passed via CLI take precedence over `config.yml`.
 ```bash
 run_md --config config.yml
