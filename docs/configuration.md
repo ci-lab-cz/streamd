@@ -1,4 +1,4 @@
-# Configuration
+# Configuration file
 
 `run_md`, `run_prolif`, and `run_gbsa` accept a `--config` option that supplies default arguments from a YAML file. Command-line arguments override YAML values.
 
