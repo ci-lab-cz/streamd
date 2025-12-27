@@ -165,7 +165,7 @@ Arguments passed via CLI take precedence over `config.yml`.
 ```bash
 run_md --config config.yml
 ```
-See {doc}`configuration file` for details.
+See {doc}`configuration` for details.
 
 ## Replicas
 Run several independent simulations of one prepared system with `--replicas`. The system is prepared once and copied for each replica under `md_files/md_run/<complex>_replicaN`. Replica seeds increment from the value passed via `--seed`; if `--seed -1` (default) is provided, all replicas keep `-1`.
