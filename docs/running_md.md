@@ -158,18 +158,12 @@ All cofactor molecules must be present in a simulated system; if any cofactor pr
 run_md -p protein_H_HIS.pdb --cofactor cofactors.sdf --md_time 1
 ```
 
-### Using a Configuration File
+## Configuration File
 Arguments passed via CLI take precedence over `config.yml`.
 ```bash
 run_md --config config.yml
 ```
 See `configuration.md` for details.
-
-### Boron-Containing Molecules (Gaussian)
-See {doc}`advanced_features` for Gaussian setup, options, and an example command.
-
-### Ligand-Binding Metalloproteins with MCPB.py
-See {doc}`advanced_features` for MCPB.py requirements and command examples.
 
 ## Replicas
 Run several independent simulations of one prepared system with `--replicas`. The system is prepared once and copied for each replica under `md_files/md_run/<complex>_replicaN`. Replica seeds increment from the value passed via `--seed`; if `--seed -1` (default) is provided, all replicas keep `-1`.
@@ -267,6 +261,12 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device auto --gpu_ids 0
 
 ## Custom MDP Files and Step Control
 See {doc}`advanced_features` for custom `.mdp` usage, step selection, trajectory size options, and other advanced flags.
+
+## Boron-Containing Molecules (Gaussian)
+See {doc}`advanced_features` for Gaussian setup, options, and an example command.
+
+## Ligand-Binding Metalloproteins with MCPB.py
+See {doc}`advanced_features` for MCPB.py requirements and command examples.
 
 ## Additional Analysis Tools
 - Binding free energies: see {doc}`mm_pbsa`

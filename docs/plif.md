@@ -55,7 +55,7 @@ run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --ligand GTP
 ```
 
 ## Effective Parallel Processing
-Two knobs control parallelism:
+To control parallelism:
 1) `--ncpu`: maximum number of cores available (defaults to all CPUs).
 2) `--n_jobs`: number of processes per trajectory. StreaMD distributes `--ncpu` across trajectories and `--n_jobs`. By default, `--n_jobs` is capped (12) to avoid the ProLIF bottleneck; override explicitly if needed.
 
