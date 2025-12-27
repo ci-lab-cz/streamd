@@ -3,7 +3,8 @@
 
 `run_rmsd_analysis` identifies converged trajectory segments by comparing RMSD means and standard deviations for ligand, protein, and active site residues (5 Angstrom default). The same analysis runs automatically as part of `run_md` step 4 from {doc}`running_md`.
 
-## Usage (`run_rmsd_analysis -h`)
+## Usage   
+`run_rmsd_analysis -h`
 ```
 usage: run_rmsd_analysis [-h] [-i FILENAME [FILENAME ...]] [--rmsd_type backbone [backbone ...]] [--time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]] [-d dirname]
                        [--paint_by PAINT_BY] [-o OUT_SUFFIX] [--title RMSD Mean vs RMSD Std]
