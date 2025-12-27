@@ -1,4 +1,5 @@
-# Trajectory Convergence Analysis (`run_rmsd_analysis`)
+# Trajectory Convergence Analysis     
+`run_rmsd_analysis`
 
 `run_rmsd_analysis` identifies converged trajectory segments by comparing RMSD means and standard deviations for ligand, protein, and active site residues (5 Angstrom default). The same analysis runs automatically as part of `run_md` step 4 from {doc}`running_md`.
 

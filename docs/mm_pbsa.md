@@ -1,8 +1,10 @@
-# MM-PBSA/MM-GBSA (`run_gbsa`)
+# MM-PBSA/MM-GBSA    
+`run_gbsa`
 
-StreaMD wraps gmx_MMPBSA to compute binding free energies from trajectories.
+StreaMD wraps [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/) to compute binding free energies from trajectories.
 
-## Usage (`run_gbsa -h`)
+## Usage    
+`run_gbsa -h`
 ```
 run_gbsa -h
 usage: run_gbsa [-h] [-i DIRNAME [DIRNAME ...]] [--topol topol.top] [--tpr md_out.tpr] [--xtc md_fit.xtc] [--index index.ndx] [-m mmpbsa.in] [-d WDIR]
