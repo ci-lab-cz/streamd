@@ -38,24 +38,24 @@ pip install streamd
 pip install git+https://github.com/ci-lab-cz/streamd.git
 
 ```
-
+   
+Minimal protein-ligand run (1 ns)
 ```
-# Minimal protein-ligand run (1 ns)
 run_md -p protein.pdb -l ligand.mol --md_time 1
 ```
-
+   
+Protein - multiple ligands multiple replicas runs (1 ns)
 ```
-# Protein - multiple ligands multiple replicas runs (1 ns)
 run_md -p protein.pdb -l ligands.sdf --md_time 1 --replicas 3 --seed 1024
 ```
-
+  
+Extend successfully finished simulations
 ```
-# Extend succesfully finished simulations
 run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 10
 ```
-
+    
+GPU-accelerated simulations
 ```
-# GPU-accelerated simulations
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --ncpu 32
 ```
 
