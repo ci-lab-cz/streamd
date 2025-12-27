@@ -5,7 +5,7 @@ Set up StreaMD with the provided conda environments and install the Python packa
 ## Requirements
 - Conda (or Mamba) to create the supplied environments
 - GPU-enabled machines should use `env_gpu.yml`; CPU-only machines should use `env.yml`
-- Access to GROMACS/Gaussian if you plan to run GPU or Gaussian-dependent workflows
+- Access to Gaussian if you plan to run Gaussian-dependent workflows
 
 ## Install
 ```bash
@@ -29,3 +29,5 @@ run_gbsa -h
 run_prolif -h
 ```
 If the commands print their help text, your installation is ready.
+
+Next steps: see {doc}`data_preparation` for input prep and {doc}`running_md` for running simulations.
