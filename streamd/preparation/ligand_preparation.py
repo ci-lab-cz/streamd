@@ -158,8 +158,8 @@ def prepare_gaussian_files(file_template, file_out, ncpu, opt_restart=False, gau
         output.write(new_data)
 
 
-def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand, no_dr,
-                conda_env_path, bash_log, gaussian_exe=None,
+def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
+                conda_env_path, bash_log, gaussian_exe=None,  no_dr=False,
                 activate_gaussian=None, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB', ncpu=1,
                 mol2_file=None, env=None):
     """Prepare force-field parameters and conformers for a single ligand."""
@@ -267,12 +267,12 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
 
     if ligand_fname.endswith('.mol2'):
         mol_tuple = next(supply_mols_tuple(ligand_fname, preset_resid=preset_resid, protein_resid_set=protein_resid_set))
-        res = prep_ligand(mol_tuple=mol_tuple,
-                          script_path=script_path, project_dir=project_dir,
-                          wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"],
-                          gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
-                          gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                          ncpu=ncpu, bash_log=bash_log, mol2_file=ligand_fname)
+        res = prep_ligand(mol_tuple=mol_tuple, script_path=script_path,
+            project_dir=project_dir, wdir_ligand=wdir_ligand,
+            conda_env_path=os.environ["CONDA_PREFIX"],
+            ncpu = ncpu, mol2_file = ligand_fname,
+            bash_log=bash_log, env = os.environ.copy())
+
         if res:
             lig_wdirs.append(res)
 
@@ -299,7 +299,7 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
                                          wdir_ligand=wdir_ligand, conda_env_path=os.environ["CONDA_PREFIX"],
                                          gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                          gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                                         ncpu=ncpu, bash_log=bash_log,
+                                         ncpu=ncpu, bash_log=bash_log, no_dr=no_dr,
                                          env=os.environ.copy()):
                         if res:
                             lig_wdirs.append(res)
