@@ -4,21 +4,24 @@ StreaMD runs preparation, equilibration, production, continuation, and analysis.
 
 ## Quick Start Examples
 
-### CPU: Protein in Water (end-to-end)
+### CPU: Protein in Water (end-to-end) with Continuation
 ```bash
 run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000
 
-# Extend to 2 ns using the same working directory
-run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand1_replica1 --md_time 2
 ```
 Outputs: see {doc}`outputs` for the `md_files/` structure with `md_preparation/` and `md_run/<system>/` plus `md_analysis/` summaries.
 
-### GPU: Protein-Ligand with Continuation
+```bash
+# Extend to 2 ns using the same working directory
+run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand1_replica1 --md_time 2
+```
+Outputs: `md_files/md_run/protein_H_HIS_ligand1_replica1/` contains GROMACS outputs and `md_analysis/`; see {doc}`outputs` for file details.
+
+### GPU: Protein-Ligand
 ```bash
 # 1 ns run on a GPU
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --device gpu
 ```
-Outputs: `md_files/md_run/protein_H_HIS_ligand1_replica1/` contains GROMACS outputs and `md_analysis/`; see {doc}`outputs` for file details.
 
 ## Command-Line Reference (`run_md -h`)
 ```
