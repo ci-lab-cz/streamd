@@ -135,7 +135,8 @@ MCPBPY usage (Use together with Standard Molecular Dynamics Simulation Run and B
 
 ## Standard Workflows
 
-### Protein in Water 
+### Protein in Water  
+
 use all available CPUs, by default
 ```bash
 run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000
@@ -144,7 +145,7 @@ run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000
 ### Protein-Ligand
 ```bash
 # Single ligand
-run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --ncpu 128
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --ncpu 32
 ```
 
 StreaMD can run multiple simulations for a set of ligands bound to the same protein. All ligands should have valid, aligned 3D coordinates.
