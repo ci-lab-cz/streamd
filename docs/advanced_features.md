@@ -39,5 +39,6 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 --md_time 3 --s
 - `--deffnm` sets a custom prefix for continuing/extending runs.
 
 ## Parallelism and GPUs
-- Combine `--device`, `--gpu_ids`, `--ntmpi_per_gpu`, and `--mdrun_per_node` to balance CPU/GPU use; see examples in {doc}`running_md`.
-- Distributed runs use `--hostfile` for Dask clusters (PBS/SLURM examples in {doc}`running_md`).
+- Combine `--device`, `--gpu_ids`, `--ntmpi_per_gpu`, and `--mdrun_per_node` to balance CPU/GPU use; see examples in {doc}`running_md`. 
+- Set the `--ncpu` option to limit CPU usage; by default, StreaMD uses all available CPU cores.
+- Distributed runs use `--hostfile` for Dask servers (PBS/SLURM examples in {doc}`running_md`).
