@@ -46,7 +46,7 @@ run_md -p protein.pdb -l ligand.mol --md_time 1
 
 ```
 # Protein - multiple ligands multiple replicas runs (1 ns)
-run_md -p protein.pdb -l ligand.sdf --md_time 1 --replicas 3 --seed 1024
+run_md -p protein.pdb -l ligands.sdf --md_time 1 --replicas 3 --seed 1024
 ```
 
 ```
@@ -59,7 +59,7 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 10
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --ncpu 32
 ```
 
-More examples can be found in the (documentation)[https://streamd.readthedocs.io/]
+More examples can be found in the [documentation](https://streamd.readthedocs.io/)
 
 
 ## Documentation

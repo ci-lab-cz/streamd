@@ -15,7 +15,7 @@ Outputs: see {doc}`outputs` for the `md_files/` structure with `md_preparation/`
 
 ### GPU: Protein-Ligand with Continuation
 ```bash
-# Initial 1 ns run on a GPU
+# 1 ns run on a GPU
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --device gpu
 ```
 Outputs: `md_files/md_run/protein_H_HIS_ligand1_replica1/` contains GROMACS outputs and `md_analysis/`; see {doc}`outputs` for file details.
