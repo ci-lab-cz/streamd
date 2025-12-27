@@ -17,7 +17,6 @@ plif
 trajectory_convergence
 configuration
 logging
-api
 changelog
 license
 citation
