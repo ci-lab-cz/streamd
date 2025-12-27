@@ -83,7 +83,8 @@ complex.gro           em.tpr       ions.mdp    md_out.cpt         newbox.gro    
 all_ligand_resid.txt  em.log       md_fit.xtc  md_out.xtc         mdout.mdp              minim.mdp npt.tpr  posre.itp solv_ions.gro
 ```
 
-## Analysis Outputs (`md_analysis/`)
+## Analysis Outputs   
+`md_analysis/`
 - `potential_*.{csv,png,xtc}`: potential energy from energy minimization (gmx energy)
 - `temperature_*.{csv,png,xtc}`: system temperature during NVT
 - `density_*.{csv,png,xtc}`: total density during NPT
@@ -94,7 +95,8 @@ all_ligand_resid.txt  em.log       md_fit.xtc  md_out.xtc         mdout.mdp     
 
 See {doc}`mm_pbsa` for MM-PBSA/MM-GBSA outputs, {doc}`plif` for interaction fingerprints, and {doc}`trajectory_convergence` for RMSD convergence analysis.
 
-## MD Outputs (`md_run/<system>/`)
+## MD Outputs    
+`md_run/<system>/`
 - `md_fit.xtc`: PBC-removed, protein- or protein-ligand-fitted trajectory
 - `md_short_forcheck.xtc`: short trajectory for sanity checks
 - `frame.pdb`: starting frame (0.1 ns)
