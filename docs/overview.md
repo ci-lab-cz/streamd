@@ -10,26 +10,8 @@ StreaMD is a toolkit to run high-throughput molecular dynamics simulations end-t
 - Multiple replicas in a single command
 - Restartable: extend or continue interrupted runs safely
 - Built-in analysis (RMSD, RMSF, radius of gyration) plus MM/PB(GB)SA and ProLIF utilities
-- GPU support and custom `.mdp` files
-
-## Features
-- Multiple simultaneous simulations
-- Launch multiple replicas of the same system through a single command
-- Simulation for different systems:  
-    - Protein in Water;  
-    - Protein - Ligand;  
-    - Protein - Cofactor (multiple);  
-    - Protein - Ligand - Cofactor (multiple);
-
-- Support for custom `.mdp` files
-- Boron-containing molecule support through Gaussian
-- MCPB.py workflow for ligand-binding metalloproteins
-- Distributed computing with Dask and multi-server support
-- Extend or continue MD simulations and preparation stages
-- End-state free energy (gmx_MMPBSA) and ProLIF interaction analysis
-- Interactive trajectory convergence analysis
-- GPU support with control over GPUs and thread-MPI ranks
-
+- Custom `.mdp` files
+- GPU support
     
 ## Next Steps
 - Set up the environment: see {doc}`installation`
