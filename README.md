@@ -1,8 +1,8 @@
 ![StreaMD Logo](./streamd_logo.png)
-# StreaMD: high-throughput molecular dynamics toolkit
+# StreaMD:  a tool to perform high-throughput automated molecular dynamics simulations
 
-StreaMD automates preparation, equilibration, production, continuation, and analysis for protein-only and protein-ligand/cofactor systems, with GPU support and built-in MM/PB(GB)SA and ProLIF analysis.
-
+StreaMD provides an end-to-end molecular dynamics workflow that takes a PDB structure as input and automatically performs system preparation, equilibration, production and continuation runs, and analysis,
+producing XTC trajectories together with ready-to-use plots and CSV outputs.
 
 ## Features:  
 - Run multiple simultaneous molecular dynamics simulations
