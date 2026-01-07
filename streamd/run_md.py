@@ -117,14 +117,19 @@ def run_simulation(wdir, project_dir, bash_log, mdtime_ns,
     :return: Tuple with working directory and ``deffnm`` or ``None`` on failure.
     """
     # continue/extend simulation if checkpoint files exist
-    if (tpr is not None and os.path.isfile(tpr) and cpt is not None and os.path.isfile(cpt) and xtc is not None and os.path.isfile(str(xtc))) or \
+    if ((tpr is not None and os.path.isfile(tpr)) and (cpt is not None) and (os.path.isfile(cpt) and xtc is not None) and (os.path.isfile(str(xtc))) ) or \
         (os.path.isfile(os.path.join(wdir, f'{deffnm}.tpr')) and os.path.isfile(os.path.join(wdir, f'{deffnm}.cpt'))
          and os.path.isfile(os.path.join(wdir, f'{deffnm}.xtc'))) :
         logging.warning(f'{wdir}. {deffnm}.xtc and {deffnm}.tpr and  {deffnm}.cpt exist. '
                         f'MD simulation will be continued until the setup simulation steps are reached.')
 
         if not os.path.isfile(os.path.join(wdir, f'{deffnm}.gro')):
+            if tpr is None:
+                tpr = os.path.join(wdir, f'{deffnm}.tpr')
+            if xtc is None:
+                xtc = os.path.join(wdir, f'{deffnm}.xtc')
             logging.warning(f'Create {os.path.join(wdir, f"{deffnm}.gro")}')
+            logging.warning(f'Use previously created files: {wdir} {tpr} {xtc}')
             create_last_frame_file(wdir=wdir, tpr=tpr, xtc=xtc,
                                    out_file=os.path.join(wdir, f'{deffnm}.gro'),
                                    bash_log=bash_log, env=env)
