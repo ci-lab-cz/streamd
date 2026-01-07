@@ -15,4 +15,4 @@ gmx make_ndx -f $molid.gro -o index.ndx << INPUT
 2 & ! a H*
 q
 INPUT
-gmx genrestr -f $molid.gro -o posre_$molid.itp -n index.ndx -fc 1000 1000 1000 <<< 3 || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }
+printf '%s\n' "3" | gmx genrestr -f $molid.gro -o posre_$molid.itp -n index.ndx -fc 1000 1000 1000 || { echo "Failed to run command  at line ${LINENO} in ${BASH_SOURCE}" && exit 1; }

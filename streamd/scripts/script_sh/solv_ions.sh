@@ -15,4 +15,4 @@ gmx grompp -f ions.mdp -c solv.gro -p topol.top -o ions.tpr   || { echo "Failed 
 #-maxwarn 10
 #FATAL error SDMSO type not found -> try renaming to SDmso
 
-gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname NA -nname CL -neutral <<< SOL  || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
+printf '%s\n' "SOL" | gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname NA -nname CL -neutral || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
