@@ -284,7 +284,9 @@ def create_posre(all_resids, wdir, bash_log, env):
             return None
         index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
 
-    cmd = (f'cd {wdir}; gmx genrestr -f solv_ions.gro -o posre.itp -fc 1000 1000 1000 -n index.ndx <<< {index_list.index(couple_group)}')
+    selection_index = index_list.index(couple_group)
+    cmd = (f"cd {wdir}; printf '%s\\n' \"{selection_index}\" | "
+           "gmx genrestr -f solv_ions.gro -o posre.itp -fc 1000 1000 1000 -n index.ndx")
 
     if not run_check_subprocess(cmd, wdir, log=bash_log, env=env):
         return None
@@ -298,6 +300,5 @@ def add_restraints_to_topol(topol):
 #endif'''
     if not check_if_info_already_added_to_topol(topol, string):
         edit_topology_file(topol_file=topol, pattern='\n[ moleculetype ]', add=string, count_pattern=2)
-
 
 

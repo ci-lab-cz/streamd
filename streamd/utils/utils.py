@@ -289,7 +289,7 @@ def create_last_frame_file(wdir, tpr, xtc, out_file, bash_log, env):
     current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
     cmd = f'''
     cd {wdir}
-    gmx trjconv -s {tpr} -f {xtc} -o {out_file} -dump {current_number_of_frames} >> {os.path.join(wdir, bash_log)} 2>&1 <<< System
+    printf '%s\n' "System" | gmx trjconv -s {tpr} -f {xtc} -o {out_file} -dump {current_number_of_frames} >> {os.path.join(wdir, bash_log)} 2>&1
         '''
     run_check_subprocess(cmd, key=out_file, log=os.path.join(wdir, bash_log), env=env)
 
