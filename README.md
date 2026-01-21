@@ -67,7 +67,7 @@ This functionality is based on the [gmx_MMPBSA tool](https://valdes-tresanco-ms.
 
 **ProLIF (Protein-Ligand Interaction Fingerprints) Analysis**
 ```
-run_gbsa --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 -c 128 -m mmpbsa.in
+run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 -c 128 -s 5
 ```
 This functionality is based on the [ProLIF tool](https://github.com/chemosim-lab/ProLIF)
 
