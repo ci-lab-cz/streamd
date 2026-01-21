@@ -1,4 +1,4 @@
-# MM-PBSA/MM-GBSA    
+# MM-PBSA/MM-GBSA calculations
 `run_gbsa`
 
 StreaMD wraps [gmx_MMPBSA tool](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev/) to compute binding free energies from trajectories.
