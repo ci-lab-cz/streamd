@@ -59,6 +59,19 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 10
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --ncpu 32
 ```
 
+**MM-PBSA/MM-GBSA calculation support**
+```
+run_gbsa --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 -c 128 -m mmpbsa.in
+```
+This functionality is based on the [gmx_MMPBSA tool](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/dev)
+
+**ProLIF (Protein-Ligand Interaction Fingerprints) Analysis**
+```
+run_gbsa --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 -c 128 -m mmpbsa.in
+```
+This functionality is based on the [ProLIF tool](https://github.com/chemosim-lab/ProLIF)
+
+
 More examples can be found in the [documentation](https://streamd.readthedocs.io/)
 
 
