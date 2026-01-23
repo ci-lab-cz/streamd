@@ -101,7 +101,7 @@ wget -O streamd_cpu.sif https://zenodo.org/records/18176058/files/streamd_cpu.si
 ```
 wget -O streamd_gpu.sif https://zenodo.org/records/18176058/files/streamd_gpu.sif
 ```
-Run apptainer:
+Run apptainer:   
 **CPU:** `apptainer run --cleanenv streamd_cpu.sif run_md --help`  
 **GPU:** `apptainer run --nv --cleanenv streamd_gpu.sif run_md --help`
 
