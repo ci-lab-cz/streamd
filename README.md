@@ -93,17 +93,18 @@ MIT
 
 ## Ready-to-use containers (Apptainer)
 Pre-built `.sif` images are available (CPU and GPU) in the [Zenodo record](https://zenodo.org/records/18176058)  
-**CPU:** `apptainer run --cleanenv streamd_cpu.sif run_md --help`  
-**GPU:** `apptainer run --nv --cleanenv streamd_gpu.sif run_md --help`
-
-CPU image
+- CPU image
 ```
 wget -O streamd_cpu.sif https://zenodo.org/records/18176058/files/streamd_cpu.sif
 ```
-GPU image
+- GPU image
 ```
 wget -O streamd_gpu.sif https://zenodo.org/records/18176058/files/streamd_gpu.sif
 ```
+Run apptainer:
+**CPU:** `apptainer run --cleanenv streamd_cpu.sif run_md --help`  
+**GPU:** `apptainer run --nv --cleanenv streamd_gpu.sif run_md --help`
+
 The provided `.sif` images are intended for Apptainer on Linux/HPC systems.
 GPU usage requires an NVIDIA GPU node and launching with `--nv` and `run_md --device gpu`.
 
