@@ -27,10 +27,9 @@ producing XTC trajectories together with ready-to-use plots and CSV outputs.
 
 
 ## Quick start
-Download conda environment yaml file (choose CPU-only or GPU):  
+Download the Conda environment YAML file (CPU-only or GPU):  
 - CPU-only
 ```bash
-# download  
 wget -O env.yml https://raw.githubusercontent.com/ci-lab-cz/streamd/refs/heads/master/env.yml
 ```
 - GPU
