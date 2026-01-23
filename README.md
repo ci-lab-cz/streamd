@@ -27,6 +27,17 @@ producing XTC trajectories together with ready-to-use plots and CSV outputs.
 
 
 ## Quick start
+Download conda environment yaml file (choose CPU-only or GPU):  
+- CPU-only
+```bash
+# download  
+wget -O env.yml https://raw.githubusercontent.com/ci-lab-cz/streamd/refs/heads/master/env.yml
+```
+- GPU
+```bash
+wget -O env_gpu.yml https://raw.githubusercontent.com/ci-lab-cz/streamd/refs/heads/master/env_gpu.yml
+```
+
 ```bash
 # Create environment (choose CPU-only or GPU)
 conda env create --file env.yml -n md          # or env_gpu.yml on GPU-capable hosts
@@ -86,6 +97,14 @@ Pre-built `.sif` images are available (CPU and GPU) in the [Zenodo record](https
 **CPU:** `apptainer run --cleanenv streamd_cpu.sif run_md --help`  
 **GPU:** `apptainer run --nv --cleanenv streamd_gpu.sif run_md --help`
 
+CPU image
+```
+wget -O streamd_cpu.sif https://zenodo.org/records/18176058/files/streamd_cpu.sif
+```
+GPU image
+```
+wget -O streamd_gpu.sif https://zenodo.org/records/18176058/files/streamd_gpu.sif
+```
 The provided `.sif` images are intended for Apptainer on Linux/HPC systems.
 GPU usage requires an NVIDIA GPU node and launching with `--nv` and `run_md --device gpu`.
 
