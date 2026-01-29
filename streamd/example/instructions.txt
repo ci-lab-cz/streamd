@@ -1,5 +1,6 @@
 conda activate md
-
+# Toy example: run 10 ps NVT and NPT equilibration and 10 ps product simulation
+# For real simulation use at least 1ns --md_time 1 --nvt_time 1000 --npt_time 1000
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 0.01 --nvt_time 10 --npt_time 10 --ncpu 8 -d mdrun
 run_gbsa -i mdrun/md_files/md_run/protein_HIS_1ke7_LS3_replica1/
 run_prolif -i mdrun/md_files/md_run/protein_HIS_1ke7_LS3_replica1/ -s 1
