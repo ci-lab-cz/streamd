@@ -27,6 +27,13 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 run_md -p protein.pdb -l ligand.mol --mdp_dir custom_mdp/ --md_time 5
 ```
 
+### Custom Force Field
+Use any force field for pdb2gmx run available under your GROMACS installation (e.g., `Miniconda3/envs/md/share/gromacs/top`).
+```bash
+run_md -p protein_H_HIS.pdb --md_time 1 --protein_forcefield your_ff_name
+```
+The value passed to the `--protein_forcefield` option must match the directory name of the desired `.ff` package without the `.ff` extension.
+
 ## StreaMD Step Control
 - `--steps` runs selected pipeline stages when continuing existing runs (`1` preparation, `2` equilibration, `3` production, `4` analysis).
 ```bash
