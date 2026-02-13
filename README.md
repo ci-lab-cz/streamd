@@ -74,6 +74,12 @@ run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --ncpu 32
 run_md -p protein.pdb -l ligand.mol --md_time 1 --box_type dodecahedron --box_padding_nm 1.2
 ```
 
+**Use a specific force field**
+```bash
+run_md -p protein.pdb --md_time 1 --protein_forcefield amber99sb-ildn
+```
+Pass the `--protein_forcefield` value that matches the directory name of the desired pdb2gmx `.ff` bundle in your GROMACS installation.
+
 **MM-PBSA/MM-GBSA calculation support**
 ```
 run_gbsa --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 -c 128 -m mmpbsa.in

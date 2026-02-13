@@ -151,6 +151,13 @@ run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 \
   --box_type dodecahedron --box_padding_nm 1.2
 ```
 
+### Custom Force Field
+Use any pdb2gmx force field available under your GROMACS installation (e.g., `Miniconda3/envs/md/share/gromacs/top`).
+```bash
+run_md -p protein_H_HIS.pdb --md_time 1 --protein_forcefield charmm36-mar2019
+```
+The value passed to `--protein_forcefield` must match the directory name of the desired `.ff` bundle without a trailing slash.
+
 ### Protein-Ligand
 ```bash
 # Single ligand
