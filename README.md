@@ -69,6 +69,11 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_*/ --md_time 10
 run_md -p protein_HIS.pdb -l ligand.mol --md_time 1 --device gpu --ncpu 32
 ```
 
+**Change simulation box**
+```bash
+run_md -p protein.pdb -l ligand.mol --md_time 1 --box_type dodecahedron --box_padding_nm 1.2
+```
+
 **MM-PBSA/MM-GBSA calculation support**
 ```
 run_gbsa --wdir_to_run md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run/protein_H_HIS_ligand_2 -c 128 -m mmpbsa.in

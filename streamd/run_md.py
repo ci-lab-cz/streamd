@@ -331,7 +331,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           seed, steps, hostfile, ncpu, mdrun_per_node, compute_device, gpu_ids, ntmpi_per_gpu, clean_previous,
           not_clean_backup_files, unique_id, replicas=1,
           active_site_dist=5.0, save_traj_without_water=False,
-          explicit_args=(), mdp_dir=None, bash_log=None):
+          explicit_args=(), mdp_dir=None, bash_log=None,
+          box_type='cubic', box_padding_nm=1.0):
     """Run StreaMD pipeline.
 
     :param protein: Protein file in PDB or GRO format.
@@ -378,6 +379,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param not_clean_backup_files: Keep backup files instead of removing.
     :param active_site_dist: Distance threshold in Å for active-site analysis.
     :param save_traj_without_water: Whether to output trajectories without water.
+    :param box_type: Simulation box type passed to ``gmx editconf -bt``.
+    :param box_padding_nm: Minimum solute-to-box edge distance in nm passed to ``gmx editconf -d``.
     :return: ``None``.
     """
     project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -546,6 +549,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
                     logging.info('MCPBPY procedure: Finish MCPBPY preparation')
                 else:
+                    logging.info(
+                        f'Simulation box: box_type={box_type}, box_padding_nm={box_padding_nm}')
                     dask_client, cluster = init_dask_cluster(hostfile=hostfile,
                                                              n_tasks_per_node=min(ncpu, len(var_lig_wdirs)),
                                                              use_multi_servers=True if len(var_lig_wdirs) > ncpu else False,
@@ -556,6 +561,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          clean_previous=clean_previous, wdir_md=prep_root,
                                          script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
                                          npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps,
+                                         box_type=box_type, box_padding_nm=box_padding_nm,
                                          mdp_dir=mdp_dir, explicit_args=explicit_args,
                                          bash_log=bash_log, seed=seed, env=os.environ.copy()):
                         if res:
@@ -805,6 +811,11 @@ def main():
                         help='Time of NPT equilibration in ps. Default: 1000 ps.')
     parser1.add_argument('--nvt_time', metavar='ps', required=False, default=1000, type=int,
                         help='Time of NVT equilibration in ps. Default: 1000 ps.')
+    parser1.add_argument('--box_type', metavar='BOX TYPE', required=False, default='cubic', type=str,
+                        choices=['triclinic', 'cubic', 'dodecahedron', 'octahedron'],
+                        help='simulation box type (triclinic, cubic, dodecahedron, octahedron) defined using gmx editconf -bt. Default: cubic')
+    parser1.add_argument('--box_padding_nm', metavar='nm', required=False, default=1.0, type=float,
+                        help='minimum solute-to-box edge distance defined using gmx editconf -d. Default: 1 nm = 10 A')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
     parser1.add_argument('--replicas', metavar='INTEGER', required=False, default=1,
@@ -949,6 +960,11 @@ def main():
                         f'The tool will use only {ncpu} CPUs.')
 
     try:
+        if args.box_padding_nm <= 0:
+            raise ValueError(
+                f'--box_padding_nm should be greater than 0, got {args.box_padding_nm}'
+            )
+
         start(protein=args.protein,
               lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh, no_dr=args.no_dr,
               topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
@@ -967,6 +983,8 @@ def main():
               save_traj_without_water=args.save_traj_without_water,
               mdp_dir=args.mdp_dir,
               explicit_args=explicit_args,
-              bash_log=bash_log)
+              bash_log=bash_log,
+              box_type=args.box_type,
+              box_padding_nm=args.box_padding_nm)
     finally:
         logging.shutdown()
