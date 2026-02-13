@@ -1,4 +1,5 @@
-![StreaMD Logo](./streamd_logo.png)
+<img src="./streamd_logo.png" alt="StreaMD Logo" width="220" height="220">
+
 # StreaMD:  a tool to perform high-throughput automated molecular dynamics simulations
 
 StreaMD provides an end-to-end molecular dynamics workflow that takes a PDB structure as input and automatically performs system preparation, equilibration, production and continuation runs, and analysis,
