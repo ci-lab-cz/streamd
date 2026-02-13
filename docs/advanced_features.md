@@ -27,7 +27,7 @@ run_md -p protein_H_HIS.pdb -l molecules.sdf --cofactor cofactors.sdf --md_time 
 run_md -p protein.pdb -l ligand.mol --mdp_dir custom_mdp/ --md_time 5
 ```
 
-### Custom Force Field
+## Custom Force Field
 Use any force field for pdb2gmx run available under your GROMACS installation (e.g., `Miniconda3/envs/md/share/gromacs/top`).
 ```bash
 run_md -p protein_H_HIS.pdb --md_time 1 --protein_forcefield your_ff_name
