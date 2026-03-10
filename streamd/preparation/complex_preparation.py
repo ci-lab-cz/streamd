@@ -36,7 +36,8 @@ def run_complex_preparation(wdir_var_ligand, wdir_system_ligand_list,
                             protein_name, wdir_protein, wdir_md, script_path, project_dir,
                             mdtime_ns, npt_time_ps, nvt_time_ps, clean_previous, seed, bash_log,
                             mdp_dir=None, explicit_args=(), box_type='cubic',
-                            box_padding_nm=1.0, env=None):
+                            box_padding_nm=1.0, salt_concentration=None,
+                            pname='NA', nname='CL', env=None):
     """Prepare all input files for MD by combining protein and ligand data."""
     wdir_md_cur, md_files_dict = prep_md_files(wdir_var_ligand=wdir_var_ligand, protein_name=protein_name,
                                                wdir_system_ligand_list=wdir_system_ligand_list,
@@ -95,7 +96,9 @@ def run_complex_preparation(wdir_var_ligand, wdir_system_ligand_list,
     #         shutil.copy(mdp_file, wdir_md_cur)
 
     if not os.path.isfile(os.path.join(wdir_md_cur, 'solv_ions.gro')):
+        salt_env = f'salt_concentration={salt_concentration} ' if salt_concentration is not None else ''
         cmd = (f'wdir={wdir_md_cur} box_type={box_type} box_padding_nm={box_padding_nm} '
+               f'pname={pname} nname={nname} {salt_env}'
                f'bash {os.path.join(project_dir, "scripts/script_sh/solv_ions.sh")} '
                f'>> {os.path.join(wdir_md_cur, bash_log)} 2>&1')
         if not run_check_subprocess(cmd=cmd, key=wdir_md_cur, log=os.path.join(wdir_md_cur, bash_log), env=env):

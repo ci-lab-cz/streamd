@@ -12,6 +12,16 @@ if [[ -z "$box_padding_nm" ]]; then
     exit 1
 fi
 
+if [[ -z "$pname" ]]; then
+    echo "Missing required variable: pname"
+    exit 1
+fi
+
+if [[ -z "$nname" ]]; then
+    echo "Missing required variable: nname"
+    exit 1
+fi
+
 >&2 echo 'Script running:***************************** Solvation step *********************************'
 cd $wdir
 gmx editconf -f complex.gro -o newbox.gro -c -d "$box_padding_nm" -bt "$box_type" || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
@@ -25,4 +35,8 @@ gmx grompp -f ions.mdp -c solv.gro -p topol.top -o ions.tpr   || { echo "Failed 
 #-maxwarn 10
 #FATAL error SDMSO type not found -> try renaming to SDmso
 
-printf '%s\n' "SOL" | gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname NA -nname CL -neutral || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
+genion_cmd="gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname \"$pname\" -nname \"$nname\" -neutral"
+if [[ -n "$salt_concentration" ]]; then
+    genion_cmd="$genion_cmd -conc $salt_concentration"
+fi
+printf '%s\n' "SOL" | eval $genion_cmd || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }

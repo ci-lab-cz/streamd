@@ -10,6 +10,9 @@ steps: 3 4
 md_time: 2
 box_type: cubic
 box_padding_nm: 1
+salt_concentration: 0.15
+ion_pname: NA
+ion_nname: CL
 seed: 1024
 ```
 

@@ -31,7 +31,7 @@ usage: run_md [-h] [--config FILENAME] [-p FILENAME] [-d WDIR] [-l FILENAME] [--
               [--mdrun_per_node INTEGER] [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
               [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--box_type BOX TYPE] [--box_padding_nm nm]
-              [--seed int] [--replicas INTEGER] [--no_dr]
+              [--salt_concentration mol/L] [--ion_pname ION] [--ion_nname ION] [--seed int] [--replicas INTEGER] [--no_dr]
               [--not_clean_backup_files] [--steps [STEPS ...]] [--mdp_dir Path to a directory with specific MDP files] [--save_traj_without_water]
               [--wdir_to_continue DIRNAME [DIRNAME ...]] [-o OUT_SUFFIX] [--deffnm prefix for MD files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
               [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL] [--activate_gaussian module load Gaussian/09-d01]
@@ -82,6 +82,10 @@ Standard Molecular Dynamics Simulation Run:
   --nvt_time ps         Time of NVT equilibration in ps. Default: 1000 ps.
   --box_type BOX TYPE   Simulation box type (triclinic, cubic, dodecahedron, octahedron) defined using gmx editconf -bt. Default: cubic
   --box_padding_nm nm   Minimum solute-to-box edge distance defined using gmx editconf -d. Default: 1 nm = 10 A.
+  --salt_concentration mol/L
+                        Salt concentration in mol/L passed to gmx genion -conc. If not specified, only charge neutralization is performed (gmx genion -neutral).
+  --ion_pname ION       Positive ion name passed to gmx genion -pname. Default: NA.
+  --ion_nname ION       Negative ion name passed to gmx genion -nname. Default: CL.
   --seed int            Random seed.
   --replicas INTEGER    Number of replicate simulations to run per complex
   --no_dr               Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt if the regular antechamber run for
@@ -149,6 +153,19 @@ run_md -p protein_H_HIS.pdb --md_time 1 --nvt_time 1000 --npt_time 1000
 ```bash
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 \
   --box_type dodecahedron --box_padding_nm 1.2
+```
+
+### Custom Salt Concentration and Ion Types
+By default, only charge neutralization is performed (equivalent to `gmx genion -neutral`).
+To add a physiological salt concentration:
+```bash
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 \
+  --salt_concentration 0.15
+```
+To use non-default ion types (e.g., potassium chloride):
+```bash
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 \
+  --salt_concentration 0.15 --ion_pname K --ion_nname CL
 ```
 
 ### Specific Force Field choice

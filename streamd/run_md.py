@@ -332,7 +332,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           not_clean_backup_files, unique_id, replicas=1,
           active_site_dist=5.0, save_traj_without_water=False,
           explicit_args=(), mdp_dir=None, bash_log=None,
-          box_type='cubic', box_padding_nm=1.0):
+          box_type='cubic', box_padding_nm=1.0,
+          salt_concentration=None, ion_pname='NA', ion_nname='CL'):
     """Run StreaMD pipeline.
 
     :param protein: Protein file in PDB or GRO format.
@@ -381,6 +382,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param save_traj_without_water: Whether to output trajectories without water.
     :param box_type: Simulation box type passed to ``gmx editconf -bt``.
     :param box_padding_nm: Minimum solute-to-box edge distance in nm passed to ``gmx editconf -d``.
+    :param salt_concentration: Salt concentration in mol/L passed to ``gmx genion -conc``. Default: 0.15.
+    :param ion_pname: Positive ion name passed to ``gmx genion -pname``. Default: NA.
+    :param ion_nname: Negative ion name passed to ``gmx genion -nname``. Default: CL.
     :return: ``None``.
     """
     project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -549,8 +553,11 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
                     logging.info('MCPBPY procedure: Finish MCPBPY preparation')
                 else:
+                    salt_conc_str = f'{salt_concentration} mol/L' if salt_concentration is not None else 'not set (neutralization only)'
                     logging.info(
                         f'Simulation box: box_type={box_type}, box_padding_nm={box_padding_nm}')
+                    logging.info(
+                        f'Ions: pname={ion_pname}, nname={ion_nname}, salt_concentration={salt_conc_str}')
                     dask_client, cluster = init_dask_cluster(hostfile=hostfile,
                                                              n_tasks_per_node=min(ncpu, len(var_lig_wdirs)),
                                                              use_multi_servers=True if len(var_lig_wdirs) > ncpu else False,
@@ -562,6 +569,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                          script_path=script_mdp_path, project_dir=project_dir, mdtime_ns=mdtime_ns,
                                          npt_time_ps=npt_time_ps, nvt_time_ps=nvt_time_ps,
                                          box_type=box_type, box_padding_nm=box_padding_nm,
+                                         salt_concentration=salt_concentration,
+                                         pname=ion_pname, nname=ion_nname,
                                          mdp_dir=mdp_dir, explicit_args=explicit_args,
                                          bash_log=bash_log, seed=seed, env=os.environ.copy()):
                         if res:
@@ -816,6 +825,12 @@ def main():
                         help='simulation box type (triclinic, cubic, dodecahedron, octahedron) defined using gmx editconf -bt. Default: cubic')
     parser1.add_argument('--box_padding_nm', metavar='nm', required=False, default=1.0, type=float,
                         help='minimum solute-to-box edge distance defined using gmx editconf -d. Default: 1 nm = 10 A')
+    parser1.add_argument('--salt_concentration', metavar='mol/L', required=False, default=None, type=float,
+                        help='salt concentration in mol/L passed to gmx genion -conc. If not specified, -conc is not used and only charge neutralization is performed.')
+    parser1.add_argument('--ion_pname', metavar='ION', required=False, default='NA', type=str,
+                        help='positive ion name passed to gmx genion -pname. Default: NA')
+    parser1.add_argument('--ion_nname', metavar='ION', required=False, default='CL', type=str,
+                        help='negative ion name passed to gmx genion -nname. Default: CL')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
     parser1.add_argument('--replicas', metavar='INTEGER', required=False, default=1,
@@ -964,6 +979,10 @@ def main():
             raise ValueError(
                 f'--box_padding_nm should be greater than 0, got {args.box_padding_nm}'
             )
+        if args.salt_concentration is not None and args.salt_concentration < 0:
+            raise ValueError(
+                f'--salt_concentration should be >= 0, got {args.salt_concentration}'
+            )
 
         start(protein=args.protein,
               lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh, no_dr=args.no_dr,
@@ -985,6 +1004,9 @@ def main():
               explicit_args=explicit_args,
               bash_log=bash_log,
               box_type=args.box_type,
-              box_padding_nm=args.box_padding_nm)
+              box_padding_nm=args.box_padding_nm,
+              salt_concentration=args.salt_concentration,
+              ion_pname=args.ion_pname,
+              ion_nname=args.ion_nname)
     finally:
         logging.shutdown()
