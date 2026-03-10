@@ -1,3 +1,8 @@
+**0.5.1 (Future release)**
+- add argument `salt_concentration` - salt concentration in mol/L passed to `gmx genion -conc` (default: not set, only charge neutralization is performed)
+- add argument `ion_pname` - positive ion name passed to `gmx genion -pname` (default `NA`)
+- add argument `ion_nname` - negative ion name passed to `gmx genion -nname` (default `CL`)
+
 **0.5**
 - add argument `box_type` - simulation box type (`triclinic`, `cubic`, `dodecahedron`, `octahedron`) (default `cubic`) defined using `gmx editconf -bt`
 - add argument `box_padding_nm` - minimum solute-to-box edge distance (default `1 nm = 10 A`) defined using `gmx editconf -d`
