@@ -100,9 +100,6 @@ More examples can be found in the [documentation](https://streamd.readthedocs.io
 ## Documentation
 https://streamd.readthedocs.io/
 
-## License
-MIT
-
 ## Ready-to-use containers (Apptainer)
 Pre-built `.sif` images are available (CPU and GPU) in the [Zenodo record](https://zenodo.org/records/18176058)  
 - CPU image
@@ -119,6 +116,9 @@ Run apptainer:
 
 The provided `.sif` images are intended for Apptainer on Linux/HPC systems.
 GPU usage requires an NVIDIA GPU node and launching with `--nv` and `run_md --device gpu`.
+
+## License
+MIT
 
 ## Citation
 Ivanova A, Mokshyna O, Polishchuk P.  
