@@ -1,4 +1,4 @@
-# Data Preparation
+# Input Preparation
 
 Before running MD, ensure the system is correctly prepared to avoid failures during topology generation or simulation.
 

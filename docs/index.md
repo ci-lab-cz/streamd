@@ -8,7 +8,7 @@ StreaMD is a toolkit for high-throughput molecular dynamics simulations that aut
 
 overview
 installation
-data_preparation
+input_preparation
 running_md
 advanced_features
 outputs

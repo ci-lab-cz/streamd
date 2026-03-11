@@ -15,6 +15,6 @@ StreaMD is a toolkit to run high-throughput molecular dynamics simulations end-t
     
 ## Next Steps
 - Set up the environment: see {doc}`installation`
-- Prepare inputs: see {doc}`data_preparation`
+- Prepare inputs: see {doc}`input_preparation`
 - Run simulations: see {doc}`running_md`
 - Explore outputs and analysis: see {doc}`outputs`, {doc}`mm_pbsa`, {doc}`plif`, and {doc}`trajectory_convergence`

@@ -30,4 +30,4 @@ run_prolif -h
 ```
 If the commands print their help text, your installation is ready.
 
-Next steps: see {doc}`data_preparation` for input prep and {doc}`running_md` for running simulations.
+Next steps: see {doc}`input_preparation` for input prep and {doc}`running_md` for running simulations.
