@@ -2,6 +2,7 @@
 - add argument `salt_concentration` - salt concentration in mol/L passed to `gmx genion -conc` (default: not set, only charge neutralization is performed)
 - add argument `ion_pname` - positive ion name passed to `gmx genion -pname` (default `NA`)
 - add argument `ion_nname` - negative ion name passed to `gmx genion -nname` (default `CL`)
+- add argument `water_model` - water model passed to `gmx pdb2gmx -water` (default `tip3p`)
 
 **0.5**
 - add argument `box_type` - simulation box type (`triclinic`, `cubic`, `dodecahedron`, `octahedron`) (default `cubic`) defined using `gmx editconf -bt`

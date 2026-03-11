@@ -13,6 +13,7 @@ box_padding_nm: 1
 salt_concentration: 0.15
 ion_pname: NA
 ion_nname: CL
+water_model: tip3p
 seed: 1024
 ```
 

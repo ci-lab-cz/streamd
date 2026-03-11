@@ -31,7 +31,7 @@ usage: run_md [-h] [--config FILENAME] [-p FILENAME] [-d WDIR] [-l FILENAME] [--
               [--mdrun_per_node INTEGER] [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
               [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--box_type BOX TYPE] [--box_padding_nm nm]
-              [--salt_concentration mol/L] [--ion_pname ION] [--ion_nname ION] [--seed int] [--replicas INTEGER] [--no_dr]
+              [--salt_concentration mol/L] [--ion_pname ION] [--ion_nname ION] [--water_model WATER] [--seed int] [--replicas INTEGER] [--no_dr]
               [--not_clean_backup_files] [--steps [STEPS ...]] [--mdp_dir Path to a directory with specific MDP files] [--save_traj_without_water]
               [--wdir_to_continue DIRNAME [DIRNAME ...]] [-o OUT_SUFFIX] [--deffnm prefix for MD files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
               [--ligand_list_file all_ligand_resid.txt] [--ligand_id UNL] [--activate_gaussian module load Gaussian/09-d01]
@@ -86,6 +86,7 @@ Standard Molecular Dynamics Simulation Run:
                         Salt concentration in mol/L passed to gmx genion -conc. If not specified, only charge neutralization is performed (gmx genion -neutral).
   --ion_pname ION       Positive ion name passed to gmx genion -pname. Default: NA.
   --ion_nname ION       Negative ion name passed to gmx genion -nname. Default: CL.
+  --water_model WATER   Water model passed to gmx pdb2gmx -water. Default: tip3p.
   --seed int            Random seed.
   --replicas INTEGER    Number of replicate simulations to run per complex
   --no_dr               Turn off the acdoctor mode and do not check/diagnose problems in the input ligand file in the next attempt if the regular antechamber run for
@@ -167,6 +168,13 @@ To use non-default ion types (e.g., potassium chloride):
 run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 \
   --salt_concentration 0.15 --ion_pname K --ion_nname CL
 ```
+
+### Custom Water Model
+By default, StreaMD uses the `tip3p` water model for protein preparation. To use a different water model:
+```bash
+run_md -p protein_H_HIS.pdb --md_time 1 --water_model tip4p
+```
+The value must be a water model name recognised by your GROMACS force field (e.g., `tip3p`, `tip4p`, `spc`, `spce`). To check available water models run ```gmx pdb2gmx -h```. 
 
 ### Specific Force Field choice
 Use pdb2gmx force field available under your GROMACS installation (e.g., `Miniconda3/envs/md/share/gromacs/top`).

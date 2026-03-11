@@ -333,7 +333,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           active_site_dist=5.0, save_traj_without_water=False,
           explicit_args=(), mdp_dir=None, bash_log=None,
           box_type='cubic', box_padding_nm=1.0,
-          salt_concentration=None, ion_pname='NA', ion_nname='CL'):
+          salt_concentration=None, ion_pname='NA', ion_nname='CL',
+          water_model='tip3p'):
     """Run StreaMD pipeline.
 
     :param protein: Protein file in PDB or GRO format.
@@ -385,6 +386,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param salt_concentration: Salt concentration in mol/L passed to ``gmx genion -conc``. Default: 0.15.
     :param ion_pname: Positive ion name passed to ``gmx genion -pname``. Default: NA.
     :param ion_nname: Negative ion name passed to ``gmx genion -nname``. Default: CL.
+    :param water_model: Water model passed to ``gmx pdb2gmx -water``. Default: tip3p.
     :return: ``None``.
     """
     project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -448,7 +450,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                         os.path.join(wdir_protein, "topol.top")):
                     if p_ext != '.gro' or topol is None or posre_list_protein is None:
                         logging.info('Start protein preparation')
-                        cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water tip3p {"-ignh" if not noignh else "-noignh"} ' \
+                        logging.info(
+                            f'Water model: {water_model}')
+
+                        cmd = f'gmx pdb2gmx -f {protein} -o {os.path.join(wdir_protein, pname)}.gro -water {water_model} {"-ignh" if not noignh else "-noignh"} ' \
                               f'-i {os.path.join(wdir_protein, "posre.itp")} ' \
                               f'-p {os.path.join(wdir_protein, "topol.top")} -ff {forcefield_name} >> {os.path.join(wdir_protein, bash_log)} 2>&1'
                         if not run_check_subprocess(cmd, protein, log=os.path.join(wdir_protein, bash_log), env=os.environ.copy()):
@@ -831,6 +836,8 @@ def main():
                         help='positive ion name passed to gmx genion -pname. Default: NA')
     parser1.add_argument('--ion_nname', metavar='ION', required=False, default='CL', type=str,
                         help='negative ion name passed to gmx genion -nname. Default: CL')
+    parser1.add_argument('--water_model', metavar='WATER', required=False, default='tip3p', type=str,
+                        help='water model passed to gmx pdb2gmx -water. Default: tip3p')
     parser1.add_argument('--seed', metavar='int', required=False, default=-1, type=int,
                         help='seed')
     parser1.add_argument('--replicas', metavar='INTEGER', required=False, default=1,
@@ -1007,6 +1014,7 @@ def main():
               box_padding_nm=args.box_padding_nm,
               salt_concentration=args.salt_concentration,
               ion_pname=args.ion_pname,
-              ion_nname=args.ion_nname)
+              ion_nname=args.ion_nname,
+              water_model=args.water_model)
     finally:
         logging.shutdown()

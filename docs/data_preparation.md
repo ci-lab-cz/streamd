@@ -3,7 +3,7 @@
 Before running MD, ensure the system is correctly prepared to avoid failures during topology generation or simulation.
 
 ## Hydrogen Handling and Protonation
-StreaMD re-adds hydrogens by default using `gmx pdb2gmx -water tip3p -ignh`. This ignores original hydrogens and recreates them based on residue names.
+StreaMD re-adds hydrogens by default using `gmx pdb2gmx -ignh`. This ignores original hydrogens and recreates them based on residue names.
 
 > CAUTION: Rename residues to match correct protonation states (CYS->CYX, HIS->HID/HIE/HIP) before running. If you prefer to keep existing hydrogens, pass `--noignh`, but you must resolve any atom name recognition issues yourself or provide prepared `protein.gro`, `topol.top`, and `posre.itp`.
 
