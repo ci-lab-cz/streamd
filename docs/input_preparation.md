@@ -20,7 +20,7 @@ StreaMD re-adds hydrogens by default using `gmx pdb2gmx -ignh`. This ignores ori
   setattr r type HIP :HID@HE2,DE2,TE2
   setattr r type HIE :HIS@HE2
   ```
-- Optional tooling: Chimera (Modeller loop/refinement, Dock Prep) or pdb4amber.
+- Optional tooling: Chimera (Modeller loop/refinement, Dock Prep), pdbfixer or pdb4amber.
 
 Prepared examples and scripts: https://github.com/ci-lab-cz/docking-files
 
