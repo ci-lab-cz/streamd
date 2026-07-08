@@ -29,12 +29,12 @@ def convertplifbyframe2png(plif_out_file, output=None, plot_width=15, plot_heigh
 
     occupancy_df = subdf.groupby('variable').apply(lambda x: round(x['value'].sum() / len(x), 1))
     contact_list_within_occupancy = occupancy_df[occupancy_df >= occupancy].index.to_list()
-    subdf_occupancy = subdf.loc[(subdf['variable'].isin(contact_list_within_occupancy)) & (subdf['value']), :]
+    subdf_occupancy = subdf.loc[(subdf['variable'].isin(contact_list_within_occupancy)) & (subdf['value']), :].copy()
 #    subdf = subdf[subdf['value']]
     if filter_only_hydrophobic:
         not_only_H_residue_mask = subdf_occupancy.groupby('residue').apply(lambda x: True if x['interaction'].unique().tolist() != ['hydrophobic'] else False)
         not_only_H_residue_list = not_only_H_residue_mask[not_only_H_residue_mask].index
-        subdf_occupancy = subdf_occupancy.loc[subdf_occupancy['residue'].isin(not_only_H_residue_list),:]
+        subdf_occupancy = subdf_occupancy.loc[subdf_occupancy['residue'].isin(not_only_H_residue_list), :].copy()
 
     subdf_occupancy.loc[:,'Time, ns'] = subdf_occupancy.loc[:, 'Frame'].apply(lambda x: x/100)
 
@@ -56,7 +56,7 @@ def convertplifbyframe2png(plif_out_file, output=None, plot_width=15, plot_heigh
           )+
         # scale_x_continuous(breaks = range(min(subdf_occupancy['Frame']),
         #                max(subdf_occupancy['Frame']), 1000))
-            facet_grid('residue', scales = 'free_y')+
+            facet_grid('residue ~ .', scales = 'free_y')+
         labs(y='', title='', x= '\nTime, ns')+ scale_color_manual(values = label_colors, na_value="white"))
 
     if output is None:

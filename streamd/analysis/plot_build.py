@@ -10,9 +10,11 @@ import plotly.express as px
 # figure size in inches
 #rcParams['figure.figsize'] = 15,10
 
-#sns.set_theme(rc={'figure.figsize':(11.7,8.27)})
-sns.set_context("paper", rc={"font.size":15,"axes.titlesize":15,"axes.labelsize":15},
-                font_scale=1.5)
+rcParams.update({
+    "font.size": 22.5,
+    "axes.titlesize": 22.5,
+    "axes.labelsize": 22.5,
+})
 
 plt.ioff()
 

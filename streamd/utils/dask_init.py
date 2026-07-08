@@ -71,8 +71,8 @@ def calc_dask(func, main_arg, dask_client, dask_report_fname=None, **kwargs):
         if dask_client is not None:
             from dask.distributed import as_completed, performance_report
             # https://stackoverflow.com/a/12168252/895544 - optional context manager
-            from contextlib import contextmanager
-            none_context = contextmanager(lambda: iter([None]))()
+            from contextlib import nullcontext
+            none_context = nullcontext()
             with (performance_report(filename=dask_report_fname) if dask_report_fname is not None else none_context):
                 nworkers = len(dask_client.scheduler_info()['workers'])
                 futures = []
