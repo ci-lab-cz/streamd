@@ -154,8 +154,7 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     # but working_directories are different
     # important for paint_by file where all system columns should be presented and used
     if 'directory' in rmsd_merged_data.columns:
-        max_num_unique_dirs = rmsd_merged_data.groupby(system_cols).apply(
-            lambda x: len(x['directory'].unique()), include_groups=False).reset_index(drop=True).max()
+        max_num_unique_dirs = rmsd_merged_data.groupby(system_cols)['directory'].nunique().max()
         if max_num_unique_dirs > 1:
             system_cols.append('directory')
 
@@ -276,8 +275,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
 
 
 

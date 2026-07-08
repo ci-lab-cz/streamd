@@ -212,7 +212,7 @@ def get_number_of_frames(xtc, env):
     """
     res = subprocess.run(f'gmx check -f {xtc}', shell=True, capture_output=True, env=env)
 
-    res_parsed = re.findall('Step\s*(\d*)\s*(\d*)\n', res.stderr.decode("utf-8"))
+    res_parsed = re.findall(r'Step\s*(\d*)\s*(\d*)\n', res.stderr.decode("utf-8"))
     if res_parsed:
         frames, timestep = res_parsed[0]
         # starts with 0
