@@ -51,6 +51,23 @@ def _parse_system_name(system: str) -> tuple[str, int]:
     return system, 1
 
 
+def _load_universe_with_gro_fallback(topology, trajectory):
+    try:
+        return mda.Universe(topology, trajectory, in_memory=False, in_memory_step=1)
+    except ValueError as exc:
+        error_message = str(exc)
+        gro = f'{os.path.splitext(topology)[0]}.gro'
+        if (
+            os.path.splitext(topology)[1] != '.tpr'
+            or 'tpx version' not in error_message
+            or 'does not support' not in error_message
+            or not os.path.isfile(gro)
+        ):
+            raise
+        logging.warning('Cannot parse %s with MDAnalysis; using %s as topology instead', topology, gro)
+        return mda.Universe(gro, trajectory, in_memory=False, in_memory_step=1)
+
+
 def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                      molid_resid_pairs,
                      ligand_resid="UNL", active_site_dist=5.0):
@@ -59,7 +76,7 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
     Parameters
     ----------
     tpr : str | os.PathLike
-        Path to the topology ``.tpr`` file of the simulation.
+        Path to the MDAnalysis topology file of the simulation.
     xtc : str | os.PathLike
         Path to the trajectory ``.xtc`` file.
     wdir_out_analysis : str | os.PathLike
@@ -80,7 +97,7 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
     """
     # groupselections = ['protein']
     rmsd_out_file = os.path.join(wdir_out_analysis, f'rmsd_{system_name}.csv')
-    universe = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
+    universe = _load_universe_with_gro_fallback(tpr, xtc)
     groupselections = []
     molid_resid_pairs = dict(molid_resid_pairs)
     ligand_name = None
@@ -231,8 +248,13 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
                      molid_resid_pairs=molid_resid_pairs,
                      active_site_dist=active_site_dist)
     if not save_traj_without_water:
-        os.remove(os.path.join(wdir, 'md_out_nowater.tpr'))
-        os.remove(os.path.join(wdir, 'md_fit_nowater.xtc'))
+        for path in [
+            os.path.join(wdir, 'md_out_nowater.tpr'),
+            os.path.join(wdir, 'md_out_nowater.gro'),
+            os.path.join(wdir, 'md_fit_nowater.xtc'),
+        ]:
+            if os.path.isfile(path):
+                os.remove(path)
 
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, system_name=system_name, transform_nm_to_A=True)

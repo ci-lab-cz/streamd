@@ -11,6 +11,7 @@ printf '%s\n%s\n' "$index_group" "System" | gmx trjconv -s $tpr -f $deffnm\_noj_
 printf '%s\n%s\n' "$index_group" "System" | gmx trjconv -s $tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit.xtc -n index.ndx || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 
 printf '%s\n%s\n' "$index_group" "non-Water" | gmx trjconv -s $tpr -f md_centermolsnoPBC.xtc -fit rot+trans -o md_fit_nowater.xtc -n index.ndx || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
+printf '%s\n%s\n' "$index_group" "non-Water" | gmx trjconv -s $tpr -f md_centermolsnoPBC.xtc -fit rot+trans -dump 0 -o md_out_nowater.gro -n index.ndx || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 printf '%s\n' "non-Water" | gmx convert-tpr -s $tpr -o  md_out_nowater.tpr
 
 printf '%s\n' "System" | gmx trjconv -s $tpr -f md_fit.xtc -dt $dtstep -o md_short_forcheck.xtc || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
