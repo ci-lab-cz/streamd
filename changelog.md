@@ -3,6 +3,7 @@
 - add argument `ion_pname` - positive ion name passed to `gmx genion -pname` (default `NA`)
 - add argument `ion_nname` - negative ion name passed to `gmx genion -nname` (default `CL`)
 - add argument `water_model` - water model passed to `gmx pdb2gmx -water` (default `tip3p`)
+- update GROMACS to 2025.2 and MDAnalysis to 2.10.0 to support GROMACS 2026 TPR files (TPR version 138)
 
 **0.5**
 - add argument `box_type` - simulation box type (`triclinic`, `cubic`, `dodecahedron`, `octahedron`) (default `cubic`) defined using `gmx editconf -bt`
