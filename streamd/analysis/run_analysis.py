@@ -14,6 +14,7 @@ from streamd.utils.utils import filepath_type
 
 
 def _parse_system_name(system: str) -> tuple[str, int]:
+    """Split an RMSD system name into base protein name and replica id."""
     match = re.match(r"(.*)_replica(\d+)$", system)
     if match:
         return match.group(1), int(match.group(2))
@@ -21,10 +22,23 @@ def _parse_system_name(system: str) -> tuple[str, int]:
 
 
 def _ensure_replica_cols(df: pd.DataFrame) -> pd.DataFrame:
-    if 'protein_name' not in df.columns or 'replica' not in df.columns:
-        protein_name, replica = _parse_system_name(str(df['system'].iloc[0]))
-        df.loc[:, 'protein_name'] = protein_name
-        df.loc[:, 'replica'] = replica
+    """Ensure RMSD data has protein_name and replica columns without overwriting values."""
+    if 'system' not in df.columns:
+        raise ValueError("RMSD input is missing the required 'system' column")
+
+    parsed = df['system'].astype(str).map(_parse_system_name)
+    parsed_names = parsed.map(lambda value: value[0])
+    parsed_replicas = parsed.map(lambda value: value[1])
+    if 'protein_name' not in df.columns:
+        df.loc[:, 'protein_name'] = parsed_names
+    else:
+        missing = df['protein_name'].isna()
+        df.loc[missing, 'protein_name'] = parsed_names[missing]
+    if 'replica' not in df.columns:
+        df.loc[:, 'replica'] = parsed_replicas
+    else:
+        missing = df['replica'].isna()
+        df.loc[missing, 'replica'] = parsed_replicas[missing]
     return df
 
 
