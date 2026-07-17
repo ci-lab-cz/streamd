@@ -278,7 +278,16 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
                 show_legend = False
             else:
                 paint_by_data = make_lower_case(paint_by_data, cols=merge_cols)
-                paint_by_col = [i for i in paint_by_data.columns if i not in merge_cols][0]
+                paint_by_candidates = [
+                    column for column in paint_by_data.columns
+                    if column not in merge_cols
+                ]
+                if not paint_by_candidates:
+                    raise ValueError(
+                        f"{paint_by_fname} does not contain a paint-by value "
+                        f"column. Add one column other than: {', '.join(merge_cols)}"
+                    )
+                paint_by_col = paint_by_candidates[0]
                 df_mean_std = pd.merge(df_mean_std, paint_by_data.loc[:,
                                                     merge_cols+[paint_by_col]], on=merge_cols)
                 show_legend = True
