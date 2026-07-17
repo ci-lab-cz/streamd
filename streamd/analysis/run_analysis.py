@@ -27,6 +27,58 @@ def _ensure_replica_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _resolve_rmsd_columns(rmsd_files, rmsd_type_list):
+    """Validate base columns and return the requested metrics that are usable.
+
+    The base columns ``time(ns)``, ``system`` and ``ligand_name`` are structurally
+    required and must be present in every input file. Requested RMSD metrics are
+    handled leniently so a single incomplete system cannot abort an entire batch:
+    a metric missing from *some* files is kept (those systems contribute empty
+    values) with a warning, a metric missing from *all* files is dropped with a
+    warning, and a ``ValueError`` is raised only when no requested metric survives.
+    """
+    if not rmsd_files:
+        raise ValueError("At least one RMSD input file is required")
+
+    if not rmsd_type_list:
+        raise ValueError("At least one RMSD metric must be requested")
+
+    required_base_columns = {'time(ns)', 'system', 'ligand_name'}
+    per_file_columns = {}
+    for rmsd_file in rmsd_files:
+        columns = set(pd.read_csv(rmsd_file, sep='\t', nrows=0).columns)
+        per_file_columns[rmsd_file] = columns
+        missing_base = sorted(required_base_columns - columns)
+        if missing_base:
+            raise ValueError(
+                f"{rmsd_file} is missing required base column(s): {', '.join(missing_base)}"
+            )
+
+    all_columns = set().union(*per_file_columns.values())
+    usable_metrics = []
+    for metric in rmsd_type_list:
+        if metric not in all_columns:
+            logging.warning(
+                "Skipping RMSD metric '%s': it is not present in any input file.", metric)
+            continue
+        files_without_metric = sorted(
+            rmsd_file for rmsd_file, columns in per_file_columns.items()
+            if metric not in columns)
+        if files_without_metric:
+            logging.warning(
+                "RMSD metric '%s' is missing from %d input file(s); the affected "
+                "systems will have empty '%s' values: %s",
+                metric, len(files_without_metric), metric, ', '.join(files_without_metric))
+        usable_metrics.append(metric)
+
+    if not usable_metrics:
+        raise ValueError(
+            "None of the requested RMSD metrics "
+            f"({', '.join(rmsd_type_list)}) are present in the input file(s)"
+        )
+    return usable_metrics
+
+
 def merge_rmsd_csv(csv_files, out):
     """Concatenate multiple RMSD CSV files into one DataFrame.
 
@@ -141,6 +193,8 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     None
         The function writes output files to ``wdir`` and returns ``None``.
     """
+    rmsd_type_list = _resolve_rmsd_columns(rmsd_files, rmsd_type_list)
+
     if len(rmsd_files) > 1:
         rmsd_merged_data = merge_rmsd_csv(rmsd_files, os.path.join(wdir, f'rmsd_all_systems_{unique_id}.csv'))
     else:
@@ -223,23 +277,29 @@ def main():
     None
     """
     parser = argparse.ArgumentParser(description='''Run rmsd analysis for StreaMD output files''')
-    parser.add_argument('-i', '--input', metavar='FILENAME', required=False, nargs='+',
-                        help='input file(s) with rmsd. Supported formats: *.csv. Required columns: '
-                             'time(ns)\tbackbone\tligand\tligand_name\tsystem')
-    parser.add_argument('--rmsd_type', metavar='backbone', required=False, nargs='+',
-                        help='Column names in the input file to use for the analysis', default=['backbone', 'ligand'])
+    parser.add_argument('-i', '--input', metavar='FILENAME', required=True, nargs='+',
+                        help='Input RMSD TSV file(s). Required base columns: '
+                             'time(ns), system, ligand_name. A column requested through '
+                             '--rmsd_type that is missing from some files is skipped for '
+                             'those systems (with a warning); one missing from all files '
+                             'is dropped.')
+    parser.add_argument('--rmsd_type', metavar='COLUMN', required=False, nargs='+',
+                        help='RMSD column names to aggregate, for example '
+                             'backbone, ligand, ligand_local, or ActiveSite5.0A',
+                        default=['backbone', 'ligand', 'ligand_local', 'ActiveSite5.0A'])
     parser.add_argument('--time_ranges', metavar='0-1 5-10 9-10', required=False, nargs='+',
-                        help='Time ranges in ns. Default: start-end, middle-end, end-1ns', default=None)
+                        help='Time ranges in nanoseconds. Default: start-end, middle-end, and the final 1 ns.',
+                        default=None)
     parser.add_argument('-d','--wdir', metavar='dirname', required=False,
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Output files directory', default=None)
     parser.add_argument('--paint_by', default='',
                         help='File to paint by additional column. '
                              'Required columns: '
-                             '- Protein-ligand simulations: protein_name\tligand_name.'
-                             '- Protein only in water simulations: protein_name'
-                             ' Sep: /\t. '
-                             'The plot will be painted by any other than system and ligand_name column.')
+                             'protein-ligand simulations: protein_name, ligand_name; '
+                             'protein-only simulations: protein_name. '
+                             'The plot is coloured using the first column other than '
+                             'protein_name and ligand_name.')
     parser.add_argument('-o','--out_suffix', default=None,
                         help='Suffix for output files')
     parser.add_argument('--title', default=None,
