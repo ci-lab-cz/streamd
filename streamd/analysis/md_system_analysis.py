@@ -163,10 +163,22 @@ def _reference_pocket_selections(universe, ligand_resid, active_site_dist):
         return None, ligand_selection
 
     if len(ligand.residues) > 1:
+        # Multiple copies of the ligand (e.g. one per chain in a multimer) would be
+        # merged into a single cross-site pocket, and the local fit would span the
+        # copies' separate binding sites, so ActiveSite/ligand_local become
+        # meaningless. Skip the pocket metrics; the global 'ligand' RMSD still runs.
+        # TODO (option B): support multiple binding sites by defining a pocket and
+        # computing ActiveSite/ligand_local per ligand copy (per chain/segid) and
+        # emitting per-copy columns instead of skipping. This needs schema/selection
+        # changes in run_analysis (rmsd_type, _resolve_rmsd_columns) and the plots.
         logging.warning(
-            'Multiple ligand residues found for resname %s; using all of them for ligand RMSD and pocket definition',
-            ligand_resid,
+            'Found %d residues for resname %s (resids %s), e.g. copies in different '
+            'chains; active-site and ligand_local RMSD are only defined for a single '
+            'binding site and are skipped for this system. The global "ligand" RMSD is '
+            'still reported.',
+            len(ligand.residues), ligand_resid, list(ligand.residues.resids),
         )
+        return None, ligand_selection
 
     pocket_atoms = universe.select_atoms(
         f'protein and around {active_site_dist} group ligand',
@@ -253,6 +265,12 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                      ligand_resid="UNL", active_site_dist=5.0):
     """Calculate RMSD profiles for a single MD system.
 
+    All reported group RMSDs are calculated after global protein-backbone
+    alignment.  ``ActiveSite{active_site_dist}A`` is a reference-defined
+    pocket-backbone RMSD after that global alignment.  ``ligand_local``, when
+    present, is ligand heavy-atom RMSD after local alignment on the same
+    reference-defined pocket backbone.
+
     Parameters
     ----------
     tpr : str | os.PathLike
@@ -280,16 +298,30 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
     universe = _load_universe_with_gro_fallback(tpr, xtc)
     groupselections = []
     molid_resid_pairs = dict(molid_resid_pairs)
+    mol_residue_names = _unique_residue_names(molid_resid_pairs.items())
     ligand_name = None
+    active_site_selection = None
+    ligand_selection = f'resname {ligand_resid} and not name H*'
     if molid_resid_pairs:
         if ligand_resid in molid_resid_pairs.values():
             for molid, resid in molid_resid_pairs.items():
                 if resid == ligand_resid:
                     ligand_name = molid
                     break
-            groupselections.append(f'backbone and (around {active_site_dist} resname {ligand_resid})')
+            active_site_selection, ligand_selection = _reference_pocket_selections(
+                universe=universe,
+                ligand_resid=ligand_resid,
+                active_site_dist=active_site_dist,
+            )
+            if active_site_selection:
+                groupselections.append(active_site_selection)
 
-        groupselections.extend([f"resname {i} and not name H*" for i in molid_resid_pairs.values()])
+        for resid in mol_residue_names:
+            selection = f"resname {resid} and not name H*"
+            if len(universe.select_atoms(selection)) == 0:
+                logging.warning('Skipping RMSD for resname %s: no heavy atoms found', resid)
+                continue
+            groupselections.append(selection)
 
     rmsd_df = rmsd_for_atomgroups(universe, selection1="backbone",
                                   selection2 = groupselections)
