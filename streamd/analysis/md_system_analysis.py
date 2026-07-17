@@ -44,6 +44,84 @@ def rmsd_for_atomgroups(universe, selection1='backbone', selection2=None):
     # transform to ns
     rmsd_df['time(ns)'] = rmsd_df['frame'] / 100
     rmsd_df = rmsd_df.drop('frame', axis='columns')
+def _ensure_index_group(group_name, members, index_list, wdir, bash_log, env=None):
+    """Return an index group id, creating the group from member groups when needed.
+
+    The group is looked up by its exact (canonical) name and created when absent, so
+    the group StreaMD references downstream is always the deterministically-named one
+    built from the current residue order. In normal operation the same
+    all_ligand_resid.txt yields the same name across runs, so re-runs reuse the group
+    rather than duplicating it.
+    """
+    if group_name not in index_list:
+        missing = [member for member in members if member not in index_list]
+        if missing:
+            logging.error(
+                'Cannot build the %s index group: group(s) %s are missing from index.ndx. '
+                'This usually means a residue listed in all_ligand_resid.txt is absent from '
+                'the simulated topology/coordinates (e.g. a ligand or cofactor that was not '
+                'correctly built into the system). Analysis of this system will be skipped.',
+                group_name, missing)
+            return None, index_list
+        query = '|'.join(str(index_list.index(member)) for member in members)
+        if not make_group_ndx(query=query, wdir=wdir, bash_log=bash_log, env=env):
+            return None, index_list
+        index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
+
+    if group_name not in index_list:
+        logging.error('Required index group %s failed to be found/created in index.ndx', group_name)
+        return None, index_list
+    return index_list.index(group_name), index_list
+
+
+def _resolve_analysis_groups(index_list, molid_resid_pairs, ligand_resid, wdir, bash_log, env=None):
+    """Resolve separate centering and trajectory-fitting index groups for analysis."""
+    if molid_resid_pairs:
+        resids = _unique_residue_names(molid_resid_pairs)
+        # Every residue listed in all_ligand_resid.txt must have an auto-generated
+        # index group; a missing one means the residue is absent from the simulated
+        # topology/coordinates, so _ensure_index_group fails and this system is
+        # skipped rather than analysed as a silently incomplete complex.
+        center_members = ['Protein'] + resids
+        center_group_name = '_'.join(center_members)
+        center_group, index_list = _ensure_index_group(
+            group_name=center_group_name,
+            members=center_members,
+            index_list=index_list,
+            wdir=wdir,
+            bash_log=bash_log,
+            env=env,
+        )
+        if ligand_resid in resids:
+            trajectory_fit_members = ['Protein', ligand_resid]
+            trajectory_fit_group_name = '_'.join(trajectory_fit_members)
+        else:
+            trajectory_fit_members = center_members
+            trajectory_fit_group_name = center_group_name
+        if trajectory_fit_group_name == center_group_name:
+            trajectory_fit_group = center_group
+        else:
+            trajectory_fit_group, index_list = _ensure_index_group(
+                group_name=trajectory_fit_group_name,
+                members=trajectory_fit_members,
+                index_list=index_list,
+                wdir=wdir,
+                bash_log=bash_log,
+                env=env,
+            )
+    else:
+        if 'Protein' not in index_list:
+            logging.error('Required center group Protein was not found in index.ndx. '
+                          f'Check if {os.path.join(wdir, "index.ndx")} file was corrupted.')
+            return None
+        center_group = index_list.index('Protein')
+        trajectory_fit_group = center_group
+
+    if center_group is None or trajectory_fit_group is None:
+        return None
+    return center_group, trajectory_fit_group, index_list
+
+
     return rmsd_df
 
 
@@ -213,29 +291,23 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
 
     index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
 
-    # choose group to fit the trajectory
+    # choose groups to center and fit the trajectory
     if os.path.isfile(molid_resid_pairs_fname) and os.path.getsize(molid_resid_pairs_fname) > 0:
         molid_resid_pairs = list(get_mol_resid_pair(molid_resid_pairs_fname))
-        if ligand_resid in index_list:
-            if f'Protein_{ligand_resid}' not in index_list:
-                if not make_group_ndx(query=f'"Protein"|{index_list.index(ligand_resid)}', wdir=wdir,  bash_log=bash_log, env=env):
-                    return None
-                index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
-
-            index_group = index_list.index(f'Protein_{ligand_resid}')
-        else: # cofactors only
-            cofactors_resid =  '_'.join([i[1] for i in molid_resid_pairs])
-            logging.warning(f'Fit trajectory to Protein_all-cofactors group: {molid_resid_pairs}')
-            if f'Protein_{cofactors_resid}' not in index_list:
-                if not make_group_ndx(query=f'"Protein"|{index_list.index(ligand_resid)}', wdir=wdir,  bash_log=bash_log, env=env):
-                    return None
-                index_list = get_index(os.path.join(wdir, 'index.ndx'), env=env)
-            index_group = index_list.index(f'Protein_{cofactors_resid}')
-
-
     else:
         molid_resid_pairs = []
-        index_group = index_list.index('Protein')
+
+    analysis_groups = _resolve_analysis_groups(
+        index_list=index_list,
+        molid_resid_pairs=molid_resid_pairs,
+        ligand_resid=ligand_resid,
+        wdir=wdir,
+        bash_log=bash_log,
+        env=env,
+    )
+    if analysis_groups is None:
+        return None
+    center_group, trajectory_fit_group, index_list = analysis_groups
 
     dtstep = 50 if mdtime_ns <= 10 else 100
 
