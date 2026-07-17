@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime
 from functools import partial
+import math
 import os
 import pandas as pd
 import logging
@@ -77,6 +78,42 @@ def _resolve_rmsd_columns(rmsd_files, rmsd_type_list):
             f"({', '.join(rmsd_type_list)}) are present in the input file(s)"
         )
     return usable_metrics
+
+
+def _default_time_ranges(start, end):
+    """Build normalized default convergence windows from available trajectory bounds."""
+    duration = end - start
+
+    if duration <= 1:
+        return [
+            (
+                round(float(start), 10),
+                round(float(end), 10),
+            )
+        ]
+
+    exact_midpoint = (start + end) / 2
+    midpoint = math.ceil(exact_midpoint)
+
+    if midpoint >= end:
+        midpoint = math.floor(exact_midpoint)
+
+    candidates = [
+        (start, end),
+        (midpoint, end),
+        (end - 1.0, end),
+    ]
+
+    time_ranges = []
+    for range_start, range_end in candidates:
+        normalized_range = (
+            round(float(range_start), 10),
+            round(float(range_end), 10),
+        )
+        if normalized_range not in time_ranges:
+            time_ranges.append(normalized_range)
+
+    return time_ranges
 
 
 def merge_rmsd_csv(csv_files, out):
@@ -218,13 +255,7 @@ def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
     if time_ranges is None:
         start = rmsd_merged_data['time(ns)'].min()
         end = rmsd_merged_data['time(ns)'].max()
-        mean = end // 2
-        duration = end - start
-        if duration > 1:
-            #time_ranges = [(start, 1), (start, mean), (mean, end),  (end - 1, end), (start, end)]
-            time_ranges = [ (start, end), (mean, end),  (end - 1, end)]
-        else:
-            time_ranges = [(start, end)]
+        time_ranges = _default_time_ranges(start, end)
 
         # df_mean_std = pd.DataFrame()
     mean_std_list = []
