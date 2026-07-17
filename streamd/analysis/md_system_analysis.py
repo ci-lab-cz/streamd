@@ -37,13 +37,29 @@ def rmsd_for_atomgroups(universe, selection1='backbone', selection2=None):
     ref = universe
     rmsd_analysis = rms.RMSD(universe, ref, select=selection1, groupselections=selection2, in_memory=False)
     rmsd_analysis.run()
-    columns = [selection1, *selection2] if selection2 else [selection1]
-    rmsd_df = pd.DataFrame(np.round(rmsd_analysis.results.rmsd[:, 2:], 2), columns=columns)
-    rmsd_df.index.name = "frame"
-    rmsd_df = rmsd_df.reset_index()
-    # transform to ns
-    rmsd_df['time(ns)'] = rmsd_df['frame'] / 100
-    rmsd_df = rmsd_df.drop('frame', axis='columns')
+    columns = [selection1, *(selection2 or [])]
+    results = rmsd_analysis.results.rmsd
+    rmsd_df = pd.DataFrame(np.round(results[:, 2:], 2), columns=columns)
+    # MDAnalysis reports GROMACS trajectory time in ps; StreaMD CSVs use ns.
+    times_ps = results[:, 1]
+    if len(times_ps) > 1 and not np.all(np.diff(times_ps) > 0):
+        logging.warning(
+            'Trajectory time is not strictly increasing (%.3f ... %.3f ps); '
+            'time(ns) values may be unreliable. Check that the trajectory carries '
+            'per-frame time information.', times_ps[0], times_ps[-1])
+    rmsd_df.insert(0, 'time(ns)', times_ps / 1000.0)
+    return rmsd_df
+
+
+def _unique_residue_names(molid_resid_pairs):
+    """Return residue names from molecule/residue pairs, preserving first-seen order."""
+    resids = []
+    for _, resid in molid_resid_pairs:
+        if resid not in resids:
+            resids.append(resid)
+    return resids
+
+
 def _ensure_index_group(group_name, members, index_list, wdir, bash_log, env=None):
     """Return an index group id, creating the group from member groups when needed.
 
@@ -122,6 +138,74 @@ def _resolve_analysis_groups(index_list, molid_resid_pairs, ligand_resid, wdir, 
     return center_group, trajectory_fit_group, index_list
 
 
+def _index_selection(atomgroup):
+    """Build an MDAnalysis index selection string for a fixed atom group."""
+    return 'index ' + ' '.join(str(i) for i in atomgroup.indices)
+
+
+def _has_minimum_fit_atoms(atomgroup):
+    """Return whether an atom group can define a stable rotational fit."""
+    if len(atomgroup) < 3:
+        return False
+    positions = getattr(atomgroup, 'positions', None)
+    if positions is None:
+        return True
+    return np.linalg.matrix_rank(positions - positions[0]) >= 2
+
+
+def _reference_pocket_selections(universe, ligand_resid, active_site_dist):
+    """Define fixed reference-frame pocket and ligand selections for local RMSD."""
+    ligand_selection = f'resname {ligand_resid} and not name H*'
+    universe.trajectory[0]
+    ligand = universe.select_atoms(ligand_selection)
+    if len(ligand) == 0:
+        logging.warning('Cannot define active site: no ligand atoms found for resname %s', ligand_resid)
+        return None, ligand_selection
+
+    if len(ligand.residues) > 1:
+        logging.warning(
+            'Multiple ligand residues found for resname %s; using all of them for ligand RMSD and pocket definition',
+            ligand_resid,
+        )
+
+    pocket_atoms = universe.select_atoms(
+        f'protein and around {active_site_dist} group ligand',
+        ligand=ligand,
+    )
+    pocket_backbone = pocket_atoms.residues.atoms.select_atoms('backbone')
+    if len(pocket_backbone) == 0:
+        logging.warning(
+            'Cannot define active-site RMSD: no pocket-backbone atoms within %.2f A of %s in the reference frame',
+            active_site_dist,
+            ligand_resid,
+        )
+        return None, ligand_selection
+
+    if not _has_minimum_fit_atoms(pocket_backbone):
+        logging.warning(
+            'Cannot define active-site RMSD: fewer than three non-collinear pocket-backbone atoms for %s',
+            ligand_resid,
+        )
+        return None, ligand_selection
+
+    return _index_selection(pocket_backbone), ligand_selection
+
+
+def _add_local_ligand_rmsd(rmsd_df, universe, pocket_selection, ligand_selection):
+    """Append ligand RMSD after local fitting on the reference-defined pocket."""
+    try:
+        universe.trajectory[0]
+        local_rmsd = rms.RMSD(
+            universe,
+            universe,
+            select=pocket_selection,
+            groupselections=[ligand_selection],
+            in_memory=False,
+        )
+        local_rmsd.run()
+        rmsd_df.loc[:, 'ligand_local'] = np.round(local_rmsd.results.rmsd[:, 3], 2)
+    except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
+        logging.warning('Skipping ligand_local RMSD after local pocket alignment: %s', exc)
     return rmsd_df
 
 
@@ -209,6 +293,13 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
 
     rmsd_df = rmsd_for_atomgroups(universe, selection1="backbone",
                                   selection2 = groupselections)
+    if active_site_selection and ligand_selection in groupselections:
+        rmsd_df = _add_local_ligand_rmsd(
+            rmsd_df=rmsd_df,
+            universe=universe,
+            pocket_selection=active_site_selection,
+            ligand_selection=ligand_selection,
+        )
     del universe
     rmsd_df = rmsd_df.rename(
         {active_site_selection: f'ActiveSite{active_site_dist}A',
@@ -317,7 +408,7 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     if not system_name:
         system_name = os.path.split(wdir)[-1]
 
-    cmd = f'wdir={wdir} index_group={index_group} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} wdir_out_analysis={wdir_out_analysis} system_name={system_name} ' \
+    cmd = f'wdir={wdir} center_group={center_group} trajectory_fit_group={trajectory_fit_group} dtstep={dtstep} deffnm={deffnm} tpr={tpr} xtc={xtc} wdir_out_analysis={wdir_out_analysis} system_name={system_name} ' \
            f'bash {os.path.join(project_dir, "scripts/script_sh/md_analysis.sh")} >> {os.path.join(wdir, bash_log)} 2>&1'
 
     if not run_check_subprocess(cmd, key=wdir, log=os.path.join(wdir, bash_log), env=env):
