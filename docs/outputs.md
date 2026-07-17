@@ -80,25 +80,34 @@ ligand_1.itp          em.trr       ions.tpr    md_out.edr         md_out.tpr    
 cofactor_1.itp        em.edr       frame.pdb   md_out.gro         md_out.xtc             npt.edr   npt.trr  nvt.mdp  topol.top
 all.itp               em.gro       md_fit.xtc  md_out.log         md_short_forcheck.xtc  npt.gro   nvt.cpt  nvt.tpr  nvt.edr  solv.gro
 complex.gro           em.tpr       ions.mdp    md_out.cpt         newbox.gro             npt.mdp   npt.log  index.ndx
-all_ligand_resid.txt  em.log       md_fit.xtc  md_out.xtc         mdout.mdp              minim.mdp npt.tpr  posre.itp solv_ions.gro
+all_ligand_resid.txt  em.log       mdout.mdp   minim.mdp          posre.itp              solv_ions.gro
 ```
 
 ## Analysis Outputs   
 `md_analysis/`
-- `potential_*.{csv,png,xtc}`: potential energy from energy minimization (gmx energy)
-- `temperature_*.{csv,png,xtc}`: system temperature during NVT
-- `density_*.{csv,png,xtc}`: total density during NPT
-- `pressure_*.{csv,png,xtc}`: system pressure during NPT
-- `rmsd_*.{csv,png}`: RMSD for backbone, ligand, and active site (5 A default)
-- `rmsf_*.{csv,png,xtc,pdb}`: RMSF traces and structures
-- `gyrate_*.{csv,png,xtc}`: radius of gyration
+- `potential_*.{xvg,png}`: potential energy from energy minimization (gmx energy)
+- `temperature_*.{xvg,png}`: system temperature during NVT
+- `density_*.{xvg,png}`: total density during NPT
+- `pressure_*.{xvg,png}`: system pressure during NPT
+- `rmsd_*.{csv,png}`: RMSD for backbone, ligand, active site (5 A default), and optional local-pocket ligand RMSD
+- `rmsf_*.{xvg,png,pdb}`: per-residue protein RMSF traces and structures
+- `gyrate_*.{xvg,png}`: radius of gyration
+
+RMSD columns are reported after global protein-backbone alignment unless noted otherwise:
+- `backbone`: protein-backbone RMSD.
+- `ligand`: ligand heavy-atom RMSD after global protein-backbone alignment. This measures ligand motion relative to the globally aligned protein.
+- `ActiveSite5.0A`: RMSD of reference-defined binding-site backbone atoms. The pocket is defined from protein residues within the active-site distance of the ligand in the reference frame, then kept fixed for all trajectory frames.
+- `ligand_local`: ligand heavy-atom RMSD after local alignment on the same reference-defined pocket backbone. This measures ligand pose stability relative to its local binding pocket and is useful for flexible or multidomain proteins where global protein motion can inflate the ordinary `ligand` RMSD.
+
+`ActiveSite5.0A` and `ligand_local` are only defined for a single binding site. If more than one copy of the ligand residue is present (e.g. one per chain in a multimer), both are skipped for that system with a warning, while `backbone` and `ligand` are still reported.
 
 See {doc}`mm_pbsa` for MM-PBSA/MM-GBSA outputs, {doc}`plif` for interaction fingerprints, and {doc}`trajectory_convergence` for RMSD convergence analysis.
 
 ## MD Outputs    
 `md_run/<system>/`
-- `md_fit.xtc`: PBC-removed, protein- or protein-ligand-fitted trajectory
+- `md_fit.xtc`: PBC-corrected trajectory centered using the complete molecular complex and fitted using Protein + primary ligand for systems containing a ligand. Protein-only systems use `Protein`; cofactor-only systems use `Protein` plus the cofactor groups.
 - `md_short_forcheck.xtc`: short trajectory for sanity checks
-- `frame.pdb`: starting frame (0.1 ns)
+- `frame.pdb`: representative start frame around 10 ps (0.01 ns)
 - `last_frame.pdb`: last frame of the trajectory
+- `md_fit_nowater.xtc`, `md_out_nowater.tpr`, `md_out_nowater.gro`: optional no-water analysis files when `--save_traj_without_water` is enabled
 - Standard GROMACS files (`md_out.*`, `em.*`, `nvt.*`, `npt.*`, `index.ndx`, `topol.top`, etc.)
