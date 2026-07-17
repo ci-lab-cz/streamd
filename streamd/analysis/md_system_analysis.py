@@ -13,8 +13,11 @@ from streamd.analysis.plot_build import plot_rmsd
 from streamd.utils.utils import get_index, make_group_ndx, get_mol_resid_pair, run_check_subprocess, create_last_frame_file
 
 
-def rmsd_for_atomgroups(universe, selection1, selection2=None):
-    """Calulate the RMSD for selected atom groups.
+def rmsd_for_atomgroups(universe, selection1='backbone', selection2=None):
+    """Calculate globally protein-backbone-aligned, by default, RMSD for atom groups.
+
+    All reported group RMSDs are calculated after alignment using
+    ``selection1``.  In StreaMD this is normally the protein backbone.
 
     Parameters
     ----------
@@ -45,13 +48,28 @@ def rmsd_for_atomgroups(universe, selection1, selection2=None):
 
 
 def _parse_system_name(system: str) -> tuple[str, int]:
+    """Split a system name into its base name and numeric replica id."""
     match = re.match(r"(.*)_replica(\d+)$", system)
     if match:
         return match.group(1), int(match.group(2))
     return system, 1
 
 
+def _system_metadata(system_name, ligand_name):
+    """Return output system, protein, and replica metadata for an RMSD table."""
+    protein_name, replica = _parse_system_name(system_name)
+    replica_suffix = system_name[len(protein_name):]
+
+    if ligand_name:
+        ligand_suffix = f'_{ligand_name}'
+        if protein_name.endswith(ligand_suffix):
+            protein_name = protein_name[:-len(ligand_suffix)]
+
+    return f'{protein_name}{replica_suffix}', protein_name, replica
+
+
 def _load_universe_with_gro_fallback(topology, trajectory):
+    """Load an MDAnalysis universe, falling back from unsupported TPR to matching GRO."""
     try:
         return mda.Universe(topology, trajectory, in_memory=False, in_memory_step=1)
     except ValueError as exc:
@@ -115,7 +133,7 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                                   selection2 = groupselections)
     del universe
     rmsd_df = rmsd_df.rename(
-        {f'backbone and (around {active_site_dist} resname {ligand_resid})': f'ActiveSite{active_site_dist}A',
+        {active_site_selection: f'ActiveSite{active_site_dist}A',
          f'resname {ligand_resid} and not name H*': 'ligand'}, axis='columns')
 
     rmsd_df = rmsd_df.rename({f"resname {i[1]} and not name H*": f"{i[0]}" for i in molid_resid_pairs.items()}, axis='columns')
@@ -123,8 +141,7 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
     plot_rmsd(rmsd_df=rmsd_df, system_name=system_name, out=os.path.join(wdir_out_analysis, f'rmsd_{system_name}.png'))
 
     rmsd_df.loc[:, 'ligand_name'] = ligand_name
-    base_system = system_name.replace(f'_{ligand_name}', '') if ligand_name else system_name
-    protein_name, replica = _parse_system_name(base_system)
+    base_system, protein_name, replica = _system_metadata(system_name, ligand_name)
     rmsd_df.loc[:, 'system'] = base_system
     rmsd_df.loc[:, 'replica'] = replica
     rmsd_df.loc[:, 'protein_name'] = protein_name
