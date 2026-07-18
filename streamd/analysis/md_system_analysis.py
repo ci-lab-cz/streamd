@@ -356,6 +356,7 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
     rmsd_df.loc[:, 'replica'] = replica
     rmsd_df.loc[:, 'protein_name'] = protein_name
     rmsd_df.loc[:, 'directory'] = wdir_out_analysis
+    rmsd_df = rmsd_df[['time(ns)', *[column for column in rmsd_df.columns if column != 'time(ns)']]]
 
     rmsd_df.to_csv(rmsd_out_file, sep='\t', index=False)
     return rmsd_out_file

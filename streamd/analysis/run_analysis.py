@@ -42,6 +42,11 @@ def _ensure_replica_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _move_time_first(df: pd.DataFrame) -> pd.DataFrame:
+    """Return RMSD data with time(ns) as the first column."""
+    return df[['time(ns)', *[column for column in df.columns if column != 'time(ns)']]]
+
+
 def _resolve_rmsd_columns(rmsd_files, rmsd_type_list):
     """Validate base columns and return the requested metrics that are usable.
 
@@ -152,12 +157,12 @@ def merge_rmsd_csv(csv_files, out):
         data = _ensure_replica_cols(data)
         all_data_list.append(data)
 
-    merged_data = pd.concat(all_data_list)
+    merged_data = _move_time_first(pd.concat(all_data_list))
     merged_data.to_csv(out, sep='\t', index=False)
     return merged_data
 
 
-def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='backbone', system_cols=['ligand_name','system']):
+def calc_mean_std_by_ranges_time(rmsd_data, time_ranges, rmsd_system='CA', system_cols=['ligand_name','system']):
     """Return mean and standard deviation of RMSD per time range.
 
     Parameters
@@ -218,7 +223,7 @@ def make_lower_case(df, cols):
 
 
 def run_rmsd_analysis(rmsd_files, wdir, unique_id, time_ranges=None,
-                      rmsd_type_list=['backbone', 'ligand'], paint_by_fname=None,
+                      rmsd_type_list=['CA', 'backbone', 'ligand'], paint_by_fname=None,
                       title=None):
     """Execute RMSD analysis workflow and write summary files.
 
@@ -339,8 +344,8 @@ def main():
                              'is dropped.')
     parser.add_argument('--rmsd_type', metavar='COLUMN', required=False, nargs='+',
                         help='RMSD column names to aggregate, for example '
-                             'backbone, ligand, ligand_local, or ActiveSite5.0A',
-                        default=['backbone', 'ligand', 'ligand_local', 'ActiveSite5.0A'])
+                             'CA, backbone, ligand, ligand_local, or ActiveSite5.0A',
+                        default=['CA', 'backbone', 'ligand', 'ligand_local', 'ActiveSite5.0A'])
     parser.add_argument('--time_ranges', metavar='0-1 5-10 9-10', required=False, nargs='+',
                         help='Time ranges in nanoseconds. Default: start-end, middle-end, and the final 1 ns.',
                         default=None)
