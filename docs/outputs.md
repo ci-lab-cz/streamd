@@ -89,17 +89,18 @@ all_ligand_resid.txt  em.log       mdout.mdp   minim.mdp          posre.itp     
 - `temperature_*.{xvg,png}`: system temperature during NVT
 - `density_*.{xvg,png}`: total density during NPT
 - `pressure_*.{xvg,png}`: system pressure during NPT
-- `rmsd_*.{csv,png}`: RMSD for backbone, ligand, active site (5 A default), and optional local-pocket ligand RMSD
-- `rmsf_*.{xvg,png,pdb}`: per-residue protein RMSF traces and structures
+- `rmsd_*.{csv,png}`: RMSD for backbone and Cα, ligand, active site (5 A default), and optional local-pocket ligand RMSD
+- `rmsf_*.{xvg,png,pdb}`: per-residue Cα RMSF traces and structures (fitted on and computed over Cα atoms)
 - `gyrate_*.{xvg,png}`: radius of gyration
 
 RMSD columns are reported after global protein-backbone alignment unless noted otherwise:
-- `backbone`: protein-backbone RMSD.
+- `backbone`: protein backbone (N, CA, C, O) RMSD; the backbone is the superposition (fit) group.
+- `CA`: protein Cα RMSD (the Cα subset, reported in the same backbone-aligned frame).
 - `ligand`: ligand heavy-atom RMSD after global protein-backbone alignment. This measures ligand motion relative to the globally aligned protein.
 - `ActiveSite5.0A`: RMSD of reference-defined binding-site backbone atoms. The pocket is defined from protein residues within the active-site distance of the ligand in the reference frame, then kept fixed for all trajectory frames.
 - `ligand_local`: ligand heavy-atom RMSD after local alignment on the same reference-defined pocket backbone. This measures ligand pose stability relative to its local binding pocket and is useful for flexible or multidomain proteins where global protein motion can inflate the ordinary `ligand` RMSD.
 
-`ActiveSite5.0A` and `ligand_local` are only defined for a single binding site. If more than one copy of the ligand residue is present (e.g. one per chain in a multimer), both are skipped for that system with a warning, while `backbone` and `ligand` are still reported.
+`ActiveSite5.0A` and `ligand_local` are only defined for a single binding site. If more than one copy of the ligand residue is present (e.g. one per chain in a multimer), both are skipped for that system with a warning, while `CA`, `backbone` and `ligand` are still reported.
 
 See {doc}`mm_pbsa` for MM-PBSA/MM-GBSA outputs, {doc}`plif` for interaction fingerprints, and {doc}`trajectory_convergence` for RMSD convergence analysis.
 

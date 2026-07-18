@@ -51,7 +51,7 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 md_files/md_run
 
 Direct usage:
 ```bash
-run_rmsd_analysis -i rmsd_all_systems.csv --rmsd_type "backbone" "ligand" "ligand_local" "ActiveSite5.0A" \
+run_rmsd_analysis -i rmsd_all_systems.csv --rmsd_type "CA" "backbone" "ligand" "ligand_local" "ActiveSite5.0A" \
   --paint_by exp_data.csv -o protein --title "Protein. RMSD Mean vs RMSD Std" --time_ranges 0-1 0-2 0-10 5-10 9-10
 ```
 
