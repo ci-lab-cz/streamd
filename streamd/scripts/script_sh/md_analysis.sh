@@ -17,7 +17,7 @@ printf '%s\n' "non-Water" | gmx convert-tpr -s $tpr -o  md_out_nowater.tpr
 printf '%s\n' "System" | gmx trjconv -s $tpr -f md_fit.xtc -dt $dtstep -o md_short_forcheck.xtc || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}" && exit 1; }
 
 printf '%s\n' "Protein" | gmx gyrate -s $tpr -f md_fit.xtc -n index.ndx -o $wdir_out_analysis/gyrate_$system_name.xvg || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
-printf '%s\n' "Protein" | gmx rmsf -s $tpr -f md_fit.xtc -n index.ndx -o $wdir_out_analysis/rmsf_$system_name.xvg -oq $wdir_out_analysis/rmsf_$system_name.pdb -res || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
+printf '%s\n' "C-alpha" | gmx rmsf -s $tpr -f md_fit.xtc -n index.ndx -o $wdir_out_analysis/rmsf_$system_name.xvg -oq $wdir_out_analysis/rmsf_$system_name.pdb -res || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
 
 printf '%s\n' "System" | gmx trjconv -s $tpr -f md_fit.xtc -o frame.pdb -b 10 -e 11  -n index.ndx || { echo "Failed to run command  at line ${LINENO} of ${BASH_SOURCE}"; }
 
