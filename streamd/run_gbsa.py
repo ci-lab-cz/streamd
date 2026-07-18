@@ -146,6 +146,12 @@ def run_gbsa_task(wdir, tpr, xtc, topol, index, mmpbsa, np, ligand_resid, append
 
     logging.info(f'{protein_index} number of index selection will be used as a protein system')
 
+    # TODO (gbsa): md_fit.xtc is centered/fitted on Protein + the primary ligand of
+    # the MD run, so running GBSA for a different molecule (a cofactor or a secondary
+    # ligand passed via ligand_resid) uses a trajectory not fitted to that molecule,
+    # which can leave it poorly imaged across PBC for gmx_MMPBSA. Refit the trajectory
+    # to Protein + the ligand_resid requested for this GBSA run (into a per-run xtc)
+    # so GBSA can be run for any ligand, not only the one the MD was fitted on.
     ligand_index = index_list.index(ligand_resid)
 
     output = calc_gbsa(
