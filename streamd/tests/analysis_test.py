@@ -82,6 +82,7 @@ def _write_rmsd_input(path, drop_columns=(), column_overrides=None):
     """Write a standard two-frame RMSD input table for convergence tests."""
     data = {
         'time(ns)': [0.0, 0.02],
+        'CA': [0.0, 0.0],
         'backbone': [0.0, 0.0],
         'ligand': [1.0, 2.0],
         'ligand_local': [0.5, 1.5],
@@ -123,6 +124,7 @@ def test_rmsd_for_atomgroups_uses_trajectory_time(monkeypatch):
 
     rmsd_df = analysis.rmsd_for_atomgroups(universe, selection1='backbone', selection2=['ligand'])
 
+    assert rmsd_df.columns[0] == 'time(ns)'
     assert rmsd_df['time(ns)'].tolist() == [0.0, 0.02, 0.04]
     assert 'frame' not in rmsd_df.columns
     assert rmsd_df['ligand'].tolist() == [0.0, 2.0, 4.0]
@@ -278,7 +280,7 @@ def test_md_analysis_shell_uses_center_and_trajectory_fit_groups_without_backbon
     assert any('-o md_fit_nowater.xtc' in line and '"$trajectory_fit_group"' in line and '"non-Water"' in line for line in fit_lines)
     assert any('-o md_out_nowater.gro' in line and '"$trajectory_fit_group"' in line and '"non-Water"' in line for line in fit_lines)
     assert rmsf_lines
-    assert all('"Protein"' in line for line in rmsf_lines)
+    assert all('"C-alpha"' in line for line in rmsf_lines)
     assert all('-f md_fit.xtc' in line for line in rmsf_lines)
     assert all('md_fit_backbone.xtc' not in line for line in rmsf_lines)
     assert all('-nofit' not in line for line in rmsf_lines)
@@ -546,6 +548,29 @@ def test_run_rmsd_analysis_aggregates_ligand_local(tmp_path):
     assert set(result['rmsd_system']) == {'ligand', 'ligand_local'}
 
 
+def test_merge_rmsd_csv_writes_time_first_with_legacy_input_order(tmp_path):
+    """Merged RMSD CSV output starts with time(ns), even for old input order."""
+    from streamd.analysis.run_analysis import merge_rmsd_csv
+
+    columns = ['CA', 'backbone', 'ligand', 'time(ns)', 'ligand_name', 'system']
+    _write_rmsd_input(tmp_path / 'a.csv')
+    _write_rmsd_input(
+        tmp_path / 'b.csv',
+        column_overrides={
+            'ligand_name': ['ligand_b', 'ligand_b'],
+            'system': ['protein_b_replica1', 'protein_b_replica1'],
+        },
+    )
+    pd.read_csv(tmp_path / 'a.csv', sep='\t')[columns].to_csv(tmp_path / 'a.csv', sep='\t', index=False)
+    pd.read_csv(tmp_path / 'b.csv', sep='\t')[columns].to_csv(tmp_path / 'b.csv', sep='\t', index=False)
+
+    result = merge_rmsd_csv([str(tmp_path / 'b.csv'), str(tmp_path / 'a.csv')], tmp_path / 'merged.csv')
+    written = pd.read_csv(tmp_path / 'merged.csv', sep='\t')
+
+    assert result.columns[0] == 'time(ns)'
+    assert written.columns[0] == 'time(ns)'
+
+
 @pytest.mark.parametrize('rmsd_files', [[], None])
 def test_run_rmsd_analysis_requires_input_files(tmp_path, rmsd_files):
     """Missing input files fail with a clear public API error."""
@@ -810,7 +835,7 @@ def test_run_rmsd_analysis_paint_by_requires_value_column_for_protein_only(tmp_p
             wdir=str(tmp_path),
             unique_id='protein-only-paint-by-missing-value',
             time_ranges=[(0.0, 0.02)],
-            rmsd_type_list=['backbone'],
+            rmsd_type_list=['CA'],
             paint_by_fname=str(paint_by_file),
             title=None,
         )
@@ -931,6 +956,7 @@ def test_rmsd_analysis(dir_with_streamd_output_for_analysis,
     rmsd_data = pd.read_csv(rmsd_file, sep='\t')
     expected_rmsd_columns = {
         'time(ns)',
+        'CA',
         'backbone',
         'ligand',
         'ActiveSite5.0A',
@@ -941,6 +967,7 @@ def test_rmsd_analysis(dir_with_streamd_output_for_analysis,
         'replica',
         'directory',
     }
+    assert rmsd_data.columns[0] == 'time(ns)'
     assert expected_rmsd_columns.issubset(rmsd_data.columns)
 
 
@@ -948,8 +975,8 @@ def test_rmsd_analysis(dir_with_streamd_output_for_analysis,
 @pytest.mark.filterwarnings('ignore::DeprecationWarning')
 # @pytest.mark.skip(reason="Ignore")
 @pytest.mark.parametrize("rmsd_type_list", [
-    pytest.param(['backbone', 'ligand', f'ActiveSite5.0A'], id="backbone, ligand, ActiveSite5.0A"),
-    pytest.param(['backbone'], id="backbone"),
+    pytest.param(['CA', 'backbone', 'ligand', f'ActiveSite5.0A'], id="CA, backbone, ligand, ActiveSite5.0A"),
+    pytest.param(['CA'], id="CA"),
     pytest.param(['ActiveSite5.0A'], id="ActiveSite5.0A"),
 ])
 def test_rmsd_analysis(rmsd_type_list, dir_and_rmsd_files):
@@ -966,7 +993,7 @@ def test_rmsd_analysis(rmsd_type_list, dir_and_rmsd_files):
     assert not os.path.isfile(rmsd_expected_output_html)
 
     # test rmsd file with only protein rmsd available (protein only in water case)
-    if rmsd_type_list == ['backbone']:
+    if rmsd_type_list == ['CA']:
         for rmsd_file in rmsd_file_list:
             data = pd.read_csv(rmsd_file, sep='\t')
             data.loc[:, 'ligand_name'] = None
@@ -1014,7 +1041,7 @@ def test_rmsd_analysis_html_paintby(dir_and_rmsd_files, tmp_experimental_file_fo
                       wdir=wdir,
                       unique_id='test',
                       time_ranges=None,
-                      rmsd_type_list=['backbone', 'ligand'],
+                      rmsd_type_list=['CA', 'ligand'],
                       paint_by_fname=paint_by_file,
                       title=None)
 
