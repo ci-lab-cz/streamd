@@ -265,11 +265,12 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                      ligand_resid="UNL", active_site_dist=5.0):
     """Calculate RMSD profiles for a single MD system.
 
-    All reported group RMSDs are calculated after global protein-backbone
-    alignment.  ``ActiveSite{active_site_dist}A`` is a reference-defined
-    pocket-backbone RMSD after that global alignment.  ``ligand_local``, when
-    present, is ligand heavy-atom RMSD after local alignment on the same
-    reference-defined pocket backbone.
+    ``backbone``, ``CA`` and the group RMSDs (ligand, ActiveSite, cofactors) are all
+    calculated after global protein-backbone alignment; ``backbone``
+    is the fit group and ``CA`` its Cα subset.  ``ActiveSite{active_site_dist}A`` is a
+    reference-defined pocket-backbone RMSD after that global alignment.
+    ``ligand_local``, when present, is ligand heavy-atom RMSD after local alignment
+    on the same reference-defined pocket backbone.
 
     Parameters
     ----------
@@ -323,8 +324,12 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
                 continue
             groupselections.append(selection)
 
+    # Superpose on the protein backbone and report every RMSD in that
+    # one frame: 'backbone' is the fit group, 'CA' is the Cα subset, and the ligand/
+    # ActiveSite/cofactor RMSDs are all measured relative to the same backbone alignment.
+    protein_ca_selection = "protein and name CA"
     rmsd_df = rmsd_for_atomgroups(universe, selection1="backbone",
-                                  selection2 = groupselections)
+                                  selection2=[protein_ca_selection] + groupselections)
     if active_site_selection and ligand_selection in groupselections:
         rmsd_df = _add_local_ligand_rmsd(
             rmsd_df=rmsd_df,
@@ -334,12 +339,16 @@ def md_rmsd_analysis(tpr, xtc, wdir_out_analysis, system_name,
         )
     del universe
     rmsd_df = rmsd_df.rename(
-        {active_site_selection: f'ActiveSite{active_site_dist}A',
+        {protein_ca_selection: 'CA',
+         active_site_selection: f'ActiveSite{active_site_dist}A',
          f'resname {ligand_resid} and not name H*': 'ligand'}, axis='columns')
 
     rmsd_df = rmsd_df.rename({f"resname {i[1]} and not name H*": f"{i[0]}" for i in molid_resid_pairs.items()}, axis='columns')
 
-    plot_rmsd(rmsd_df=rmsd_df, system_name=system_name, out=os.path.join(wdir_out_analysis, f'rmsd_{system_name}.png'))
+    # Plot the backbone protein-RMSD line (not CA); the two are near-identical, and CA
+    # is still written to the CSV. Ligand/ActiveSite/cofactor lines are still plotted.
+    plot_rmsd(rmsd_df=rmsd_df.drop(columns=['CA'], errors='ignore'),
+              system_name=system_name, out=os.path.join(wdir_out_analysis, f'rmsd_{system_name}.png'))
 
     rmsd_df.loc[:, 'ligand_name'] = ligand_name
     base_system, protein_name, replica = _system_metadata(system_name, ligand_name)

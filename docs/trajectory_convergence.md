@@ -30,7 +30,7 @@ options:
   -i FILENAME [FILENAME ...], --input FILENAME [FILENAME ...]
                         Input RMSD TSV file(s). Required base columns: time(ns), system, ligand_name. A column requested through --rmsd_type that is missing from some files is skipped for those systems (with a warning); one missing from all files is dropped.
   --rmsd_type COLUMN [COLUMN ...]
-                        RMSD column names to aggregate, for example backbone, ligand, ligand_local, or ActiveSite5.0A
+                        RMSD column names to aggregate, for example CA, backbone, ligand, ligand_local, or ActiveSite5.0A
   --time_ranges 0-1 5-10 9-10 [0-1 5-10 9-10 ...]
                         Time ranges in nanoseconds. Default: start-end, middle-end, and the final 1 ns.
   -d dirname, --wdir dirname
