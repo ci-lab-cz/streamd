@@ -37,7 +37,8 @@ def backup_output(output):
 
 
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
-                    occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None):
+                    occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None,
+                    water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
     """Compute protein–ligand interaction fingerprints for a single trajectory.
 
     :param tpr:
@@ -52,6 +53,9 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     :param dpi:
     :param plot_width:  in inches
     :param plot_height: in inches
+    :param water_bridge: also compute water-mediated (water-bridge) interactions
+    :param water_selection: MDAnalysis selection string for water molecules (used only if water_bridge)
+    :param water_bridge_order: maximum number of water molecules bridging the ligand and protein
     :return: pandas dataframe
     """
     u = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
@@ -67,9 +71,19 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         if len(protein.segments.segids) == len(protein_pdb.segments.segids):
             protein.segments.segids = protein_pdb.segments.segids
 
-    fp = plf.Fingerprint(['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
-                          'PiStacking', 'MetalAcceptor'])
     interactions = ['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
+                    'PiStacking', 'MetalAcceptor', 'XBDonor', 'XBAcceptor']
+    parameters = None
+    if water_bridge:
+        water = u.atoms.select_atoms(water_selection)
+        if len(water) == 0:
+            logging.warning(f'{xtc}: water-bridge analysis was requested but no atoms matched the water selection '
+                            f'"{water_selection}". Water-mediated contacts will be skipped for this trajectory.')
+        else:
+            interactions.append('WaterBridge')
+            parameters = {'WaterBridge': {'water': water, 'order': water_bridge_order}}
+
+    fp = plf.Fingerprint(interactions, parameters=parameters)
     fp.run(u.trajectory[::step] if step > 1 else u.trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs)
 
     df = fp.to_dataframe()
@@ -88,7 +102,8 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 
 
 def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
-                         plot_width, plot_height, save_viz, pdb, n_jobs, occupancy):
+                         plot_width, plot_height, save_viz, pdb, n_jobs, occupancy,
+                         water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
     """Execute ProLIF analysis using paths relative to a directory."""
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
@@ -104,7 +119,8 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
     run_prolif_task(tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                     ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
                     plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, occupancy=occupancy,
-                    pdb=pdb, n_jobs=n_jobs)
+                    pdb=pdb, n_jobs=n_jobs, water_bridge=water_bridge, water_selection=water_selection,
+                    water_bridge_order=water_bridge_order)
     return output
 
 
@@ -129,7 +145,8 @@ def collect_outputs(output_list, output):
 
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
           protein_selection, ligand_resid, hostfile, ncpu, n_jobs,
-          occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose):
+          occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose,
+          water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
     """Run ProLIF across multiple directories and aggregate results.
     :param wdir_to_run: list
     :param wdir_output: path to dirn
@@ -149,6 +166,9 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param unique_id: str
     :param pdb: None or path to file (protein.pdb for renumbering)
     :param verbose: bool
+    :param water_bridge: bool, compute water-mediated (water-bridge) interactions
+    :param water_selection: str, MDAnalysis selection for water molecules
+    :param water_bridge_order: int, maximum number of bridging water molecules
     :return:
     """
     output = 'plifs.csv'
@@ -180,7 +200,9 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                                  tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                                  ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
                                  plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb,
-                                 n_jobs=n_jobs_per_task, occupancy=occupancy):
+                                 n_jobs=n_jobs_per_task, occupancy=occupancy,
+                                 water_bridge=water_bridge, water_selection=water_selection,
+                                 water_bridge_order=water_bridge_order):
                 if res:
                     var_prolif_out_files.append(res)
         finally:
@@ -198,7 +220,9 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                         ligand_selection=ligand_selection,
                         step=step, verbose=verbose, output=output,
                         plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
-                        pdb=pdb, n_jobs= min(12, ncpu), occupancy=occupancy)
+                        pdb=pdb, n_jobs= min(12, ncpu), occupancy=occupancy,
+                        water_bridge=water_bridge, water_selection=water_selection,
+                        water_bridge_order=water_bridge_order)
         var_prolif_out_files = [output]
 
     backup_output(output_aggregated)
@@ -267,6 +291,16 @@ def main():
                         help='width of the output pictures')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
                         help='height of the output pictures')
+    parser.add_argument('--water_bridge', default=False, action='store_true',
+                        help='additionally compute water-mediated (water-bridge) interactions between the ligand '
+                             'and the protein. Requires water molecules to be present in the input trajectory '
+                             '(the default md_fit.xtc keeps them). This adds extra computation.')
+    parser.add_argument('--water_selection', metavar='STRING', required=False, default='resname SOL',
+                        help='MDAnalysis selection string for water molecules used by --water_bridge. '
+                             'The GROMACS default water residue name is SOL.')
+    parser.add_argument('--water_bridge_order', metavar='INTEGER', required=False, default=1, type=int,
+                        help='maximum number of water molecules that can bridge the ligand and the protein '
+                             '(only used with --water_bridge). Order 1 considers a single bridging water.')
     parser.add_argument('--occupancy', metavar='float', default=0.6, type=float,
                         help='occupancy of the unique contacts to show. '
                              'Applied for plifs_occupancyX.html (for each complex) and'
@@ -326,7 +360,8 @@ def main():
           protein_selection=args.protein_selection, ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
           n_jobs=args.n_jobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
           save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
-          verbose=args.verbose)
+          verbose=args.verbose, water_bridge=args.water_bridge, water_selection=args.water_selection,
+          water_bridge_order=args.water_bridge_order)
     finally:
         logging.shutdown()
 

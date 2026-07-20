@@ -9,9 +9,12 @@ This functionality is based on [ProLIF tool](https://github.com/chemosim-lab/Pro
 `run_prolif -h`
 ```
 usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [--protein_selection STRING] [-a STRING] [-d WDIR] [-v]
-                  [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--occupancy float] [--not_save_pics] [-o string]
+                  [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--water_bridge] [--water_selection STRING]
+                  [--water_bridge_order INTEGER] [--occupancy float] [--not_save_pics] [-o string]
 
 Get protein-ligand interactions from MD trajectories using ProLIF module.
+The computed interactions are: Hydrophobic, HBDonor, HBAcceptor, Anionic, Cationic, CationPi, PiCation, PiStacking, MetalAcceptor and halogen bonds (XBDonor, XBAcceptor).
+Water-mediated (water-bridge) interactions are additionally computed when --water_bridge is set.
 
 options:
   -h, --help            show this help message and exit
@@ -36,6 +39,11 @@ options:
   --n_jobs INTEGER      Number of processes to run per each trajectory. Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--n_jobs arg). (default: 1)
   --width FILENAME      width of the output pictures (default: 15)
   --height FILENAME     height of the output pictures (default: 10)
+  --water_bridge        additionally compute water-mediated (water-bridge) interactions between the ligand and the protein. Requires water molecules to be present in the input trajectory (the default md_fit.xtc keeps them). This adds extra computation. (default: False)
+  --water_selection STRING
+                        MDAnalysis selection string for water molecules used by --water_bridge. The GROMACS default water residue name is SOL. (default: resname SOL)
+  --water_bridge_order INTEGER
+                        maximum number of water molecules that can bridge the ligand and the protein (only used with --water_bridge). Order 1 considers a single bridging water. (default: 1)
   --occupancy float     occupancy of the unique contacts to show. Applied for plifs_occupancyX.html (for each complex) and prolif_output_occupancyX.png (all systems aggregated plot) (default: 0.6)
   --not_save_pics       not create html and png files (by frames) for each unique trajectory. Only overall prolif png file will be created. (default: False)
   -o string, --out_suffix string
@@ -56,6 +64,16 @@ run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --append_protein
 
 # Treat a cofactor as the ligand of interest
 run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --ligand GTP
+```
+
+### Water-mediated (water-bridge) interactions
+Halogen bonds (XBDonor/XBAcceptor) are always analysed. Water-mediated contacts are opt-in with `--water_bridge`, which requires water to be present in the trajectory (the default `md_fit.xtc` keeps it).
+```bash
+# Add single-water bridges using the GROMACS default water residue name (SOL)
+run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --water_bridge
+
+# Allow up to two bridging waters and use a custom water selection
+run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --water_bridge --water_bridge_order 2 --water_selection "resname SOL WAT HOH"
 ```
 
 ## Effective Parallel Calculations
