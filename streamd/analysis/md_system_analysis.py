@@ -484,6 +484,8 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     create_last_frame_file(wdir=wdir,
                            tpr=tpr, xtc=xtc,
                            out_file=os.path.join(wdir, 'last_frame.pdb'),
-                           bash_log=bash_log, env=env)
+                           bash_log=bash_log, env=env,
+                           center_group=center_group,
+                           index=os.path.join(wdir, 'index.ndx'))
 
     return rmsd_out_file, wdir_out_analysis, wdir

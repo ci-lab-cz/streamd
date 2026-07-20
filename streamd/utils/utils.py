@@ -5,6 +5,7 @@ from glob import glob
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from tempfile import mkdtemp
@@ -222,6 +223,34 @@ def get_number_of_frames(xtc, env):
         logging.warning(f'Failed to read number of frames of {xtc} trajectory. {res}')
         return None
 
+def get_last_frame_time(xtc, env=None):
+    """Return the final trajectory time in ps parsed from ``gmx check``.
+    :param xtc: Path to the trajectory ``.xtc`` file.
+    :param env: Optional environment variables for subprocess calls.
+    :return: Final trajectory time in picoseconds as ``float``.
+    :raises RuntimeError: If ``gmx check`` fails (nonzero return code) or the final
+        time cannot be parsed from its output.
+    """
+    res = subprocess.run(f'gmx check -f {shlex.quote(str(xtc))}', shell=True,
+                         capture_output=True, env=env)
+    # gmx may write the "Last frame" line to stdout or stderr depending on the version.
+    combined_output = res.stdout.decode('utf-8', errors='replace') + '\n' + \
+                      res.stderr.decode('utf-8', errors='replace')
+    if res.returncode != 0:
+        raise RuntimeError(
+            f'"gmx check" failed for {xtc} (return code {res.returncode}). '
+            f'GROMACS output:\n{combined_output}')
+    # Support integer, decimal and scientific-notation times with variable whitespace.
+    matches = re.findall(
+        r'Last frame\s+\d+\s+time\s+([-+]?\d*\.?\d+(?:[eE][+-]?\d+)?)',
+        combined_output)
+    if not matches:
+        raise RuntimeError(
+            f'Cannot determine the final trajectory time of {xtc} from "gmx check". '
+            f'GROMACS output:\n{combined_output}')
+    # gmx may emit several progress lines; use the last reported "Last frame" time.
+    return float(matches[-1])
+
 def backup_and_replace(src_file, target_file, copy=False):
     backup_prev_files(target_file)
     if not copy:
@@ -253,19 +282,30 @@ def backup_prev_files(file_to_backup, wdir=None, copy=False):
 def check_to_continue_simulation_time(xtc, new_mdtime_ps, env):
     """Check whether a trajectory reached the desired simulation time.
 
+    The current length is taken from the actual final frame time reported by
+    ``gmx check`` (:func:`get_last_frame_time`), not from
+    ``number_of_frames * timestep``. The latter assumes a single uniform output
+    interval and can be wrong for concatenated/continued trajectories whose parts
+    used different output intervals (or contain a duplicate frame at the join).
+
     :param xtc: Path to the trajectory ``.xtc`` file.
     :param new_mdtime_ps: Desired simulation time in picoseconds.
     :param env: Optional environment variables for subprocess calls.
     :return: ``False`` if the desired time is already reached, otherwise ``True``.
     """
-    current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
-    if current_number_of_frames and timestep:
-        time_ns = (current_number_of_frames*timestep-timestep)/1000
-        logging.info(f'The length of the found trajectory is {time_ns} ns. The desired length is {new_mdtime_ps/1000} ns.')
-        if current_number_of_frames * timestep >= new_mdtime_ps:
-            logging.warning(f'The desired length of the found simulation trajectory {xtc} has been already reached. '
-                            f'Calculations will be interrupted.')
-            return False
+    try:
+        current_time_ps = get_last_frame_time(xtc=xtc, env=env)
+    except RuntimeError as e:
+        # If the current length cannot be determined, do not block continuation.
+        logging.warning(f'Could not determine the current length of {xtc}; '
+                        f'continuation will proceed. {e}')
+        return True
+    logging.info(f'The length of the found trajectory is {current_time_ps / 1000} ns. '
+                 f'The desired length is {new_mdtime_ps / 1000} ns.')
+    if current_time_ps >= new_mdtime_ps:
+        logging.warning(f'The desired length of the found simulation trajectory {xtc} has been already reached. '
+                        f'Calculations will be interrupted.')
+        return False
     return True
 
 def merge_parts_of_simulation(start_xtc, part_xtc, new_xtc, wdir, bash_log, env=None):
@@ -285,13 +325,51 @@ gmx trjcat -f {start_xtc} {part_xtc} -o {new_xtc} -tu fs >> {os.path.join(wdir,b
     '''
     return run_check_subprocess(cmd, key=part_xtc, log=os.path.join(wdir, bash_log), env=env)
 
-def create_last_frame_file(wdir, tpr, xtc, out_file, bash_log, env):
-    current_number_of_frames, timestep = get_number_of_frames(xtc=xtc, env=env)
-    cmd = f'''
-    cd {wdir}
-    printf '%s\n' "System" | gmx trjconv -s {tpr} -f {xtc} -o {out_file} -dump {current_number_of_frames} >> {os.path.join(wdir, bash_log)} 2>&1
+def create_last_frame_file(wdir, tpr, xtc, out_file, bash_log, env, center_group=None, index=None, dump_time=None):
+    """Extract a single trajectory frame into a structure file.
+
+    By default the *final* frame is written: it is selected by the final
+    trajectory *time* (ps) reported by :func:`get_last_frame_time`, because
+    ``gmx trjconv -dump`` expects a time, not a frame index. Pass ``dump_time`` to
+    extract a different frame instead (e.g. ``0`` for the first/start frame).
+
+    When ``center_group`` and ``index`` are provided (used for ``last_frame.pdb`` and
+    ``start_frame.pdb``) the snapshot is made visualization-ready: molecules are
+    reconstructed across periodic boundaries (``-pbc mol``), ``center_group`` is centered
+    (``-center``) and the whole ``System`` is written in a compact unit cell
+    (``-ur compact``). No rotational fit is applied. Without those arguments the raw frame
+    of ``System`` is written unchanged (used for the continuation ``.gro``).
+
+    :param wdir: directory containing the trajectory files.
+    :param tpr: Path to the run-input ``.tpr`` file.
+    :param xtc: Path to the trajectory ``.xtc`` file.
+    :param out_file: Path of the structure file to write.
+    :param bash_log: Log file capturing shell output.
+    :param env: Optional environment variables for subprocess calls.
+    :param center_group: Index group (name or numeric id) to center on; enables PBC
+        reconstruction, centering and compact unit-cell output when given together with
+        ``index``.
+    :param index: Path to the ``index.ndx`` file defining ``center_group``.
+    :param dump_time: Trajectory time in ps to extract. Defaults to the final frame time
+        determined from ``gmx check``.
+    :return: ``None``.
+    """
+    if dump_time is None:
+        last_time = get_last_frame_time(xtc=xtc, env=env)
+        # keep an integer literal when the time is integral (e.g. 100000, not 100000.0)
+        dump_time = int(last_time) if float(last_time).is_integer() else last_time
+    log_path = os.path.join(wdir, bash_log)
+    if center_group is not None and index is not None:
+        cmd = f'''
+    cd {shlex.quote(wdir)}
+    printf '%s\\n%s\\n' "{center_group}" "System" | gmx trjconv -s {shlex.quote(tpr)} -f {shlex.quote(xtc)} -o {shlex.quote(out_file)} -dump {dump_time} -pbc mol -center -ur compact -n {shlex.quote(index)} >> {shlex.quote(log_path)} 2>&1
         '''
-    run_check_subprocess(cmd, key=out_file, log=os.path.join(wdir, bash_log), env=env)
+    else:
+        cmd = f'''
+    cd {shlex.quote(wdir)}
+    printf '%s\\n' "System" | gmx trjconv -s {shlex.quote(tpr)} -f {shlex.quote(xtc)} -o {shlex.quote(out_file)} -dump {dump_time} >> {shlex.quote(log_path)} 2>&1
+        '''
+    run_check_subprocess(cmd, key=out_file, log=log_path, env=env)
 
 @contextmanager
 def temporary_directory_debug(remove=True, suffix=None, dir=None):
