@@ -15,7 +15,8 @@ def convertplifbyframe2png(plif_out_file, output=None, plot_width=15, plot_heigh
     """Convert ProLIF CSV output to a frame-wise PNG plot."""
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
                     "hydrophobic": "orange", "pication": "black", "cationpi": "darkblue",
-                    "pistacking": 'darkslategray', 'metalacceptor': 'cyan'}
+                    "pistacking": 'darkslategray', 'metalacceptor': 'cyan',
+                    "xbdonor": "gold", "xbacceptor": "sienna", "waterbridge": "teal"}
 
     df = pd.read_csv(plif_out_file, sep='\t')
     subdf = pd.melt(df, id_vars=['Frame'])

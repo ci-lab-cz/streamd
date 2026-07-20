@@ -69,6 +69,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 
     fp = plf.Fingerprint(['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
                           'PiStacking', 'MetalAcceptor'])
+    interactions = ['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
     fp.run(u.trajectory[::step] if step > 1 else u.trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs)
 
     df = fp.to_dataframe()
