@@ -722,7 +722,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
         rmsd_files = [i[0] for i in var_md_analysis_res]
         md_dirs_analyzed = [i[2] for i in var_md_analysis_res]
 
-        rmsd_type_list = ['CA', 'backbone', 'ligand', f'ActiveSite{active_site_dist}A', 'ligand_local'] if lfile else ['CA', 'backbone']
+        # Always request the ligand curves; run_rmsd_analysis drops any that are
+        # absent from the CSVs, so this covers --wdir_to_continue runs (no --ligand)
+        # where ligand RMSD was still computed via all_ligand_resid.txt.
+        rmsd_type_list = ['CA', 'backbone', 'ligand', f'ActiveSite{active_site_dist}A', 'ligand_local']
         run_rmsd_analysis(rmsd_files=rmsd_files, wdir=wdir, unique_id=unique_id,
                           time_ranges=None,
                           rmsd_type_list=rmsd_type_list)

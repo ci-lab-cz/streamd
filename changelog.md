@@ -6,7 +6,11 @@
 - update GROMACS to 2025.2 and MDAnalysis to 2.10.0 to support GROMACS 2026 TPR files (TPR version 138)
 - change `ActiveSite` RMSD definition: the pocket is now the complete backbone of protein residues within `active_site_dist` of the ligand heavy atoms (previously only backbone atoms lying within the cutoff), so values are not directly comparable to earlier versions
 - RMSF is now computed on Cα atoms (`gmx rmsf` selects `C-alpha`, used for both the fit and the per-residue output) instead of `Protein`
-- protein RMSD is reported as both `backbone` (N/CA/C/O, the backbone superposition/fit group) and `CA` (the protein Cα subset); ligand and active-site RMSD use the same backbone alignment
+- protein RMSD is reported as both `backbone` (N/CA/C/O, the backbone superposition/fit group) and `CA` (the protein Cα subset)
+- fix `last_frame.pdb`: the final frame was selected by passing the number of frames to `gmx trjconv -dump`, which interprets the value as a time in ps and extracted an early frame instead of the last one; the actual final trajectory time is now parsed from `gmx check` and passed to `-dump` (a clear error is raised if it cannot be determined)
+- `last_frame.pdb` is now written as a visualization-ready snapshot: molecules are made whole across periodic boundaries and the protein–ligand–cofactor complex is centered in a compact unit cell (`gmx trjconv -pbc mol -center -ur compact`), with the full `System` (water and ions included) written
+- add `start_frame.pdb` - the first production frame written with the same visualization-ready treatment as `last_frame.pdb` (`-pbc mol -center -ur compact`, full `System`), for visual comparison of the start and end of the simulation
+- fix ligand RMSD curves (`ligand`, `ActiveSite`, `ligand_local`) missing from the RMSD html on `--wdir_to_continue` analysis-only runs: the html curve list was gated on the `--ligand` argument instead of the actual data, so continued runs excluded them even though the values were computed from `all_ligand_resid.txt`; the curves are now always requested and absent ones are dropped automatically
 
 **0.5**
 - add argument `box_type` - simulation box type (`triclinic`, `cubic`, `dodecahedron`, `octahedron`) (default `cubic`) defined using `gmx editconf -bt`
