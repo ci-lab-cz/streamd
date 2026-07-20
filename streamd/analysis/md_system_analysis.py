@@ -481,6 +481,16 @@ def run_md_analysis(var_md_dirs_deffnm, mdtime_ns, project_dir, bash_log,
     for xvg_file in glob(os.path.join(wdir_out_analysis, '*.xvg')):
         convertxvg2png(xvg_file, system_name=system_name, transform_nm_to_A=True)
 
+    # visualization-ready first/last snapshots (whole molecules, complex centered,
+    # compact cell, full System) for comparing the start and end of the simulation
+    create_last_frame_file(wdir=wdir,
+                           tpr=tpr, xtc=xtc,
+                           out_file=os.path.join(wdir, 'start_frame.pdb'),
+                           bash_log=bash_log, env=env,
+                           center_group=center_group,
+                           index=os.path.join(wdir, 'index.ndx'),
+                           dump_time=0)
+
     create_last_frame_file(wdir=wdir,
                            tpr=tpr, xtc=xtc,
                            out_file=os.path.join(wdir, 'last_frame.pdb'),
