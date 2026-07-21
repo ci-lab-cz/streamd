@@ -479,13 +479,13 @@ def main():
                         help='width of the output pictures')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
                         help='height of the output pictures')
-    parser.add_argument('--binding_site_cutoff', metavar='float', default=12.0, type=float_or_none,
+    parser.add_argument('--binding_site_cutoff', metavar='float', default=12.0, type=float,
                         help='Restrict the ProLIF protein selection to residues that come within this distance '
-                             '(in Angstrom) of the ligand in any analysed frame. ProLIF re-converts the whole '
+                             '(in Angstrom) of the ligand in at least one analysed frame. ProLIF re-converts the whole '
                              'protein to an RDKit molecule on every frame, so shrinking the protein is the main '
                              'speed lever and typically gives a large speedup for big proteins. Results are '
                              'identical to a full-protein analysis as long as the cutoff stays above the ProLIF '
-                             'vicinity cutoff (6 A). Set to 0 or None to disable and analyse the full protein '
+                             'vicinity cutoff (6 A). Set to 0 to disable and analyse the full protein '
                              'selection.')
     parser.add_argument('--parallel_strategy', required=False, default='chunk',
                         choices=['chunk', 'queue', 'auto'],
