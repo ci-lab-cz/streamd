@@ -429,7 +429,7 @@ def main():
     parser.add_argument('-d', '--wdir', metavar='WDIR', default=None,
                         type=partial(filepath_type, check_exist=False, create_dir=True),
                         help='Working directory for program output. If not set the current directory will be used.')
-    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+    parser.add_argument('-v', '--verbose', action='store_true', default=True,
                         help='print progress.')
     parser.add_argument('--hostfile', metavar='FILENAME', required=False, type=str, default=None,
                         help='text file with addresses of nodes of dask SSH cluster. The most typical, it can be '
