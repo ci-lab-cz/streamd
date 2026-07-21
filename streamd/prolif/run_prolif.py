@@ -267,7 +267,16 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         # barcode
         Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
         # Net
-        LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to('rdkit'), threshold=occupancy).save(f'{output.rstrip(".csv")}_occupancy{occupancy}.html')
+        net = LigNetwork.from_fingerprint(fp, ligand_mol=ligand.convert_to.rdkit(**lig_converter_kwargs),
+                                          threshold=occupancy)
+        net_output = f'{output.rstrip(".csv")}_occupancy{occupancy}.html'
+        try:
+            net.save(net_output, show_interaction_data=True)
+        except TypeError:
+            # show_interaction_data is only supported by newer ProLIF versions
+            logging.warning(f'{xtc}: the installed ProLIF version does not support "show_interaction_data"; '
+                            f'saving the interaction network without per-interaction data.')
+            net.save(net_output)
         convertplifbyframe2png(plif_out_file=output, plot_width=plot_width, plot_height=plot_height, point_size=5)
 
     return df
