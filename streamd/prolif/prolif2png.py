@@ -51,7 +51,7 @@ def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
     label_colors = {"hbacceptor": "red", "hbdonor": "forestgreen", "anionic": "blue", "cationic": "magenta",
                     "hydrophobic": "orange", "pication": "black",
                     "cationpi": "darkblue", "pistacking": 'darkslategray', 'metalacceptor': 'cyan',
-                    "xbdonor": "gold", "xbacceptor": "sienna", "waterbridge": "teal"}
+                    "xbdonor": "blueviolet", "xbacceptor": "saddlebrown", "waterbridge": "teal"}
 
     df = pd.read_csv(plif_out_file, sep='\t')
     id_columns = ['Name','directory'] if 'directory' in df.columns else ['Name']
