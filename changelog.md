@@ -1,4 +1,4 @@
-**0.5.1 (Future release)**
+**0.6**
 - add argument `salt_concentration` - salt concentration in mol/L passed to `gmx genion -conc` (default: not set, only charge neutralization is performed)
 - add argument `ion_pname` - positive ion name passed to `gmx genion -pname` (default `NA`)
 - add argument `ion_nname` - negative ion name passed to `gmx genion -nname` (default `CL`)
@@ -11,6 +11,10 @@
 - `last_frame.pdb` is now written as a visualization-ready snapshot: molecules are made whole across periodic boundaries and the protein–ligand–cofactor complex is centered in a compact unit cell (`gmx trjconv -pbc mol -center -ur compact`), with the full `System` (water and ions included) written
 - add `start_frame.pdb` - the first production frame written with the same visualization-ready treatment as `last_frame.pdb` (`-pbc mol -center -ur compact`, full `System`), for visual comparison of the start and end of the simulation
 - improve RMSD plot readability: move the legend outside the axes (below, left-aligned) so it no longer overlaps the curves, and draw lines with transparency (new `alpha` argument to `plot_rmsd`, default `0.7`) so overlapping RMSD curves remain visible
+- `run_prolif` major speed-up: restrict the ProLIF protein to binding-site residues (union of residues within the cutoff of the ligand over the trajectory) instead of converting the whole protein to RDKit every frame; results are identical (~15–20× faster for large solvated systems). New argument `binding_site_cutoff` (default `12` Å; set `0` to use the full protein)
+- `run_prolif` add argument `parallel_strategy` (default `chunk`): ProLIF auto-selects `queue` for solvated systems
+- `run_prolif` make `--water_bridge` usable: restrict waters to an updating per-frame selection near the ligand instead of converting every water every frame. New argument `water_cutoff` (default `8` Å, automatically widened for higher `water_bridge_order`; set `0` to use all waters)
+- `run_prolif` add argument `ligand_sdf`: optional reference `.sdf`/`.mol` bond-order template for the ligand (usually unnecessary — ligand chemistry is inferred from the topology and the interpreted SMILES is logged for verification)
 
 **0.5**
 - add argument `box_type` - simulation box type (`triclinic`, `cubic`, `dodecahedron`, `octahedron`) (default `cubic`) defined using `gmx editconf -bt`
