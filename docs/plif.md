@@ -9,8 +9,9 @@ This functionality is based on [ProLIF tool](https://github.com/chemosim-lab/Pro
 `run_prolif -h`
 ```
 usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [--protein_selection STRING] [-a STRING] [-d WDIR] [-v]
-                  [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--water_bridge] [--water_selection STRING]
-                  [--water_bridge_order INTEGER] [--occupancy float] [--not_save_pics] [-o string]
+                  [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--binding_site_cutoff float]
+                  [--parallel_strategy {chunk,queue,auto}] [--ligand_sdf FILENAME] [--water_bridge] [--water_selection STRING]
+                  [--water_bridge_order INTEGER] [--water_cutoff float] [--occupancy float] [--not_save_pics] [-o string]
 
 Get protein-ligand interactions from MD trajectories using ProLIF module.
 The computed interactions are: Hydrophobic, HBDonor, HBAcceptor, Anionic, Cationic, CationPi, PiCation, PiStacking, MetalAcceptor and halogen bonds (XBDonor, XBAcceptor).
@@ -39,11 +40,18 @@ options:
   --n_jobs INTEGER      Number of processes to run per each trajectory. Provided CPUs (--ncpu arg) will be distributed between number of trajectories and number of processes per each trajectory (--n_jobs arg). (default: 1)
   --width FILENAME      width of the output pictures (default: 15)
   --height FILENAME     height of the output pictures (default: 10)
+  --binding_site_cutoff float
+                        restrict the protein to residues within this distance (A) of the ligand in at least one analysed frame (union over the trajectory). Main speed lever: ProLIF otherwise converts the whole protein to RDKit every frame. Results are identical while the cutoff stays above the ProLIF vicinity cutoff (6 A). Set to 0 to analyse the full protein. (default: 12.0)
+  --parallel_strategy {chunk,queue,auto}
+                        ProLIF multiprocessing strategy when --n_jobs > 1. For solvated systems 'auto' selects 'queue', which runs the RDKit conversion on the main thread and is slower; 'chunk' parallelises it. (default: chunk)
+  --ligand_sdf FILENAME
+                        optional reference ligand .sdf/.mol with correct bond orders, used as a template for the ligand conversion. Usually unnecessary: the ligand chemistry is inferred from the topology and the interpreted SMILES is logged for verification. (default: None)
   --water_bridge        additionally compute water-mediated (water-bridge) interactions between the ligand and the protein. Requires water molecules to be present in the input trajectory (the default md_fit.xtc keeps them). This adds extra computation. (default: False)
   --water_selection STRING
                         MDAnalysis selection string for water molecules used by --water_bridge. The GROMACS default water residue name is SOL. (default: resname SOL)
   --water_bridge_order INTEGER
                         maximum number of water molecules that can bridge the ligand and the protein (only used with --water_bridge). Order 1 considers a single bridging water. (default: 1)
+  --water_cutoff float  only waters within this distance (A) of the ligand in a given frame are considered for --water_bridge. Main speed lever for water-bridge: ProLIF otherwise converts every water to RDKit every frame. Auto-widened for higher --water_bridge_order. Set to 0 to consider all waters (slow). (default: 8.0)
   --occupancy float     occupancy of the unique contacts to show. Applied for plifs_occupancyX.html (for each complex) and prolif_output_occupancyX.png (all systems aggregated plot) (default: 0.6)
   --not_save_pics       not create html and png files (by frames) for each unique trajectory. Only overall prolif png file will be created. (default: False)
   -o string, --out_suffix string
@@ -76,10 +84,17 @@ run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --water_bridge
 run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --water_bridge --water_bridge_order 2 --water_selection "resname SOL WAT HOH"
 ```
 
+## Performance
+ProLIF converts the protein (and, for `--water_bridge`, the water) to an RDKit molecule on **every frame**, so the runtime is dominated by how many atoms are converted per frame. StreaMD reduces this automatically, with results identical to analysing the full system:
+
+1) **Binding-site restriction** (`--binding_site_cutoff`, default `12` Å): the protein is cropped to residues that come within the cutoff of the ligand in at least one frame (the union over the trajectory). Because ProLIF only detects interactions within 6 Å of the ligand, any cutoff above 6 Å is exact. This is the main speed lever — typically ~15–20× faster for large solvated proteins. Set `0` to analyse the full protein.
+2) **Parallel strategy** (`--parallel_strategy`, default `chunk`): with `--n_jobs > 1`, ProLIF's own default (`queue`) runs the conversion on the main thread; `chunk` parallelises it. Use `auto` to defer to ProLIF.
+3) **Water restriction** (`--water_cutoff`, default `8` Å): makes `--water_bridge` usable by keeping only waters near the ligand each frame (re-evaluated per frame) instead of converting every water. A bridging water must hydrogen-bond the ligand, so the result is unchanged; the value is widened automatically for higher `--water_bridge_order`. Set `0` to consider all waters.
+
 ## Effective Parallel Calculations
 To control parallelism:
 1) `--ncpu`: maximum number of cores available (defaults to all CPUs).
-2) `--n_jobs`: number of processes per trajectory. StreaMD distributes `--ncpu` across trajectories and `--n_jobs`. By default, `--n_jobs` is capped (12) to avoid the ProLIF bottleneck; override explicitly if needed.
+2) `--n_jobs`: number of processes per trajectory. StreaMD distributes `--ncpu` across trajectories and `--n_jobs`. By default, `--n_jobs` is capped (12) to avoid the ProLIF bottleneck; override explicitly if needed. See also `--parallel_strategy` (default `chunk`), which makes `--n_jobs > 1` effective for solvated systems.
 
 ## Outputs
 1) Per trajectory: `plifs.csv`, `plifs.png`, `plifs_map.png`, `plifs.html` (HTML/PNG creation can be disabled with `--not_save_pics`)
