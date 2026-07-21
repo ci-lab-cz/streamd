@@ -15,7 +15,7 @@ sns.set_context("paper", rc={"font.size":15,"axes.titlesize":15,"axes.labelsize"
 plt.ioff()
 
 
-def plot_rmsd(rmsd_df, system_name, out):
+def plot_rmsd(rmsd_df, system_name, out, alpha=0.7):
     """Plot RMSD over time and save to disk.
 
     Parameters
@@ -26,11 +26,18 @@ def plot_rmsd(rmsd_df, system_name, out):
         Name of the analysed MD system used in the plot title.
     out : str | os.PathLike
         Path where the PNG plot will be written.
+    alpha : float, optional
+        Line transparency in ``[0, 1]`` (0 fully transparent, 1 opaque).
+        Values below 1 let overlapping RMSD curves show through each other.
+        Defaults to ``0.7``.
     """
-    plot = rmsd_df.set_index('time(ns)').plot(title=f"RMSD of {system_name}")
+    plot = rmsd_df.set_index('time(ns)').plot(title=f"RMSD of {system_name}", alpha=alpha)
     plt.ylabel("RMSD (Å)")
     plt.xlabel("Time (ns)")
-    plt.legend(loc='lower right', ncol=len(rmsd_df.columns) // 2, frameon=False)
+    # place the legend outside the axes (below, left-aligned) so it never
+    # overlaps the curves
+    plt.legend(loc='upper left', bbox_to_anchor=(0, -0.15),
+               ncol=len(rmsd_df.columns) // 2, frameon=False)
     plot.figure.savefig(out, dpi=350, bbox_inches="tight")
     plt.clf()
     plt.close('all')

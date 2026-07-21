@@ -10,6 +10,7 @@
 - fix `last_frame.pdb`: the final frame was selected by passing the number of frames to `gmx trjconv -dump`, which interprets the value as a time in ps and extracted an early frame instead of the last one; the actual final trajectory time is now parsed from `gmx check` and passed to `-dump` (a clear error is raised if it cannot be determined)
 - `last_frame.pdb` is now written as a visualization-ready snapshot: molecules are made whole across periodic boundaries and the protein–ligand–cofactor complex is centered in a compact unit cell (`gmx trjconv -pbc mol -center -ur compact`), with the full `System` (water and ions included) written
 - add `start_frame.pdb` - the first production frame written with the same visualization-ready treatment as `last_frame.pdb` (`-pbc mol -center -ur compact`, full `System`), for visual comparison of the start and end of the simulation
+- improve RMSD plot readability: move the legend outside the axes (below, left-aligned) so it no longer overlaps the curves, and draw lines with transparency (new `alpha` argument to `plot_rmsd`, default `0.7`) so overlapping RMSD curves remain visible
 
 **0.5**
 - add argument `box_type` - simulation box type (`triclinic`, `cubic`, `dodecahedron`, `octahedron`) (default `cubic`) defined using `gmx editconf -bt`
