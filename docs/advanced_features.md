@@ -45,6 +45,16 @@ run_md --wdir_to_continue md_files/md_run/protein_H_HIS_ligand_1 --md_time 3 --s
 - `--no_dr` skips acdoctor ligand diagnostics (use with care).
 - `--deffnm` sets a custom prefix for continuing/extending runs.
 
+## Convert Trajectories for OpenMMDL (gro/xtc → pdb/dcd)
+- `streamd.scripts.gro2pdb_dcd` converts a GROMACS trajectory to the PDB topology + DCD trajectory that [OpenMMDL Analysis](https://github.com/wolberlab/OpenMMDL) expects. PDB and DCD are written from the same selection so their atom order matches; feed an already PBC-treated/fitted trajectory (`md_fit.xtc`).
+- `--i` batch-converts in place: each item is a StreaMD run directory (`md_fit.xtc` → `md_fit.pdb`/`md_fit.dcd`) or a trajectory file (`<name>.xtc` → `<name>.pdb`/`<name>.dcd`). Use `-f`/`-o` instead for a single conversion with a custom output prefix.
+- A topology is always required (DCD stores coordinates only). It is auto-detected next to each trajectory (`md_out.tpr` → `md_out.gro`); override with `-s`. Preferring the `.tpr` adds `CONECT` records to the PDB.
+- `md_fit.xtc` is the full system, so OpenMMDL sees water/ions unless you pass `--selection` (e.g. `"protein or resname UNL"`). GROMACS-derived PDBs have no HETATM/chain info, so give OpenMMDL the ligand resname/SDF explicitly.
+```bash
+python -m streamd.scripts.gro2pdb_dcd --i md_files/md_run/protein_H_HIS_ligand_1 --selection "protein or resname UNL"
+python -m streamd.scripts.gro2pdb_dcd -f md_fit.xtc -s md_out.tpr -o openmmdl_in --step 5
+```
+
 ## Parallelism and GPUs
 - Combine `--device`, `--gpu_ids`, `--ntmpi_per_gpu`, and `--mdrun_per_node` to balance CPU/GPU use; see examples in {doc}`running_md`. 
 - Set the `--ncpu` option to limit CPU usage; by default, StreaMD uses all available CPU cores.
