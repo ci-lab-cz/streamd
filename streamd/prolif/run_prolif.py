@@ -122,6 +122,10 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         ligand in any analysed frame. ProLIF re-converts the whole protein to RDKit every frame,
         so this is the main speed lever. Results stay identical while the cutoff stays above the
         ProLIF vicinity cutoff (6 A). Set to <= 0 to analyse the full protein selection.
+    :param parallel_strategy: ProLIF multiprocessing strategy ('chunk', 'queue' or None for ProLIF
+        auto). For solvated MD systems ProLIF auto-selects 'queue', which serialises the RDKit
+        conversion on the main thread and is slower than serial; 'chunk' parallelises the conversion
+        and is ~2-2.6x faster (measured). Only used when n_jobs > 1.
     :param ligand_sdf: optional path to a reference ligand structure (.sdf/.mol) with correct bond
         orders, used as a template for the ligand conversion. USUALLY UNNECESSARY: for standard
         all-atom topologies ProLIF infers the ligand chemistry correctly from the TPR alone (the
@@ -312,6 +316,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param pdb: None or path to file (protein.pdb for renumbering)
     :param verbose: bool
     :param binding_site_cutoff: float, restrict protein to residues within this distance (A) of the ligand
+    :param parallel_strategy: str or None, ProLIF multiprocessing strategy ('chunk'/'queue'/None-for-auto)
     :param ligand_sdf: None or path to a reference ligand .sdf/.mol (bond-order template; usually unnecessary)
     :param water_bridge: bool, compute water-mediated (water-bridge) interactions
     :param water_selection: str, MDAnalysis selection for water molecules
@@ -452,6 +457,9 @@ def main():
                              'identical to a full-protein analysis as long as the cutoff stays above the ProLIF '
                              'vicinity cutoff (6 A). Set to 0 or None to disable and analyse the full protein '
                              'selection.')
+    parser.add_argument('--parallel_strategy', required=False, default='chunk',
+                        choices=['chunk', 'queue', 'auto'],
+                        help='ProLIF multiprocessing strategy when --n_jobs > 1. Use "auto" to defer to ProLIF.')
     parser.add_argument('--ligand_sdf', metavar='FILENAME', required=False, default=None,
                         type=partial(filepath_type, ext=('sdf', 'mol'), check_exist=False),
                         help='Optional reference ligand structure (.sdf/.mol) WITH correct bond orders, used as '
@@ -530,6 +538,7 @@ def main():
           n_jobs=args.n_jobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
           save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
           verbose=args.verbose, binding_site_cutoff=args.binding_site_cutoff,
+          parallel_strategy=None if args.parallel_strategy == 'auto' else args.parallel_strategy,
           ligand_sdf=args.ligand_sdf,
     finally:
         logging.shutdown()
