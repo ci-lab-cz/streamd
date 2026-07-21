@@ -1,5 +1,7 @@
 """Convert GROMACS gro/xtc trajectories to pdb/dcd pairs for OpenMMDL analysis.
 
+Run with ``python -m streamd.scripts.gro2pdb_dcd`` (or by file path).
+
 OpenMMDL Analysis (PLIP-based) expects a **PDB topology** and a coordinate-only
 **DCD trajectory**. A DCD carries no topology, so the PDB and DCD are written from
 the *same* atom selection and atom order to keep them consistent.
@@ -8,7 +10,8 @@ Two ways to drive it:
 
 * ``--i`` : batch mode. Each item is either a StreaMD working directory (its
   ``md_fit.xtc`` is converted to ``md_fit.pdb``/``md_fit.dcd`` in place) or a
-  trajectory file (converted to ``<name>.pdb``/``<name>.dcd`` next to it).
+  trajectory file (converted to ``<name>.pdb``/``<name>.dcd`` next to it). Batch
+  ,they can be converted in parallel with ``--ncpu``.
 * ``-f``/``-o`` : explicit single conversion with a chosen output prefix.
 
 A DCD stores coordinates only, so a topology is always required. When ``-s`` is not
@@ -35,6 +38,23 @@ from streamd.utils.utils import filepath_type
 # for it (deffnm is 'md_out'; md_fit.xtc is the full-System fitted trajectory).
 STREAMD_TRAJ = 'md_fit.xtc'
 STREAMD_TOPOLOGIES = ('md_out.tpr', 'md_out.gro')
+
+
+def _configure_logging():
+    """Set up logging/warnings for this process (also used as a worker initializer).
+
+    MDAnalysis' per-file chatter is quieted: attribute-guessing INFO lines and the
+    PDBWriter "Found no information for attr"/"missing chainIDs" warnings are expected
+    when a topology comes from GROMACS (a gro has no altLocs/chainIDs/record_types) and
+    would drown out this tool's messages in batch mode. Applied in every worker so
+    output stays consistent under both the fork and spawn start methods.
+    """
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.getLogger('MDAnalysis').setLevel(logging.WARNING)
+    warnings.filterwarnings('ignore', message='Found no information for attr',
+                            category=UserWarning)
+    warnings.filterwarnings('ignore', message='Found missing chainIDs',
+                            category=UserWarning)
 
 
 def _load_universe(topology, trajectory):
@@ -111,17 +131,15 @@ def _resolve_target(item, topology_override):
         if not os.path.isfile(trajectory):
             raise FileNotFoundError(
                 f'{item}: no {STREAMD_TRAJ} found in this directory')
-        extra_names = STREAMD_TOPOLOGIES
     elif os.path.isfile(item):
         trajectory = item
-        extra_names = STREAMD_TOPOLOGIES
     else:
         raise FileNotFoundError(f'{item}: not an existing directory or file')
 
     out_prefix = os.path.splitext(trajectory)[0]
     out_pdb = f'{out_prefix}.pdb'
     topology = _resolve_topology(trajectory, out_pdb,
-                                 explicit=topology_override, extra_names=extra_names)
+                                 explicit=topology_override, extra_names=STREAMD_TOPOLOGIES)
     if topology is None:
         raise FileNotFoundError(
             f'{trajectory}: could not auto-detect a topology (looked for '
@@ -177,6 +195,37 @@ def convert(topology, trajectory, out_pdb, out_dcd, selection='all',
     return out_pdb, out_dcd, atomgroup.n_atoms, n_frames
 
 
+def _convert_one(target, selection='all', start=None, stop=None, step=None):
+    """Convert a single resolved target; return ``(trajectory, ok, error)`` without raising.
+
+    Kept at module level (and returning instead of raising) so it is picklable and
+    safe to run inside a ``multiprocessing`` worker: each call builds its own universe
+    and writer and writes to its own output paths, sharing no MDAnalysis state.
+    """
+    trajectory, topology, out_prefix = target
+    try:
+        convert(topology=topology, trajectory=trajectory,
+                out_pdb=f'{out_prefix}.pdb', out_dcd=f'{out_prefix}.dcd',
+                selection=selection, start=start, stop=stop, step=step)
+        return trajectory, True, None
+    except (ValueError, OSError) as exc:
+        return trajectory, False, str(exc)
+
+
+def _dedupe_targets(targets):
+    """Drop targets that would write the same output, so parallel tasks never collide."""
+    seen = set()
+    unique = []
+    for target in targets:
+        key = os.path.abspath(target[2])
+        if key in seen:
+            logging.warning('Skipping duplicate output target %s.{pdb,dcd}', target[2])
+            continue
+        seen.add(key)
+        unique.append(target)
+    return unique
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Convert GROMACS gro/xtc to pdb/dcd for OpenMMDL analysis. PDB and '
@@ -207,18 +256,13 @@ def main():
                         help='Stop frame index (exclusive).')
     parser.add_argument('--step', metavar='INT', type=int, default=None,
                         help='Write every STEP-th frame (subsample the trajectory).')
+    parser.add_argument('--ncpu', metavar='INT', type=int, default=1,
+                        help='Parallel worker processes for --i batch mode (default: 1 = '
+                             'sequential). Conversion is I/O-bound, so 4-8 is usually '
+                             'enough; more can thrash a single disk. Ignored for -f mode.')
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    # Quiet MDAnalysis' own per-file chatter: attribute-guessing INFO lines and the
-    # PDBWriter "Found no information for attr" / "missing chainIDs" warnings are all
-    # expected when a topology comes from GROMACS (a gro has no altLocs/chainIDs/
-    # record_types), and drown out this tool's messages in batch mode.
-    logging.getLogger('MDAnalysis').setLevel(logging.WARNING)
-    warnings.filterwarnings('ignore', message='Found no information for attr',
-                            category=UserWarning)
-    warnings.filterwarnings('ignore', message='Found missing chainIDs',
-                            category=UserWarning)
+    _configure_logging()
 
     if (args.i is not None) == (args.trajectory is not None):
         parser.error('provide exactly one of --i (batch) or -f/--trajectory (single).')
@@ -245,15 +289,30 @@ def main():
                 f'{trajectory}: could not auto-detect a topology; pass one with -s/--topology.')
         targets.append((trajectory, topology, out_prefix))
 
-    for trajectory, topology, out_prefix in targets:
-        try:
-            convert(topology=topology, trajectory=trajectory,
-                    out_pdb=f'{out_prefix}.pdb', out_dcd=f'{out_prefix}.dcd',
-                    selection=args.selection,
-                    start=args.start, stop=args.stop, step=args.step)
-        except (ValueError, OSError) as exc:
-            logging.error('Failed to convert %s: %s', trajectory, exc)
-            failures += 1
+    targets = _dedupe_targets(targets)
+
+    worker = partial(_convert_one, selection=args.selection,
+                     start=args.start, stop=args.stop, step=args.step)
+    n_workers = max(1, min(args.ncpu, len(targets)))
+    if n_workers == 1:
+        results = (worker(target) for target in targets)
+    else:
+        from multiprocessing import Pool
+        logging.info('Converting %d trajectories with %d parallel workers',
+                     len(targets), n_workers)
+        pool = Pool(n_workers, initializer=_configure_logging)
+        # imap_unordered streams results as each independent conversion finishes.
+        results = pool.imap_unordered(worker, targets)
+
+    try:
+        for trajectory, ok, error in results:
+            if not ok:
+                logging.error('Failed to convert %s: %s', trajectory, error)
+                failures += 1
+    finally:
+        if n_workers > 1:
+            pool.close()
+            pool.join()
 
     if failures:
         sys.exit(1)
