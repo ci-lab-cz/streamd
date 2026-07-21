@@ -36,9 +36,48 @@ def backup_output(output):
         shutil.move(output, os.path.join(os.path.dirname(output), f'#{os.path.basename(output)}.{n}#'))
 
 
+# ProLIF only detects interactions within this distance of the ligand
+# (Fingerprint.vicinity_cutoff). Any binding-site cutoff must exceed it to keep
+# the fingerprints identical to a full-protein analysis.
+PROLIF_VICINITY_CUTOFF = 6.0
+
+
+def restrict_protein_to_binding_site(u, protein_selection, ligand_selection, trajectory, cutoff):
+    """Restrict the protein to residues near the ligand over the whole trajectory.
+
+    ProLIF converts the *entire* protein AtomGroup to an RDKit molecule on every
+    frame (bond perception + sanitization), which dominates the runtime. Because
+    it only detects interactions within ``vicinity_cutoff`` (6 A) of the ligand,
+    handing it the union of protein residues seen within a larger ``cutoff`` in
+    any analysed frame yields identical fingerprints while converting far fewer
+    atoms per frame.
+
+    :param u: MDAnalysis Universe (already renumbered if a pdb was provided).
+    :param protein_selection: MDAnalysis selection string for the protein.
+    :param ligand_selection: MDAnalysis selection string for the ligand.
+    :param trajectory: the (possibly stepped) trajectory iterator to scan.
+    :param cutoff: distance in Angstrom; must be > 6 A to preserve results.
+    :return: an AtomGroup restricted to the binding-site residues, or None if the
+        selection turned out empty (caller should fall back to the full protein).
+    """
+    pocket = u.select_atoms(
+        f'byres (({protein_selection}) and around {cutoff} ({ligand_selection}))',
+        updating=True)
+    resindices = set()
+    current_frame = u.trajectory.frame
+    for _ in trajectory:
+        resindices.update(int(i) for i in pocket.residues.resindices)
+    u.trajectory[current_frame]  # restore the frame pointer for downstream steps
+
+    if not resindices:
+        return None
+    return u.residues[sorted(resindices)].atoms
+
+
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
                     occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None,
                     water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
+                    binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
     """Compute protein–ligand interaction fingerprints for a single trajectory.
 
     :param tpr:
@@ -53,6 +92,10 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     :param dpi:
     :param plot_width:  in inches
     :param plot_height: in inches
+    :param binding_site_cutoff: restrict the protein to residues within this distance (A) of the
+        ligand in any analysed frame. ProLIF re-converts the whole protein to RDKit every frame,
+        so this is the main speed lever. Results stay identical while the cutoff stays above the
+        ProLIF vicinity cutoff (6 A). Set to <= 0 to analyse the full protein selection.
     :param water_bridge: also compute water-mediated (water-bridge) interactions
     :param water_selection: MDAnalysis selection string for water molecules (used only if water_bridge)
     :param water_bridge_order: maximum number of water molecules bridging the ligand and protein
@@ -70,6 +113,31 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
             protein.residues.resids = protein_pdb.residues.resids
         if len(protein.segments.segids) == len(protein_pdb.segments.segids):
             protein.segments.segids = protein_pdb.segments.segids
+
+    trajectory = u.trajectory[::step] if step > 1 else u.trajectory
+
+    if binding_site_cutoff and binding_site_cutoff > 0:
+        # A water bridge links the ligand to a protein residue through one or more waters,
+        # so the participating residue can sit further from the ligand than a direct contact.
+        # Add margin per bridging water to keep water-bridge results identical too.
+        effective_cutoff = binding_site_cutoff
+        if water_bridge:
+            effective_cutoff += 2 * PROLIF_VICINITY_CUTOFF * water_bridge_order
+        if effective_cutoff <= PROLIF_VICINITY_CUTOFF:
+            logging.warning(f'{xtc}: binding_site_cutoff ({binding_site_cutoff}) is not above the ProLIF '
+                            f'vicinity cutoff ({PROLIF_VICINITY_CUTOFF} A); analysing the full protein instead '
+                            f'to avoid dropping contacts.')
+        else:
+            binding_site = restrict_protein_to_binding_site(u, protein_selection, ligand_selection,
+                                                            trajectory, effective_cutoff)
+            if binding_site is None or binding_site.n_atoms == 0:
+                logging.warning(f'{xtc}: no protein residues found within {effective_cutoff} A of the ligand; '
+                                f'analysing the full protein selection instead.')
+            else:
+                logging.info(f'{xtc}: restricting ProLIF protein to {binding_site.n_residues} binding-site '
+                             f'residues ({binding_site.n_atoms} atoms) within {effective_cutoff} A of the ligand '
+                             f'(full protein: {protein.n_residues} residues).')
+                protein = binding_site
 
     interactions = ['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
                     'PiStacking', 'MetalAcceptor', 'XBDonor', 'XBAcceptor']
@@ -104,6 +172,7 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
                          plot_width, plot_height, save_viz, pdb, n_jobs, occupancy,
                          water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
+                         binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
     """Execute ProLIF analysis using paths relative to a directory."""
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
@@ -121,6 +190,7 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
                     plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, occupancy=occupancy,
                     pdb=pdb, n_jobs=n_jobs, water_bridge=water_bridge, water_selection=water_selection,
                     water_bridge_order=water_bridge_order)
+                    pdb=pdb, n_jobs=n_jobs, binding_site_cutoff=binding_site_cutoff,
     return output
 
 
@@ -147,6 +217,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
           protein_selection, ligand_resid, hostfile, ncpu, n_jobs,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose,
           water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
+          binding_site_cutoff=12.0,
     """Run ProLIF across multiple directories and aggregate results.
     :param wdir_to_run: list
     :param wdir_output: path to dirn
@@ -166,6 +237,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param unique_id: str
     :param pdb: None or path to file (protein.pdb for renumbering)
     :param verbose: bool
+    :param binding_site_cutoff: float, restrict protein to residues within this distance (A) of the ligand
     :param water_bridge: bool, compute water-mediated (water-bridge) interactions
     :param water_selection: str, MDAnalysis selection for water molecules
     :param water_bridge_order: int, maximum number of bridging water molecules
@@ -201,6 +273,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                                  ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
                                  plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb,
                                  n_jobs=n_jobs_per_task, occupancy=occupancy,
+                                 binding_site_cutoff=binding_site_cutoff,
                                  water_bridge=water_bridge, water_selection=water_selection,
                                  water_bridge_order=water_bridge_order):
                 if res:
@@ -221,6 +294,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                         step=step, verbose=verbose, output=output,
                         plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
                         pdb=pdb, n_jobs= min(12, ncpu), occupancy=occupancy,
+                        binding_site_cutoff=binding_site_cutoff,
                         water_bridge=water_bridge, water_selection=water_selection,
                         water_bridge_order=water_bridge_order)
         var_prolif_out_files = [output]
@@ -263,8 +337,10 @@ def main():
                         help='step to take every n-th frame. ps')
     parser.add_argument('--protein_selection', metavar='STRING',
                         required=False, default='protein',
-                        help='The protein selection atoms. '
-                             'Example: "protein" or "protein and byres around 20.0 resname UNL"')
+                        help='The protein selection atoms. Normally keep the default "protein": cropping '
+                             'the protein to the binding site is done automatically and safely by '
+                             '--binding_site_cutoff (a trajectory-wide union). Use this option to change which '
+                             'atoms count as the protein (e.g. limit to a chain, add cofactor, etc.).')
     parser.add_argument('-a', '--append_protein_selection', metavar='STRING', required=False, default=None,
                         help='the string which will be concatenated to the protein selection atoms. '
                              'Example: "resname ZN or resname MG".')
@@ -291,6 +367,14 @@ def main():
                         help='width of the output pictures')
     parser.add_argument('--height', metavar='FILENAME', default=10, type=int,
                         help='height of the output pictures')
+    parser.add_argument('--binding_site_cutoff', metavar='float', default=12.0, type=float_or_none,
+                        help='Restrict the ProLIF protein selection to residues that come within this distance '
+                             '(in Angstrom) of the ligand in any analysed frame. ProLIF re-converts the whole '
+                             'protein to an RDKit molecule on every frame, so shrinking the protein is the main '
+                             'speed lever and typically gives a large speedup for big proteins. Results are '
+                             'identical to a full-protein analysis as long as the cutoff stays above the ProLIF '
+                             'vicinity cutoff (6 A). Set to 0 or None to disable and analyse the full protein '
+                             'selection.')
     parser.add_argument('--water_bridge', default=False, action='store_true',
                         help='additionally compute water-mediated (water-bridge) interactions between the ligand '
                              'and the protein. Requires water molecules to be present in the input trajectory '
@@ -362,6 +446,7 @@ def main():
           save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
           verbose=args.verbose, water_bridge=args.water_bridge, water_selection=args.water_selection,
           water_bridge_order=args.water_bridge_order)
+          verbose=args.verbose, binding_site_cutoff=args.binding_site_cutoff,
     finally:
         logging.shutdown()
 
