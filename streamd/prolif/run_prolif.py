@@ -104,6 +104,8 @@ def load_ligand_template(path):
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
                     occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None,
                     binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
+                    water_bridge=False, water_selection='resname SOL', water_bridge_order=1,
+                    water_cutoff=8.0):
     """Compute protein–ligand interaction fingerprints for a single trajectory.
 
     :param tpr:
@@ -134,6 +136,11 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     :param water_bridge: also compute water-mediated (water-bridge) interactions
     :param water_selection: MDAnalysis selection string for water molecules (used only if water_bridge)
     :param water_bridge_order: maximum number of water molecules bridging the ligand and protein
+    :param water_cutoff: only waters within this distance (A) of the ligand each frame are considered
+        for water-bridge analysis. This is the main speed lever for water-bridge (ProLIF otherwise
+        converts every water to RDKit every frame). Results stay identical while the cutoff exceeds
+        the ProLIF vicinity cutoff (6 A); it is automatically widened for higher bridge orders. Set
+        to <= 0 to consider all waters.
     :return: pandas dataframe
     """
     u = mda.Universe(tpr, xtc, in_memory=False, in_memory_step=1)
@@ -178,11 +185,28 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
                     'PiStacking', 'MetalAcceptor', 'XBDonor', 'XBAcceptor']
     parameters = None
     if water_bridge:
-        water = u.atoms.select_atoms(water_selection)
-        if len(water) == 0:
+        water_all = u.atoms.select_atoms(water_selection)
+        if len(water_all) == 0:
             logging.warning(f'{xtc}: water-bridge analysis was requested but no atoms matched the water selection '
                             f'"{water_selection}". Water-mediated contacts will be skipped for this trajectory.')
         else:
+            # Water-bridge is enormously expensive because ProLIF converts every water molecule to
+            # RDKit on every frame (in the ligand-water, water-protein and, for order>=2, water-water
+            # passes). A bridging water must hydrogen-bond the ligand, so it is always close to it;
+            # restricting the water to an updating (per-frame) selection near the ligand keeps only the
+            # waters that can actually bridge and leaves results identical. The cutoff must exceed the
+            # ProLIF vicinity cutoff (6 A) and grows with the bridge order (each extra water is one more
+            # ~vicinity-length hop away from the ligand).
+            if water_cutoff and water_cutoff > 0:
+                effective_water_cutoff = water_cutoff + PROLIF_VICINITY_CUTOFF * (water_bridge_order - 1)
+                water = u.select_atoms(
+                    f'byres (({water_selection}) and around {effective_water_cutoff} ({ligand_selection}))',
+                    updating=True)
+                logging.info(f'{xtc}: water-bridge restricted to waters within {effective_water_cutoff} A of the '
+                             f'ligand each frame (out of {water_all.n_residues} waters); set --water_cutoff 0 '
+                             f'to consider all waters.')
+            else:
+                water = water_all
             interactions.append('WaterBridge')
             parameters = {'WaterBridge': {'water': water, 'order': water_bridge_order}}
 
@@ -231,7 +255,8 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
                      f'only if it looks wrong.')
 
     fp = plf.Fingerprint(interactions, parameters=parameters)
-    fp.run(u.trajectory[::step] if step > 1 else u.trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs)
+    fp.run(trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs,
+           parallel_strategy=parallel_strategy, converter_kwargs=converter_kwargs)
 
     df = fp.to_dataframe()
     df.columns = ['.'.join(item.strip().lower() for item in items[1:]) for items in df.columns]
@@ -251,6 +276,8 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
                          plot_width, plot_height, save_viz, pdb, n_jobs, occupancy,
                          binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
+                         water_bridge=False, water_selection='resname SOL', water_bridge_order=1,
+                         water_cutoff=8.0):
     """Execute ProLIF analysis using paths relative to a directory."""
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
@@ -268,6 +295,8 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
                     plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, occupancy=occupancy,
                     pdb=pdb, n_jobs=n_jobs, binding_site_cutoff=binding_site_cutoff,
                     parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
+                    water_bridge=water_bridge, water_selection=water_selection,
+                    water_bridge_order=water_bridge_order, water_cutoff=water_cutoff)
     return output
 
 
@@ -321,6 +350,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param water_bridge: bool, compute water-mediated (water-bridge) interactions
     :param water_selection: str, MDAnalysis selection for water molecules
     :param water_bridge_order: int, maximum number of bridging water molecules
+    :param water_cutoff: float, only waters within this distance (A) of the ligand each frame are used
     :return:
     """
     output = 'plifs.csv'
@@ -356,7 +386,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                                  binding_site_cutoff=binding_site_cutoff,
                                  parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
                                  water_bridge=water_bridge, water_selection=water_selection,
-                                 water_bridge_order=water_bridge_order):
+                                 water_bridge_order=water_bridge_order, water_cutoff=water_cutoff):
                 if res:
                     var_prolif_out_files.append(res)
         finally:
@@ -378,7 +408,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                         binding_site_cutoff=binding_site_cutoff,
                         parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
                         water_bridge=water_bridge, water_selection=water_selection,
-                        water_bridge_order=water_bridge_order)
+                        water_bridge_order=water_bridge_order, water_cutoff=water_cutoff)
         var_prolif_out_files = [output]
 
     backup_output(output_aggregated)
@@ -478,6 +508,14 @@ def main():
     parser.add_argument('--water_bridge_order', metavar='INTEGER', required=False, default=1, type=int,
                         help='maximum number of water molecules that can bridge the ligand and the protein '
                              '(only used with --water_bridge). Order 1 considers a single bridging water.')
+    parser.add_argument('--water_cutoff', metavar='float', default=8.0, type=float,
+                        help='Only waters within this distance (in Angstrom) of the ligand in a given frame are '
+                             'considered for --water_bridge analysis. This is the main speed lever for '
+                             'water-bridge: ProLIF otherwise converts EVERY water molecule to RDKit on every '
+                             'frame, which is extremely slow for solvated systems. A bridging water must '
+                             'hydrogen-bond the ligand, so results stay identical as long as the cutoff exceeds '
+                             'the ProLIF vicinity cutoff (6 A); the value is widened automatically for higher '
+                             '--water_bridge_order. Set to 0 to consider all waters (slow).')
     parser.add_argument('--occupancy', metavar='float', default=0.6, type=float,
                         help='occupancy of the unique contacts to show. '
                              'Applied for plifs_occupancyX.html (for each complex) and'
@@ -540,6 +578,8 @@ def main():
           verbose=args.verbose, binding_site_cutoff=args.binding_site_cutoff,
           parallel_strategy=None if args.parallel_strategy == 'auto' else args.parallel_strategy,
           ligand_sdf=args.ligand_sdf,
+          water_bridge=args.water_bridge, water_selection=args.water_selection,
+          water_bridge_order=args.water_bridge_order, water_cutoff=args.water_cutoff)
     finally:
         logging.shutdown()
 
