@@ -74,9 +74,35 @@ def restrict_protein_to_binding_site(u, protein_selection, ligand_selection, tra
     return u.residues[sorted(resindices)].atoms
 
 
+def load_ligand_template(path):
+    """Load a reference ligand structure (SDF/MOL) that carries correct bond orders.
+
+    Used as a template for MDAnalysis' TemplateInferrer so that ProLIF assigns the ligand
+    bond orders from a trusted structure instead of inferring them from the topology. This
+    is usually unnecessary - see the ``ligand_sdf`` note in :func:`run_prolif_task`.
+
+    :param path: path to a .sdf or .mol file.
+    :return: an RDKit Mol with heavy atoms only (hydrogens removed, as required by
+        MDAnalysis' TemplateInferrer / AssignBondOrdersFromTemplate), or None if it
+        could not be read.
+    """
+    from rdkit import Chem
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        # removeHs=True: the template must be a heavy-atom graph - TemplateInferrer strips
+        # hydrogens from the target before matching, so an H-bearing template fails to match.
+        if ext == '.sdf':
+            supplier = Chem.SDMolSupplier(path, removeHs=True, sanitize=True)
+            return next((m for m in supplier if m is not None), None)
+        if ext == '.mol':
+            return Chem.MolFromMolFile(path, removeHs=True, sanitize=True)
+    except Exception:
+        return None
+    return None
+
+
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
                     occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None,
-                    water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
                     binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
     """Compute protein–ligand interaction fingerprints for a single trajectory.
 
@@ -96,6 +122,11 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         ligand in any analysed frame. ProLIF re-converts the whole protein to RDKit every frame,
         so this is the main speed lever. Results stay identical while the cutoff stays above the
         ProLIF vicinity cutoff (6 A). Set to <= 0 to analyse the full protein selection.
+    :param ligand_sdf: optional path to a reference ligand structure (.sdf/.mol) with correct bond
+        orders, used as a template for the ligand conversion. USUALLY UNNECESSARY: for standard
+        all-atom topologies ProLIF infers the ligand chemistry correctly from the TPR alone (the
+        interpreted SMILES is logged so it can be checked). Provide it only for united-atom /
+        coarse-grained ligands, or if the logged SMILES is wrong.
     :param water_bridge: also compute water-mediated (water-bridge) interactions
     :param water_selection: MDAnalysis selection string for water molecules (used only if water_bridge)
     :param water_bridge_order: maximum number of water molecules bridging the ligand and protein
@@ -151,6 +182,50 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
             interactions.append('WaterBridge')
             parameters = {'WaterBridge': {'water': water, 'order': water_bridge_order}}
 
+    # Interpret the ligand chemistry. For all-atom topologies ProLIF infers bond orders correctly
+    # from the TPR alone, which is why the resulting SMILES is logged as a sanity check. A
+    # --ligand_sdf template is USUALLY UNNECESSARY: supply it only for the rare cases where the
+    # inference is wrong (united-atom / coarse-grained ligands, or an odd SMILES below).
+    from rdkit import Chem
+    lig_converter_kwargs = {}
+    converter_kwargs = None
+    try:
+        topo_heavy = ligand.convert_to.rdkit().GetNumHeavyAtoms()
+        topo_smiles = Chem.MolToSmiles(Chem.RemoveHs(ligand.convert_to.rdkit()))
+    except Exception as e:
+        topo_heavy, topo_smiles = None, None
+        logging.warning(f'{xtc}: could not convert the ligand from the topology ({e}).')
+
+    if ligand_sdf:
+        if not os.path.isfile(ligand_sdf):
+            logging.warning(f'{xtc}: ligand template "{ligand_sdf}" not found; using bond orders '
+                            f'inferred from the topology instead (usually fine).')
+        else:
+            template = load_ligand_template(ligand_sdf)
+            if template is None:
+                logging.warning(f'{xtc}: could not parse ligand template "{ligand_sdf}" (expected .sdf/.mol); '
+                                f'using topology inference instead (usually fine).')
+            elif topo_heavy is not None and template.GetNumAtoms() != topo_heavy:
+                logging.warning(f'{xtc}: ligand template "{os.path.basename(ligand_sdf)}" has '
+                                f'{template.GetNumAtoms()} heavy atoms but the ligand has {topo_heavy}; '
+                                f'template ignored, using topology inference instead.')
+            else:
+                from MDAnalysis.converters.RDKitInferring import TemplateInferrer
+                kw = {'inferrer': TemplateInferrer(template=template)}
+                try:
+                    tmpl_smiles = Chem.MolToSmiles(Chem.RemoveHs(ligand.convert_to.rdkit(**kw)))
+                    lig_converter_kwargs, converter_kwargs = kw, (kw, {})
+                    logging.info(f'{xtc}: ligand "{ligand_selection}" bond orders assigned from template '
+                                 f'{os.path.basename(ligand_sdf)}; SMILES: {tmpl_smiles}.')
+                except Exception as e:
+                    logging.warning(f'{xtc}: ligand template "{os.path.basename(ligand_sdf)}" did not match '
+                                    f'the ligand ({e}); using topology inference instead.')
+
+    if converter_kwargs is None and topo_smiles is not None:
+        logging.info(f'{xtc}: ligand "{ligand_selection}" interpreted as SMILES: {topo_smiles} '
+                     f'(inferred from topology). Usually correct without a template; pass --ligand_sdf '
+                     f'only if it looks wrong.')
+
     fp = plf.Fingerprint(interactions, parameters=parameters)
     fp.run(u.trajectory[::step] if step > 1 else u.trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs)
 
@@ -171,7 +246,6 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 
 def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, step, verbose, output,
                          plot_width, plot_height, save_viz, pdb, n_jobs, occupancy,
-                         water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
                          binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
     """Execute ProLIF analysis using paths relative to a directory."""
     tpr = os.path.join(wdir, tpr)
@@ -188,9 +262,8 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
     run_prolif_task(tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                     ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
                     plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, occupancy=occupancy,
-                    pdb=pdb, n_jobs=n_jobs, water_bridge=water_bridge, water_selection=water_selection,
-                    water_bridge_order=water_bridge_order)
                     pdb=pdb, n_jobs=n_jobs, binding_site_cutoff=binding_site_cutoff,
+                    parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
     return output
 
 
@@ -216,8 +289,9 @@ def collect_outputs(output_list, output):
 def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
           protein_selection, ligand_resid, hostfile, ncpu, n_jobs,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose,
-          water_bridge=False, water_selection='resname SOL', water_bridge_order=1):
-          binding_site_cutoff=12.0,
+          binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
+          water_bridge=False, water_selection='resname SOL', water_bridge_order=1,
+          water_cutoff=8.0):
     """Run ProLIF across multiple directories and aggregate results.
     :param wdir_to_run: list
     :param wdir_output: path to dirn
@@ -238,6 +312,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param pdb: None or path to file (protein.pdb for renumbering)
     :param verbose: bool
     :param binding_site_cutoff: float, restrict protein to residues within this distance (A) of the ligand
+    :param ligand_sdf: None or path to a reference ligand .sdf/.mol (bond-order template; usually unnecessary)
     :param water_bridge: bool, compute water-mediated (water-bridge) interactions
     :param water_selection: str, MDAnalysis selection for water molecules
     :param water_bridge_order: int, maximum number of bridging water molecules
@@ -274,6 +349,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                                  plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb,
                                  n_jobs=n_jobs_per_task, occupancy=occupancy,
                                  binding_site_cutoff=binding_site_cutoff,
+                                 parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
                                  water_bridge=water_bridge, water_selection=water_selection,
                                  water_bridge_order=water_bridge_order):
                 if res:
@@ -295,6 +371,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                         plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
                         pdb=pdb, n_jobs= min(12, ncpu), occupancy=occupancy,
                         binding_site_cutoff=binding_site_cutoff,
+                        parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
                         water_bridge=water_bridge, water_selection=water_selection,
                         water_bridge_order=water_bridge_order)
         var_prolif_out_files = [output]
@@ -375,6 +452,14 @@ def main():
                              'identical to a full-protein analysis as long as the cutoff stays above the ProLIF '
                              'vicinity cutoff (6 A). Set to 0 or None to disable and analyse the full protein '
                              'selection.')
+    parser.add_argument('--ligand_sdf', metavar='FILENAME', required=False, default=None,
+                        type=partial(filepath_type, ext=('sdf', 'mol'), check_exist=False),
+                        help='Optional reference ligand structure (.sdf/.mol) WITH correct bond orders, used as '
+                             'a template to assign the ligand bond orders for ProLIF. USUALLY UNNECESSARY: for '
+                             'standard all-atom topologies the ligand chemistry (bond orders, aromaticity, '
+                             'charges) is inferred correctly from the TPR alone, and the interpreted SMILES is '
+                             'written to the log so you can verify it. Provide this only for united-atom / '
+                             'coarse-grained ligands, or if the logged SMILES is wrong.')
     parser.add_argument('--water_bridge', default=False, action='store_true',
                         help='additionally compute water-mediated (water-bridge) interactions between the ligand '
                              'and the protein. Requires water molecules to be present in the input trajectory '
@@ -444,9 +529,8 @@ def main():
           protein_selection=args.protein_selection, ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
           n_jobs=args.n_jobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
           save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
-          verbose=args.verbose, water_bridge=args.water_bridge, water_selection=args.water_selection,
-          water_bridge_order=args.water_bridge_order)
           verbose=args.verbose, binding_site_cutoff=args.binding_site_cutoff,
+          ligand_sdf=args.ligand_sdf,
     finally:
         logging.shutdown()
 
