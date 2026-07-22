@@ -42,6 +42,93 @@ def backup_output(output):
 PROLIF_VICINITY_CUTOFF = 6.0
 
 
+# Fix for ProLIF issue #358 (https://github.com/chemosim-lab/ProLIF/issues/358).
+# ProLIF matches its H-bond SMARTS on the protein *split into single-residue
+# fragments*. Cutting the peptide bond removes the backbone nitrogen's connection
+# to the previous residue's carbonyl, so ProLIF's amide exclusion
+# (``!$([NX3]-*=[O,N,P,S])``) no longer fires and the backbone amide nitrogen is
+# wrongly accepted as an H-bond acceptor. This produces impossible contacts such
+# as a ligand hydroxyl "donating" to a leucine backbone N (a false HBDonor).
+# The maintainer's suggested workaround is to also exclude the fragmented backbone
+# nitrogen (which, after the cut, appears as an sp2, neutral, degree-2 / valence-3
+# N-H bonded to CA-C(=O)) from the acceptor pattern. Adding this exclusion removes
+# the false ligand->backbone-N acceptor contacts while leaving every genuine
+# contact untouched - including the backbone N-H acting as a donor.
+BACKBONE_N_ACCEPTOR_EXCLUSION = "&!$([ND2v3^2+0](-[H])-[CD4v4H1^3]-[CD2^2+0]=O)"
+
+
+def inject_backbone_n_acceptor_exclusion(acceptor_smarts, exclusion=BACKBONE_N_ACCEPTOR_EXCLUSION):
+    """Add the fragmented-backbone-N exclusion to an H-bond acceptor SMARTS.
+
+    The exclusion is inserted into the aliphatic-nitrogen branch of ProLIF's
+    acceptor pattern so it is derived from whatever default the installed ProLIF
+    version ships (rather than hard-coding the whole pattern). Returns the input
+    unchanged if the exclusion is already present (e.g. once ProLIF fixes this
+    upstream) or if the aliphatic-nitrogen branch cannot be located.
+
+    :param acceptor_smarts: ProLIF's H-bond acceptor SMARTS (a single bracketed
+        atom query whose top-level branches are comma-separated ``$(...)`` groups).
+    :param exclusion: the ``&!$(...)`` clause to AND into the nitrogen branch.
+    :return: the patched SMARTS string.
+    """
+    if not acceptor_smarts or exclusion in acceptor_smarts:
+        return acceptor_smarts
+    inner = acceptor_smarts.strip()
+    if not (inner.startswith('[') and inner.endswith(']')):
+        return acceptor_smarts
+    body = inner[1:-1]
+    # split into top-level (bracket-depth 0) comma-separated branches
+    branches, depth, start = [], 0, 0
+    for i, ch in enumerate(body):
+        if ch in '([':
+            depth += 1
+        elif ch in ')]':
+            depth -= 1
+        elif ch == ',' and depth == 0:
+            branches.append(body[start:i])
+            start = i + 1
+    branches.append(body[start:])
+    # patch the first aliphatic-nitrogen branch: $([N...])
+    for bi, br in enumerate(branches):
+        j = br.find('[')
+        if j == -1 or br[j:j + 2] != '[N':
+            continue
+        d = 0
+        for k in range(j, len(br)):
+            if br[k] == '[':
+                d += 1
+            elif br[k] == ']':
+                d -= 1
+                if d == 0:  # matching close bracket of the atom query
+                    branches[bi] = br[:k] + exclusion + br[k:]
+                    return '[' + ','.join(branches) + ']'
+        break
+    return acceptor_smarts
+
+
+def fixed_hbond_acceptor_smarts():
+    """Return ProLIF's default H-bond acceptor SMARTS patched for issue #358.
+
+    :return: the patched acceptor SMARTS, or None if ProLIF's default could not be
+        read (in which case the caller should let ProLIF use its own default).
+    """
+    import inspect
+    try:
+        from prolif.interactions.interactions import HBAcceptor
+        default = inspect.signature(HBAcceptor.__init__).parameters['acceptor'].default
+    except Exception as e:
+        logging.warning(f'could not read ProLIF default H-bond acceptor SMARTS ({e}); '
+                        f'the issue #358 backbone-nitrogen fix will not be applied.')
+        return None
+    patched = inject_backbone_n_acceptor_exclusion(default)
+    if patched == default:
+        logging.warning('could not apply the issue #358 backbone-nitrogen fix to ProLIF\'s '
+                        'H-bond acceptor SMARTS (pattern already patched or unrecognised); '
+                        'using ProLIF\'s default acceptor pattern.')
+        return None
+    return patched
+
+
 def restrict_protein_to_binding_site(u, protein_selection, ligand_selection, trajectory, cutoff):
     """Restrict the protein to residues near the ligand over the whole trajectory.
 
@@ -245,7 +332,17 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
 
     interactions = ['Hydrophobic', 'HBDonor', 'HBAcceptor', 'Anionic', 'Cationic', 'CationPi', 'PiCation',
                     'PiStacking', 'MetalAcceptor', 'XBDonor', 'XBAcceptor']
-    parameters = None
+    # Issue #358 fix: override the H-bond acceptor SMARTS so the fragmented protein
+    # backbone nitrogen is not detected as a spurious acceptor. HBDonor detects the
+    # protein as the acceptor, so it is the interaction that carries the false
+    # contact; HBAcceptor is patched too for consistency (its acceptor pattern is
+    # matched against the ligand, which is unaffected in practice).
+    hb_acceptor_smarts = fixed_hbond_acceptor_smarts()
+    parameters = {}
+    if hb_acceptor_smarts is not None:
+        parameters['HBDonor'] = {'acceptor': hb_acceptor_smarts}
+        parameters['HBAcceptor'] = {'acceptor': hb_acceptor_smarts}
+        logging.info(f'{xtc}: applied the ProLIF issue #358 backbone-nitrogen acceptor fix.')
     if water_bridge:
         water_all = u.atoms.select_atoms(water_selection)
         if len(water_all) == 0:
@@ -270,12 +367,18 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
             else:
                 water = water_all
             interactions.append('WaterBridge')
-            parameters = {'WaterBridge': {'water': water, 'order': water_bridge_order}}
+            water_bridge_params = {'water': water, 'order': water_bridge_order}
+            # Water bridges are built from HBonds too, so apply the same issue #358
+            # acceptor fix to the ligand-water and water-protein H-bond passes.
+            if hb_acceptor_smarts is not None:
+                water_bridge_params['hbdonor'] = {'acceptor': hb_acceptor_smarts}
+                water_bridge_params['hbacceptor'] = {'acceptor': hb_acceptor_smarts}
+            parameters['WaterBridge'] = water_bridge_params
 
     lig_converter_kwargs, converter_kwargs = resolve_ligand_converter_kwargs(
         ligand, ligand_selection, ligand_sdf, xtc)
 
-    fp = plf.Fingerprint(interactions, parameters=parameters)
+    fp = plf.Fingerprint(interactions, parameters=parameters or None)
     fp.run(trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs,
            parallel_strategy=parallel_strategy, converter_kwargs=converter_kwargs)
 
