@@ -26,7 +26,11 @@ import re
 from streamd.analysis.md_system_analysis import run_md_analysis
 from streamd.analysis.run_analysis import run_rmsd_analysis
 from streamd.preparation.complex_preparation import run_complex_preparation
-from streamd.preparation.ligand_preparation import prepare_input_ligands, check_mols
+from streamd.preparation.ligand_preparation import (prepare_input_ligands, check_mols,
+                                                    ensure_run_forcefield_compatible,
+                                                    ensure_no_conflicting_run,
+                                                    write_prepared_ligand_forcefield,
+                                                    resolve_ligand_forcefield)
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.preparation.md_files_preparation import edit_mdp, copy_missing
 from streamd.utils.utils import (
@@ -421,6 +425,16 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
     device_param = f"'{device_param}'"
 
+    # Pre-flight: before any (re)preparation, refuse a fresh run whose ligand force field
+    # conflicts with an existing run directory - so the (potentially expensive) ligand
+    # parameterization is not regenerated only to stop later at run assembly.
+    if wdir_to_continue_list is None:
+        try:
+            ensure_no_conflicting_run(wdir_md, ligand_forcefield)
+        except ValueError as e:
+            logging.error(str(e))
+            return None
+
     # Start
     var_md_dirs_deffnm = []
     if tpr_prev is None or cpt_prev is None or xtc_prev is None:
@@ -601,6 +615,13 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
 
         else:
             var_complex_prepared_dirs = wdir_to_continue_list
+            # refuse to continue a run whose ligand force field differs from the requested one
+            try:
+                for cont_dir in (wdir_to_continue_list or []):
+                    ensure_run_forcefield_compatible(cont_dir, ligand_forcefield)
+            except ValueError as e:
+                logging.error(str(e))
+                return None
         if wdir_to_continue_list is None:
             replicated_dirs = []
             for d in var_complex_prepared_dirs:
@@ -609,10 +630,15 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                     replica_dir = os.path.join(
                         wdir_md, f"{os.path.basename(d)}_replica{replica_idx}"
                     )
+                    # a conflicting existing run directory was already rejected by the
+                    # pre-flight check above (before preparation), so reuse is safe here
                     if os.path.isdir(replica_dir):
                         copy_missing(d, replica_dir)
                     else:
                         shutil.copytree(d, replica_dir)
+                    # record the force field into the run directory so later runs and
+                    # analysis can tell which parameter set produced it
+                    write_prepared_ligand_forcefield(replica_dir, ligand_forcefield)
 
                     replica_nvt_mdp = os.path.join(replica_dir, 'nvt.mdp')
                     if r > 0:  # for the 1st replica use original seed from systems/protein-ligand/nvt.mdp
@@ -1005,6 +1031,20 @@ def main():
 
     logging.info(args)
 
+    # Resolve the effective ligand force field: unless --ligand_forcefield was set
+    # explicitly, adopt the one recorded by a previous run in this working directory, so a
+    # (e.g.) GAFF2 setup is not silently reverted to the default when the flag is omitted.
+    ligand_forcefield_explicit = any(
+        a == '--ligand_forcefield' or a.startswith('--ligand_forcefield=') for a in sys.argv
+    ) or 'ligand_forcefield' in config_args
+    lff_search_dirs = args.wdir_to_continue if args.wdir_to_continue else [os.path.join(wdir, 'md_files')]
+    try:
+        ligand_forcefield = resolve_ligand_forcefield(
+            lff_search_dirs, args.ligand_forcefield, ligand_forcefield_explicit)
+    except ValueError as e:
+        logging.exception(str(e))
+        return None
+
     ncpu = min(max(0, args.ncpu), len(os.sched_getaffinity(0)))
     if ncpu != args.ncpu:
         logging.warning('The number of available CPUs are less than specified value. '
@@ -1023,7 +1063,7 @@ def main():
         start(protein=args.protein,
               lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh, no_dr=args.no_dr,
               topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
-              forcefield_name=args.protein_forcefield, ligand_forcefield=args.ligand_forcefield,
+              forcefield_name=args.protein_forcefield, ligand_forcefield=ligand_forcefield,
               npt_time_ps=args.npt_time,
               nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
               wdir_to_continue_list=args.wdir_to_continue, deffnm=args.deffnm,
