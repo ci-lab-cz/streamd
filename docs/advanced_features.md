@@ -34,6 +34,12 @@ run_md -p protein_H_HIS.pdb --md_time 1 --protein_forcefield your_ff_name
 ```
 The value passed to the `--protein_forcefield` option must match the directory name of the desired `.ff` package without the `.ff` extension.
 
+`--protein_forcefield` selects the protein force field; `--ligand_forcefield` independently selects the AmberTools parameter set for standard organic ligands (`gaff` by default, or `gaff2`). For `.mol`/`.sdf` ligand inputs it drives Antechamber atom typing; it is also applied to `parmchk2` and the LEaP parameter library. Partial charges use AM1-BCC, except boron-containing ligands, which are parameterized via Gaussian with RESP charges (see the Gaussian section above).
+```bash
+run_md -p protein_H_HIS.pdb -l ligand.mol --md_time 1 --ligand_forcefield gaff2
+```
+A pre-existing `.mol2` ligand input is used as-is (Antechamber is skipped), so its atom types and charges are trusted to already match the selected family; `parmchk2 -s` and `leaprc.*` still follow `--ligand_forcefield` and StreaMD logs a warning.
+
 ## StreaMD Step Control
 - `--steps` runs selected pipeline stages when continuing existing runs (`1` preparation, `2` equilibration, `3` production, `4` analysis).
 ```bash

@@ -30,7 +30,7 @@ run_md -h
 usage: run_md [-h] [--config FILENAME] [-p FILENAME] [-d WDIR] [-l FILENAME] [--cofactor FILENAME] [--clean_previous_md] [--hostfile FILENAME] [-c INTEGER]
               [--mdrun_per_node INTEGER] [--device cpu] [--gpu_ids GPU ID [GPU ID ...]] [--ntmpi_per_gpu int] [--topol topol.top]
               [--topol_itp topol_chainA.itp topol_chainB.itp [topol_chainA.itp topol_chainB.itp ...]] [--posre posre.itp [posre.itp ...]]
-              [--protein_forcefield amber99sb-ildn] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--box_type BOX TYPE] [--box_padding_nm nm]
+              [--protein_forcefield amber99sb-ildn] [--ligand_forcefield gaff] [--noignh] [--md_time ns] [--npt_time ps] [--nvt_time ps] [--box_type BOX TYPE] [--box_padding_nm nm]
               [--salt_concentration mol/L] [--ion_pname ION] [--ion_nname ION] [--water_model WATER] [--seed int] [--replicas INTEGER] [--no_dr]
               [--not_clean_backup_files] [--steps [STEPS ...]] [--mdp_dir Path to a directory with specific MDP files] [--save_traj_without_water]
               [--wdir_to_continue DIRNAME [DIRNAME ...]] [-o OUT_SUFFIX] [--deffnm prefix for MD files] [--tpr FILENAME] [--cpt FILENAME] [--xtc FILENAME]
@@ -74,6 +74,11 @@ Standard Molecular Dynamics Simulation Run:
                         posre file(s) (required if a gro-file is provided for the protein). All output files obtained from gmx2pdb should preserve the original names
   --protein_forcefield amber99sb-ildn
                         Force field for protein preparation. Available FF can be found at Miniconda3/envs/md/share/gromacs/top.
+  --ligand_forcefield gaff
+                        AmberTools parameter set used for standard organic ligands. Choices: gaff or gaff2. For ligands prepared from .mol/.sdf inputs it sets
+                        Antechamber atom typing (-at); it is also applied to parmchk2 (-s) and the LEaP parameter library (leaprc.gaff/leaprc.gaff2). Partial
+                        charges use AM1-BCC (-c bcc), except boron-containing ligands, which are parameterized via Gaussian using RESP. A pre-existing .mol2 input is
+                        used as-is - Antechamber is skipped, so its atom types and charges are trusted to already match the selected family. Default: gaff.
   --noignh              By default, StreaMD uses gmx pdb2gmx -ignh, which re-adds hydrogens using residue names (the correct protonation states must be provided by
                         the user) and ignores the original hydrogens. If the --noignh argument is used, the original hydrogen atoms will be preserved during the
                         preparation, although there may be problems with recognition of atom names by GROMACS.
@@ -177,11 +182,38 @@ run_md -p protein_H_HIS.pdb --md_time 1 --water_model tip4p
 The value must be a water model name recognised by your GROMACS force field (e.g., `tip3p`, `tip4p`, `spc`, `spce`). To check available water models run ```gmx pdb2gmx -h```. 
 
 ### Specific Force Field choice
-Use pdb2gmx force field available under your GROMACS installation (e.g., `Miniconda3/envs/md/share/gromacs/top`).
+StreaMD uses two independent force-field settings:
+
+- `--protein_forcefield` selects the **protein** force field (a GROMACS pdb2gmx force field).
+- `--ligand_forcefield` selects the AmberTools parameter set (**GAFF** or **GAFF2**) used for standard organic ligand parameterization.
+- The ligand partial-charge method is **AM1-BCC** for standard organic ligands (a charge method, not a force field, and not selectable). Boron-containing ligands are parameterized via Gaussian with **RESP** charges instead (see {doc}`advanced_features`).
+
+#### Protein force field (`--protein_forcefield`)
+Use a pdb2gmx force field available under your GROMACS installation (e.g., `Miniconda3/envs/md/share/gromacs/top`).
 ```bash
 run_md -p protein_H_HIS.pdb --md_time 1 --protein_forcefield amber99sb-ildn
 ```
 The value passed to the `--protein_forcefield` option must match the directory name of the desired `.ff` package without the `.ff` extension.
+
+#### Ligand force field (`--ligand_forcefield`)
+Standard organic ligands are parameterized using **GAFF** by default, with **AM1-BCC** partial charges. **GAFF2** can be selected using `--ligand_forcefield gaff2`. For ligands prepared from `.mol`/`.sdf` inputs the selected value is applied to Antechamber atom typing (`antechamber -at`); it is also applied to `parmchk2` (`-s`) and the LEaP parameter library (`source leaprc.gaff` or `source leaprc.gaff2`). Partial charges use AM1-BCC (`-c bcc`), except boron-containing ligands, which are parameterized via Gaussian with RESP charges (see {doc}`advanced_features`).
+```bash
+run_md \
+    --protein_forcefield amber99sb-ildn \
+    --ligand_forcefield gaff2 \
+    -p protein_H_HIS.pdb -l ligand.mol --md_time 1
+```
+The default remains `gaff` for backward compatibility. Only `gaff` and `gaff2` are supported.
+
+```{note}
+A **pre-existing `.mol2`** ligand input is used as-is: StreaMD does not run Antechamber on it, so its atom types and partial charges are **not** reassigned (AM1-BCC is not applied). `parmchk2 -s` and `leaprc.*` still follow `--ligand_forcefield`, but the MOL2 is trusted to already match the selected family, and StreaMD logs a warning. To have StreaMD assign `gaff2` atom types and AM1-BCC charges, supply a `.mol`/`.sdf` file instead.
+```
+
+The force field used to prepare each ligand is recorded (`ligand_forcefield.txt`). If you re-run a working directory that already contains a prepared ligand — or intermediate files left by an interrupted run — with a **different** `--ligand_forcefield`, StreaMD regenerates that ligand rather than silently reusing the cached/partial files, and moves the previous files into a `backup_<forcefield>` subdirectory (nothing is deleted). Ligands prepared before this option existed carry no record and are treated as GAFF, so default `gaff` re-runs still reuse them.
+
+**Omitting `--ligand_forcefield`** makes StreaMD adopt the force field a previous run in the working directory used — so a GAFF2 working directory keeps using GAFF2 without repeating the flag (pass `--ligand_forcefield` to override). With nothing recorded, the default is `gaff`.
+
+If any **run** directory (`md_files/md_run/<complex>_replicaN/`) already exists, built with one force field, and you explicitly request a **different** `--ligand_forcefield`, StreaMD stops with a clear error instead of reusing or mixing force fields — it **never deletes** an existing run. This is checked **up front, before any ligand preparation**, and across **all** replica directories (all replicas must use the same force field), so nothing is regenerated only to fail later. To proceed, rerun with the matching `--ligand_forcefield`, use a fresh `--wdir`, remove the run directory yourself, or pass `--wdir_to_continue <run_dir>` to continue the original run with its own force field. Each run directory records its force field (`ligand_forcefield.txt`), and this check also applies to `--wdir_to_continue`.
 
 ### Protein-Ligand
 ```bash

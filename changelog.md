@@ -1,4 +1,5 @@
 **0.6**
+- add argument `ligand_forcefield` - AmberTools parameter set (`gaff` or `gaff2`) for standard organic ligand parameterization (default `gaff`). 
 - add argument `salt_concentration` - salt concentration in mol/L passed to `gmx genion -conc` (default: not set, only charge neutralization is performed)
 - add argument `ion_pname` - positive ion name passed to `gmx genion -pname` (default `NA`)
 - add argument `ion_nname` - negative ion name passed to `gmx genion -nname` (default `CL`)
