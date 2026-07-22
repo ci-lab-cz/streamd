@@ -101,6 +101,67 @@ def load_ligand_template(path):
     return None
 
 
+def resolve_ligand_converter_kwargs(ligand, ligand_selection, ligand_sdf, xtc):
+    """Determine the RDKit converter kwargs used to interpret the ligand chemistry.
+
+    For all-atom topologies ProLIF infers bond orders correctly from the TPR alone, which is why
+    the resulting SMILES is logged as a sanity check. A ``ligand_sdf`` template is USUALLY
+    UNNECESSARY: supply it only for the rare cases where the inference is wrong (united-atom /
+    coarse-grained ligands, or an odd SMILES below).
+
+    :param ligand: the ligand MDAnalysis AtomGroup.
+    :param ligand_selection: MDAnalysis selection string for the ligand (used for logging).
+    :param ligand_sdf: optional path to a reference ligand structure (.sdf/.mol) with correct bond
+        orders, used as a template. See the ``ligand_sdf`` note in :func:`run_prolif_task`.
+    :param xtc: trajectory path (used for logging only).
+    :return: a tuple ``(lig_converter_kwargs, converter_kwargs)`` where ``lig_converter_kwargs`` is
+        the dict of kwargs for converting the ligand AtomGroup to RDKit (for the network plot) and
+        ``converter_kwargs`` is the ``(ligand_kwargs, protein_kwargs)`` tuple ProLIF's
+        ``Fingerprint.run`` expects, or None to let ProLIF infer bond orders from the topology.
+    """
+    from rdkit import Chem
+    lig_converter_kwargs = {}
+    converter_kwargs = None
+    try:
+        topo_heavy = ligand.convert_to.rdkit().GetNumHeavyAtoms()
+        topo_smiles = Chem.MolToSmiles(Chem.RemoveHs(ligand.convert_to.rdkit()))
+    except Exception as e:
+        topo_heavy, topo_smiles = None, None
+        logging.warning(f'{xtc}: could not convert the ligand from the topology ({e}).')
+
+    if ligand_sdf:
+        if not os.path.isfile(ligand_sdf):
+            logging.warning(f'{xtc}: ligand template "{ligand_sdf}" not found; using bond orders '
+                            f'inferred from the topology instead (usually fine).')
+        else:
+            template = load_ligand_template(ligand_sdf)
+            if template is None:
+                logging.warning(f'{xtc}: could not parse ligand template "{ligand_sdf}" (expected .sdf/.mol); '
+                                f'using topology inference instead (usually fine).')
+            elif topo_heavy is not None and template.GetNumAtoms() != topo_heavy:
+                logging.warning(f'{xtc}: ligand template "{os.path.basename(ligand_sdf)}" has '
+                                f'{template.GetNumAtoms()} heavy atoms but the ligand has {topo_heavy}; '
+                                f'template ignored, using topology inference instead.')
+            else:
+                from MDAnalysis.converters.RDKitInferring import TemplateInferrer
+                kw = {'inferrer': TemplateInferrer(template=template)}
+                try:
+                    tmpl_smiles = Chem.MolToSmiles(Chem.RemoveHs(ligand.convert_to.rdkit(**kw)))
+                    lig_converter_kwargs, converter_kwargs = kw, (kw, {})
+                    logging.info(f'{xtc}: ligand "{ligand_selection}" bond orders assigned from template '
+                                 f'{os.path.basename(ligand_sdf)}; SMILES: {tmpl_smiles}.')
+                except Exception as e:
+                    logging.warning(f'{xtc}: ligand template "{os.path.basename(ligand_sdf)}" did not match '
+                                    f'the ligand ({e}); using topology inference instead.')
+
+    if converter_kwargs is None and topo_smiles is not None:
+        logging.info(f'{xtc}: ligand "{ligand_selection}" interpreted as SMILES: {topo_smiles} '
+                     f'(inferred from topology). Usually correct without a template; pass --ligand_sdf '
+                     f'only if it looks wrong.')
+
+    return lig_converter_kwargs, converter_kwargs
+
+
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
                     occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None,
                     binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
@@ -211,49 +272,8 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
             interactions.append('WaterBridge')
             parameters = {'WaterBridge': {'water': water, 'order': water_bridge_order}}
 
-    # Interpret the ligand chemistry. For all-atom topologies ProLIF infers bond orders correctly
-    # from the TPR alone, which is why the resulting SMILES is logged as a sanity check. A
-    # --ligand_sdf template is USUALLY UNNECESSARY: supply it only for the rare cases where the
-    # inference is wrong (united-atom / coarse-grained ligands, or an odd SMILES below).
-    from rdkit import Chem
-    lig_converter_kwargs = {}
-    converter_kwargs = None
-    try:
-        topo_heavy = ligand.convert_to.rdkit().GetNumHeavyAtoms()
-        topo_smiles = Chem.MolToSmiles(Chem.RemoveHs(ligand.convert_to.rdkit()))
-    except Exception as e:
-        topo_heavy, topo_smiles = None, None
-        logging.warning(f'{xtc}: could not convert the ligand from the topology ({e}).')
-
-    if ligand_sdf:
-        if not os.path.isfile(ligand_sdf):
-            logging.warning(f'{xtc}: ligand template "{ligand_sdf}" not found; using bond orders '
-                            f'inferred from the topology instead (usually fine).')
-        else:
-            template = load_ligand_template(ligand_sdf)
-            if template is None:
-                logging.warning(f'{xtc}: could not parse ligand template "{ligand_sdf}" (expected .sdf/.mol); '
-                                f'using topology inference instead (usually fine).')
-            elif topo_heavy is not None and template.GetNumAtoms() != topo_heavy:
-                logging.warning(f'{xtc}: ligand template "{os.path.basename(ligand_sdf)}" has '
-                                f'{template.GetNumAtoms()} heavy atoms but the ligand has {topo_heavy}; '
-                                f'template ignored, using topology inference instead.')
-            else:
-                from MDAnalysis.converters.RDKitInferring import TemplateInferrer
-                kw = {'inferrer': TemplateInferrer(template=template)}
-                try:
-                    tmpl_smiles = Chem.MolToSmiles(Chem.RemoveHs(ligand.convert_to.rdkit(**kw)))
-                    lig_converter_kwargs, converter_kwargs = kw, (kw, {})
-                    logging.info(f'{xtc}: ligand "{ligand_selection}" bond orders assigned from template '
-                                 f'{os.path.basename(ligand_sdf)}; SMILES: {tmpl_smiles}.')
-                except Exception as e:
-                    logging.warning(f'{xtc}: ligand template "{os.path.basename(ligand_sdf)}" did not match '
-                                    f'the ligand ({e}); using topology inference instead.')
-
-    if converter_kwargs is None and topo_smiles is not None:
-        logging.info(f'{xtc}: ligand "{ligand_selection}" interpreted as SMILES: {topo_smiles} '
-                     f'(inferred from topology). Usually correct without a template; pass --ligand_sdf '
-                     f'only if it looks wrong.')
+    lig_converter_kwargs, converter_kwargs = resolve_ligand_converter_kwargs(
+        ligand, ligand_selection, ligand_sdf, xtc)
 
     fp = plf.Fingerprint(interactions, parameters=parameters)
     fp.run(trajectory, ligand, protein, progress=verbose, n_jobs=n_jobs,
