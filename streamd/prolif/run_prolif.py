@@ -106,22 +106,28 @@ def inject_backbone_n_acceptor_exclusion(acceptor_smarts, exclusion=BACKBONE_N_A
     return acceptor_smarts
 
 
-def fixed_hbond_acceptor_smarts():
-    """Return ProLIF's default H-bond acceptor SMARTS patched for issue #358.
+def fixed_hbond_acceptor_smarts(default_acceptor=None):
+    """Return ProLIF's H-bond acceptor SMARTS patched for issue #358.
 
-    :return: the patched acceptor SMARTS, or None if ProLIF's default could not be
-        read (in which case the caller should let ProLIF use its own default).
+    :param default_acceptor: base acceptor SMARTS to patch. If None (the default), it
+        is read from the installed ProLIF ``HBAcceptor`` default so the patch tracks
+        the installed version. Passing an explicit pattern lets this be unit-tested
+        deterministically without depending on the installed ProLIF version.
+    :return: the patched acceptor SMARTS, or None if the base pattern could not be
+        read or could not be patched (already patched upstream, or unrecognised), in
+        which case the caller should let ProLIF use its own default acceptor pattern.
     """
-    import inspect
-    try:
-        from prolif.interactions.interactions import HBAcceptor
-        default = inspect.signature(HBAcceptor.__init__).parameters['acceptor'].default
-    except Exception as e:
-        logging.warning(f'could not read ProLIF default H-bond acceptor SMARTS ({e}); '
-                        f'the issue #358 backbone-nitrogen fix will not be applied.')
-        return None
-    patched = inject_backbone_n_acceptor_exclusion(default)
-    if patched == default:
+    if default_acceptor is None:
+        import inspect
+        try:
+            from prolif.interactions.interactions import HBAcceptor
+            default_acceptor = inspect.signature(HBAcceptor.__init__).parameters['acceptor'].default
+        except Exception as e:
+            logging.warning(f'could not read ProLIF default H-bond acceptor SMARTS ({e}); '
+                            f'the issue #358 backbone-nitrogen fix will not be applied.')
+            return None
+    patched = inject_backbone_n_acceptor_exclusion(default_acceptor)
+    if patched == default_acceptor:
         logging.warning('could not apply the issue #358 backbone-nitrogen fix to ProLIF\'s '
                         'H-bond acceptor SMARTS (pattern already patched or unrecognised); '
                         'using ProLIF\'s default acceptor pattern.')
