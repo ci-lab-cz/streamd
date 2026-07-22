@@ -225,31 +225,55 @@ def get_number_of_frames(xtc, env):
 
 def get_last_frame_time(xtc, env=None):
     """Return the final trajectory time in ps parsed from ``gmx check``.
+
+    Two output shapes are handled:
+
+    * Some GROMACS versions print an explicit ``Last frame  N time  T`` line; when
+      present its time is used directly (this is exact, including for merged
+      trajectories with a non-uniform output interval).
+    * ``gmx check`` in other versions (e.g. GROMACS 2023.x) prints **no**
+      ``Last frame`` line, only periodic ``Reading frame N time T`` progress lines
+      plus a summary table (``Step  #frames  timestep``). The last progress line is
+      not necessarily the final frame, because gmx prints them at intervals. The
+      final time is then reconstructed by anchoring on the last observed
+      ``(index, time)`` and extending to the last frame (``#frames - 1``) with the
+      reported timestep.
+
     :param xtc: Path to the trajectory ``.xtc`` file.
     :param env: Optional environment variables for subprocess calls.
     :return: Final trajectory time in picoseconds as ``float``.
     :raises RuntimeError: If ``gmx check`` fails (nonzero return code) or the final
         time cannot be parsed from its output.
     """
+    # Time literal: integer, decimal or scientific notation.
+    time_re = r'([-+]?\d*\.?\d+(?:[eE][+-]?\d+)?)'
     res = subprocess.run(f'gmx check -f {shlex.quote(str(xtc))}', shell=True,
                          capture_output=True, env=env)
-    # gmx may write the "Last frame" line to stdout or stderr depending on the version.
+    # gmx may write the relevant lines to stdout or stderr depending on the version.
     combined_output = res.stdout.decode('utf-8', errors='replace') + '\n' + \
                       res.stderr.decode('utf-8', errors='replace')
     if res.returncode != 0:
         raise RuntimeError(
             f'"gmx check" failed for {xtc} (return code {res.returncode}). '
             f'GROMACS output:\n{combined_output}')
-    # Support integer, decimal and scientific-notation times with variable whitespace.
-    matches = re.findall(
-        r'Last frame\s+\d+\s+time\s+([-+]?\d*\.?\d+(?:[eE][+-]?\d+)?)',
-        combined_output)
-    if not matches:
-        raise RuntimeError(
-            f'Cannot determine the final trajectory time of {xtc} from "gmx check". '
-            f'GROMACS output:\n{combined_output}')
+    # Preferred path: an explicit "Last frame" line (variable whitespace tolerated).
     # gmx may emit several progress lines; use the last reported "Last frame" time.
-    return float(matches[-1])
+    last_frame = re.findall(rf'Last frame\s+\d+\s+time\s+{time_re}', combined_output)
+    if last_frame:
+        return float(last_frame[-1])
+    # Fallback: reconstruct from "Reading frame N time T" progress lines and the
+    # "Step  #frames  timestep" summary row (GROMACS versions with no "Last frame").
+    progress = re.findall(rf'(?:Reading|Last) frame\s+(\d+)\s+time\s+{time_re}',
+                          combined_output)
+    table = re.search(r'Step\s+(\d+)\s+(\d+)', combined_output)
+    if progress and table:
+        last_idx, last_time = int(progress[-1][0]), float(progress[-1][1])
+        nframes, timestep = int(table.group(1)), int(table.group(2))
+        # Frames are 0-indexed: extend from the last printed frame to the final one.
+        return last_time + max(0, (nframes - 1) - last_idx) * timestep
+    raise RuntimeError(
+        f'Cannot determine the final trajectory time of {xtc} from "gmx check". '
+        f'GROMACS output:\n{combined_output}')
 
 def backup_and_replace(src_file, target_file, copy=False):
     backup_prev_files(target_file)
