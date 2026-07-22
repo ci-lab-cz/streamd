@@ -125,9 +125,10 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
         so this is the main speed lever. Results stay identical while the cutoff stays above the
         ProLIF vicinity cutoff (6 A). Set to <= 0 to analyse the full protein selection.
     :param parallel_strategy: ProLIF multiprocessing strategy ('chunk', 'queue' or None for ProLIF
-        auto). For solvated MD systems ProLIF auto-selects 'queue', which serialises the RDKit
-        conversion on the main thread and is slower than serial; 'chunk' parallelises the conversion
-        and is ~2-2.6x faster (measured). Only used when n_jobs > 1.
+        auto), only used when n_jobs > 1. 'chunk' distributes trajectory chunks across workers, so the
+        per-frame RDKit conversion is parallelised too; 'queue' converts frames in a producer thread on
+        the main process and streams them to the workers, avoiding repeated pickling of large
+        trajectories but potentially serialising the conversion.
     :param ligand_sdf: optional path to a reference ligand structure (.sdf/.mol) with correct bond
         orders, used as a template for the ligand conversion. USUALLY UNNECESSARY: for standard
         all-atom topologies ProLIF infers the ligand chemistry correctly from the TPR alone (the
@@ -499,7 +500,11 @@ def main():
                              'selection.')
     parser.add_argument('--parallel_strategy', required=False, default='chunk',
                         choices=['chunk', 'queue', 'auto'],
-                        help='ProLIF multiprocessing strategy when --n_jobs > 1. Use "auto" to defer to ProLIF.')
+                        help='ProLIF multiprocessing strategy (only used when --n_jobs > 1). "chunk" distributes '
+                             'trajectory chunks across workers, so the per-frame RDKit conversion is parallelised '
+                             'too. "queue" converts frames in a producer thread on the main process and streams '
+                             'them to the workers, avoiding repeated pickling of large trajectories but potentially '
+                             'serialising the conversion. "auto" lets ProLIF choose.')
     parser.add_argument('--ligand_sdf', metavar='FILENAME', required=False, default=None,
                         type=partial(filepath_type, ext=('sdf', 'mol'), check_exist=False),
                         help='Optional reference ligand structure (.sdf/.mol) WITH correct bond orders, used as '

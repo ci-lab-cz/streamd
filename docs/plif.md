@@ -43,7 +43,7 @@ options:
   --binding_site_cutoff float
                         restrict the protein to residues within this distance (A) of the ligand in at least one analysed frame (union over the trajectory). Main speed lever: ProLIF otherwise converts the whole protein to RDKit every frame. Results are identical while the cutoff stays above the ProLIF vicinity cutoff (6 A). Set to 0 to analyse the full protein. (default: 12.0)
   --parallel_strategy {chunk,queue,auto}
-                        ProLIF multiprocessing strategy when --n_jobs > 1. For solvated systems 'auto' selects 'queue', which runs the RDKit conversion on the main thread and is slower; 'chunk' parallelises it. (default: chunk)
+                        ProLIF multiprocessing strategy (only used when --n_jobs > 1). "chunk" distributes trajectory chunks across workers, so the per-frame RDKit conversion is parallelised too. "queue" converts frames in a producer thread on the main process and streams them to the workers, avoiding repeated pickling of large trajectories but potentially serialising the conversion. "auto" lets ProLIF choose; which is fastest depends on the trajectory format, topology size, storage and number of workers. (default: chunk)
   --ligand_sdf FILENAME
                         optional reference ligand .sdf/.mol with correct bond orders, used as a template for the ligand conversion. Usually unnecessary: the ligand chemistry is inferred from the topology and the interpreted SMILES is logged for verification. (default: None)
   --water_bridge        additionally compute water-mediated (water-bridge) interactions between the ligand and the protein. Requires water molecules to be present in the input trajectory (the default md_fit.xtc keeps them). This adds extra computation. (default: False)
@@ -76,7 +76,7 @@ run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --ligand GTP
 ```
 
 ### Water-mediated (water-bridge) interactions
-Halogen bonds (XBDonor/XBAcceptor) are always analysed. Water-mediated contacts are opt-in with `--water_bridge`, which requires water to be present in the trajectory (the default `md_fit.xtc` keeps it).
+Water-mediated contacts are opt-in with `--water_bridge`, which requires water to be present in the trajectory (the default `md_fit.xtc` keeps it).
 ```bash
 # Add single-water bridges using the GROMACS default water residue name (SOL)
 run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --water_bridge
@@ -86,11 +86,32 @@ run_prolif --wdir_to_run md_files/md_run/protein_H_HIS_ligand_* --water_bridge -
 ```
 
 ## Performance
-ProLIF converts the protein (and, for `--water_bridge`, the water) to an RDKit molecule on **every frame**, so the runtime is dominated by how many atoms are converted per frame. StreaMD reduces this automatically, with results identical to analysing the full system:
+ProLIF converts the ligand and selected protein atoms into RDKit-backed ProLIF molecules for every analysed trajectory frame. When WaterBridge analysis is enabled, the selected water molecules must also be converted and processed.
+Frame conversion can be a major runtime bottleneck, particularly for large protein or water selections. Interaction matching, residue-pair screening, trajectory I/O, interprocess communication, and multiprocessing overhead can also contribute.
 
-1) **Binding-site restriction** (`--binding_site_cutoff`, default `12` Å): the protein is cropped to residues that come within the cutoff of the ligand in at least one frame (the union over the trajectory). Because ProLIF only detects interactions within 6 Å of the ligand, any cutoff above 6 Å is exact. This is the main speed lever — typically ~15–20× faster for large solvated proteins. Set `0` to analyse the full protein.
-2) **Parallel strategy** (`--parallel_strategy`, default `chunk`): with `--n_jobs > 1`, ProLIF's own default (`queue`) runs the conversion on the main thread; `chunk` parallelises it. Use `auto` to defer to ProLIF.
-3) **Water restriction** (`--water_cutoff`, default `8` Å): makes `--water_bridge` usable by keeping only waters near the ligand each frame (re-evaluated per frame) instead of converting every water. A bridging water must hydrogen-bond the ligand, so the result is unchanged; the value is widened automatically for higher `--water_bridge_order`. Set `0` to consider all waters.
+StreaMD applies the following optimisations automatically:
+
+**Binding-site restriction** (`--binding_site_cutoff`, default: `12` Å)
+The protein is restricted to the union of residues that come within the specified distance of the ligand in at least one analysed trajectory frame. This avoids repeatedly converting distant protein regions that cannot participate in the requested interactions.
+
+For the standard direct protein–ligand interactions with ProLIF's default parameters, a 12 Å cutoff provides a conservative margin over ProLIF's default 6 Å residue-vicinity cutoff. Exact equivalence with full-protein analysis depends on the enabled interactions and their parameters, particularly when using custom distance cutoffs or higher-order water bridges.
+
+This is usually the main performance optimisation and produced approximately 15–20× acceleration in our large-system benchmarks. Set `--binding_site_cutoff 0` to analyse the complete protein.
+
+**Parallel strategy** (`--parallel_strategy`, default: `chunk`)
+
+When `--n_jobs > 1`, the `chunk` strategy distributes trajectory chunks among worker processes, so frame conversion is also performed in parallel.
+By contrast, ProLIF's `queue` strategy converts trajectory frames into RDKit molecules in a producer thread in the main process and sends the converted molecules to worker processes. This avoids repeatedly pickling large trajectory objects, but conversion can become a serial bottleneck.
+
+Use `--parallel_strategy auto` to let ProLIF choose between `chunk` and `queue`.
+
+**Water restriction** (`--water_cutoff`, default: `8` Å)
+
+With `--water_bridge`, the water selection is re-evaluated for every trajectory frame so that only waters sufficiently close to the ligand are converted and processed. This avoids converting the complete solvent box in every frame.
+
+For first-order bridges, a water must hydrogen-bond directly to the ligand, so an 8 Å cutoff is conservative relative to the default hydrogen-bond distance criterion. For higher-order bridges, StreaMD increases the cutoff according to the requested `--water_bridge_order` so that waters farther along the hydrogen-bond network remain eligible.
+
+Equivalence with analysis of all waters requires the effective cutoff to cover the maximum geometrically possible bridge under the configured hydrogen-bond criteria and bridge order. Set `--water_cutoff 0` to consider all waters.
 
 ## Effective Parallel Calculations
 To control parallelism:
