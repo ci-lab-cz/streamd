@@ -334,7 +334,7 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
           explicit_args=(), mdp_dir=None, bash_log=None,
           box_type='cubic', box_padding_nm=1.0,
           salt_concentration=None, ion_pname='NA', ion_nname='CL',
-          water_model='tip3p'):
+          water_model='tip3p', ligand_forcefield='gaff'):
     """Run StreaMD pipeline.
 
     :param protein: Protein file in PDB or GRO format.
@@ -344,6 +344,10 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
     :param noignh: Do not use ``-ignh`` argument in ``gmx pdb2gmx``.
     :param no_dr: Disable acdoctor mode when processing ligand file.
     :param forcefield_name: Force field to use for preparation.
+    :param ligand_forcefield: AmberTools parameter set for standard organic ligands
+        (``gaff`` or ``gaff2``). Applied to Antechamber atom typing, ``parmchk2`` and
+        LEaP. Charges use AM1-BCC, except boron-containing ligands, which are
+        parameterized via Gaussian using RESP. Default: ``gaff``.
     :param clean_previous: Whether to remove previous MD files.
     :param mdtime_ns: Simulation time in nanoseconds.
     :param npt_time_ps: Equilibration NPT time in picoseconds.
@@ -487,6 +491,9 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                     f'Protein preparation step will be skipped.')
 
             # Part 1. Ligand Preparation
+            if system_lfile is not None or lfile is not None:
+                logging.info(f'Ligand parameter set: {ligand_forcefield.upper()}')
+                logging.info('Ligand charge method: AM1-BCC (boron-containing ligands use RESP via Gaussian)')
             protein_resid_set = get_protein_resid_set(protein)
             if system_lfile is not None:
                 logging.info('Start cofactor preparation')
@@ -499,7 +506,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                                          project_dir=project_dir, wdir_ligand=wdir_system_ligand, no_dr=no_dr,
                                                          gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                          gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                                                         hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
+                                                         hostfile=hostfile, ncpu=ncpu, bash_log=bash_log,
+                                                         ligand_forcefield=ligand_forcefield)
                 if number_of_mols != len(system_lig_wdirs):
                     logging.exception(f'Error with the cofactor preparation. Only {len(system_lig_wdirs)} from {number_of_mols} preparation were finished.'
                                       f' The calculation will be interrupted')
@@ -520,7 +528,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                                                       project_dir=project_dir, wdir_ligand=wdir_ligand, no_dr=no_dr,
                                                       gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                                       gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
-                                                      hostfile=hostfile, ncpu=ncpu, bash_log=bash_log)
+                                                      hostfile=hostfile, ncpu=ncpu, bash_log=bash_log,
+                                                      ligand_forcefield=ligand_forcefield)
                 if number_of_mols != len(var_lig_wdirs):
                     logging.warning(f'Problem with the ligand preparation. Only {len(var_lig_wdirs)} from {number_of_mols} preparation were finished.'
                                     f' Such molecules will be skipped.')
@@ -762,7 +771,8 @@ def start(protein, wdir, lfile, system_lfile, noignh, no_dr,
                 for f in glob(os.path.join(wdir_md, analysis_dirname, '#*#')):
                     os.remove(f)
 
-def main():
+def get_parser():
+    """Build the ``run_md`` command-line argument parser."""
     parser = argparse.ArgumentParser(description='''Run or continue MD simulation.\n
     Allowed systems: Protein, Protein-Ligand, Protein-Cofactors(multiple), Protein-Ligand-Cofactors(multiple) ''')
     parser.add_argument('--config', metavar='FILENAME', required=False,
@@ -817,6 +827,16 @@ def main():
     parser1.add_argument('--protein_forcefield', metavar='amber99sb-ildn', required=False, default='amber99sb-ildn', type=str,
                         help='Force Field for protein preparation.'
                              'Available FF can be found at Miniconda3/envs/md/share/gromacs/top')
+    parser1.add_argument('--ligand_forcefield', metavar='gaff', required=False, default='gaff',
+                        choices=('gaff', 'gaff2'), type=str,
+                        help='AmberTools parameter set used for standard organic ligands. '
+                             'Choices: gaff or gaff2. For ligands prepared from .mol/.sdf inputs it sets '
+                             'Antechamber atom typing (-at); it is always applied to parmchk2 (-s) and the '
+                             'LEaP parameter library (leaprc.gaff/leaprc.gaff2). Partial charges use AM1-BCC '
+                             '(-c bcc), except boron-containing ligands, which are parameterized via Gaussian '
+                             'using RESP. A pre-existing .mol2 input is used as-is - Antechamber is skipped, so '
+                             'its atom types and charges are trusted to already match the selected family. '
+                             'Default: gaff.')
     parser1.add_argument('--noignh', required=False,  action='store_true', default=False,
                          help="By default, Streamd uses gmx pdb2gmx -ignh, which re-adds hydrogens using residue names "
                               "(the correct protonation states must be provided by user) and ignores the original hydrogens."
@@ -928,6 +948,12 @@ def main():
                              'Start MCPBPY procedure only if metal_resnames and gaussian_exe and activate_gaussian arguments are set up, '
                              'otherwise standard gmx2pdb procedure will be run')
 
+    return parser
+
+
+def main():
+    parser = get_parser()
+
     args, config_args = parse_with_config(parser, sys.argv[1:])
 
     if args.wdir is None:
@@ -997,7 +1023,8 @@ def main():
         start(protein=args.protein,
               lfile=args.ligand, system_lfile=args.cofactor, noignh=args.noignh, no_dr=args.no_dr,
               topol=args.topol, topol_itp_list=args.topol_itp, posre_list_protein=args.posre,
-              forcefield_name=args.protein_forcefield, npt_time_ps=args.npt_time,
+              forcefield_name=args.protein_forcefield, ligand_forcefield=args.ligand_forcefield,
+              npt_time_ps=args.npt_time,
               nvt_time_ps=args.nvt_time, mdtime_ns=args.md_time,
               wdir_to_continue_list=args.wdir_to_continue, deffnm=args.deffnm,
               tpr_prev=args.tpr, cpt_prev=args.cpt, xtc_prev=args.xtc,
