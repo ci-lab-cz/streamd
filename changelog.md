@@ -4,7 +4,7 @@
 - add argument `ion_pname` - positive ion name passed to `gmx genion -pname` (default `NA`)
 - add argument `ion_nname` - negative ion name passed to `gmx genion -nname` (default `CL`)
 - add argument `water_model` - water model passed to `gmx pdb2gmx -water` (default `tip3p`)
-- update GROMACS to 2025.2 and MDAnalysis to 2.10.0 to support GROMACS 2026 TPR files (TPR version 138)
+- update GROMACS to 2025.2 and MDAnalysis to 2.10.0
 - change `ActiveSite` RMSD definition: the pocket is now the complete backbone of protein residues within `active_site_dist` of the ligand heavy atoms (previously only backbone atoms lying within the cutoff), so values are not directly comparable to earlier versions
 - RMSF is now computed on Cα atoms (`gmx rmsf` selects `C-alpha`, used for both the fit and the per-residue output) instead of `Protein`
 - protein RMSD is reported as both `backbone` (N/CA/C/O, the backbone superposition/fit group) and `CA` (the protein Cα subset)

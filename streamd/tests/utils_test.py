@@ -93,8 +93,46 @@ def test_last_frame_time_real_gmx_check_format(monkeypatch):
     assert utils.get_last_frame_time('md_out.xtc') == 100.0
 
 
+def test_last_frame_time_gromacs_2023_no_last_frame_line(monkeypatch):
+    """Real 'gmx check' (GROMACS 2023.4) prints no 'Last frame' line.
+
+    Only periodic 'Reading frame' progress lines and the summary 'Step' row are
+    emitted. The last progress line (frame 90 @ 900 ps) is NOT the final frame:
+    the trajectory has 92 frames (indices 0-91, 10 ps step), so the true final
+    time is 910 ps. Reproduces the reported crash scenario.
+    """
+    stderr = (
+        b'Reading frame       0 time    0.000   \n'
+        b'# Atoms  67796\n'
+        b'Precision 0.001 (nm)\n'
+        b'Reading frame      90 time  900.000   \n'
+        b'\n'
+        b'Item        #frames Timestep (ps)\n'
+        b'Step            92    10\n'
+        b'Time            92    10\n'
+        b'Coords          92    10\n'
+        b'Box             92    10\n'
+    )
+    _patch_gmx_check(monkeypatch, stdout=b'Checking file md_out.xtc\n', stderr=stderr)
+    assert utils.get_last_frame_time('md_out.xtc') == 910.0
+
+
+def test_last_frame_time_2023_single_progress_line(monkeypatch):
+    """Fallback works when only the first frame progress line is printed.
+
+    Extends frame 0 @ 0 ps over 11 frames (10 ps step) -> final time 100 ps.
+    """
+    stderr = (
+        b'Reading frame       0 time    0.000   \n'
+        b'\n'
+        b'Item        #frames Timestep (ps)\n'
+        b'Step            11    10\n'
+    )
+    _patch_gmx_check(monkeypatch, stderr=stderr)
+    assert utils.get_last_frame_time('md_out.xtc') == 100.0
+
+
 def test_last_frame_time_missing_line_raises(monkeypatch):
-    """A missing 'Last frame' line raises a clear error including gmx output."""
     _patch_gmx_check(monkeypatch, stdout=b'Reading frame 0 time 0.000\n')
     with pytest.raises(RuntimeError) as excinfo:
         utils.get_last_frame_time('traj.xtc')
@@ -292,6 +330,22 @@ def test_check_to_continue_uses_last_frame_time_not_frame_count(monkeypatch):
     )
     _patch_gmx_check(monkeypatch, stderr=stderr)
     # true final time 150000 ps < 200000 ps target -> must continue
+    assert utils.check_to_continue_simulation_time('md.xtc', 200000, env=None) is True
+
+
+def test_check_to_continue_gromacs_2023_no_last_frame_line(monkeypatch):
+    """Continuation decision works on GROMACS 2023.x output lacking a 'Last frame' line.
+
+    Reconstructed final time is 910 ps (< 200000 ps target) -> must continue.
+    """
+    stderr = (
+        b'Reading frame       0 time    0.000   \n'
+        b'Reading frame      90 time  900.000   \n'
+        b'\n'
+        b'Item        #frames Timestep (ps)\n'
+        b'Step            92    10\n'
+    )
+    _patch_gmx_check(monkeypatch, stderr=stderr)
     assert utils.check_to_continue_simulation_time('md.xtc', 200000, env=None) is True
 
 
