@@ -3,9 +3,6 @@
 import os
 import pytest
 
-import os
-import pytest
-
 from streamd.utils.utils import run_check_subprocess, get_mol_resid_pair
 from streamd.preparation.ligand_preparation import prepare_input_ligands
 
@@ -74,3 +71,78 @@ def test_prepare_ligand(dir_with_input_for_preparation):
 
     assert os.path.isfile(f'{os.path.join(dirname, expected_mol_id, f"{molid}.itp")}')
     assert os.path.isfile(f'{os.path.join(dirname, expected_mol_id, f"{molid}.mol2")}')
+
+
+@preparation_test
+@pytest.mark.parametrize('ligand_forcefield,expected_leaprc',
+                         [('gaff', 'leaprc.gaff'), ('gaff2', 'leaprc.gaff2')])
+def test_prepare_ligand_forcefield(dir_with_input_for_preparation, ligand_forcefield, expected_leaprc):
+    """End-to-end ligand preparation with GAFF and GAFF2 (requires AmberTools).
+
+    Successful topology generation with ``leaprc.gaff2`` only works if
+    Antechamber atom typing, ``parmchk2`` and LEaP all use the same parameter
+    family, so this exercises the full propagation chain.
+    """
+    expected_mol_id = '1ke7_LS3'
+    dirname = dir_with_input_for_preparation
+
+    result = prepare_input_ligands(ligand_fname=os.path.join(dirname, 'ligand.mol'),
+                                   preset_resid='UNL',
+                                   protein_resid_set={},
+                                   script_path=pytest.script_directory,
+                                   project_dir=pytest.streamd_directory,
+                                   wdir_ligand=dirname,
+                                   no_dr=False,
+                                   gaussian_exe=None,
+                                   activate_gaussian=None,
+                                   gaussian_basis=None,
+                                   gaussian_memory=None,
+                                   hostfile=None, ncpu=1,
+                                   bash_log='test',
+                                   ligand_forcefield=ligand_forcefield)
+
+    assert result
+    lig_wdir = os.path.join(dirname, expected_mol_id)
+    assert result[0] == lig_wdir
+
+    # topology generation succeeded (prmtop/itp/gro produced by tleap + amb2gmx)
+    assert os.path.isfile(os.path.join(lig_wdir, f'{expected_mol_id}.itp'))
+    assert os.path.isfile(os.path.join(lig_wdir, f'{expected_mol_id}.mol2'))
+    assert os.path.isfile(os.path.join(lig_wdir, f'{expected_mol_id}.frcmod'))
+
+    # the LEaP input sourced the selected parameter library
+    with open(os.path.join(lig_wdir, 'tleap.in')) as inp:
+        first_line = inp.readline().strip()
+    assert first_line.endswith(f'/{expected_leaprc}'), first_line
+
+    # the force field used is recorded for later reuse checks
+    with open(os.path.join(lig_wdir, 'ligand_forcefield.txt')) as inp:
+        assert inp.read().strip() == ligand_forcefield
+
+
+@preparation_test
+def test_prepare_ligand_forcefield_switch_reparameterizes(dir_with_input_for_preparation):
+    """gaff then gaff2 in the same directory must regenerate, not reuse (requires AmberTools)."""
+    expected_mol_id = '1ke7_LS3'
+    dirname = dir_with_input_for_preparation
+    common = dict(preset_resid='UNL', protein_resid_set={},
+                  script_path=pytest.script_directory, project_dir=pytest.streamd_directory,
+                  wdir_ligand=dirname, no_dr=False, gaussian_exe=None, activate_gaussian=None,
+                  gaussian_basis=None, gaussian_memory=None, hostfile=None, ncpu=1, bash_log='test')
+    lig = os.path.join(dirname, 'ligand.mol')
+    lig_wdir = os.path.join(dirname, expected_mol_id)
+    ff_file = os.path.join(lig_wdir, 'ligand_forcefield.txt')
+
+    # first prepare with gaff
+    assert prepare_input_ligands(ligand_fname=lig, ligand_forcefield='gaff', **common)
+    with open(ff_file) as inp:
+        assert inp.read().strip() == 'gaff'
+    with open(os.path.join(lig_wdir, 'tleap.in')) as inp:
+        assert inp.readline().strip().endswith('/leaprc.gaff')
+
+    # then request gaff2 in the SAME directory: must reparameterize, not reuse the GAFF topology
+    assert prepare_input_ligands(ligand_fname=lig, ligand_forcefield='gaff2', **common)
+    with open(ff_file) as inp:
+        assert inp.read().strip() == 'gaff2'
+    with open(os.path.join(lig_wdir, 'tleap.in')) as inp:
+        assert inp.readline().strip().endswith('/leaprc.gaff2')
