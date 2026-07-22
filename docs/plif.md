@@ -11,7 +11,7 @@ This functionality is based on [ProLIF tool](https://github.com/chemosim-lab/Pro
 usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [--protein_selection STRING] [-a STRING] [-d WDIR] [-v]
                   [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--binding_site_cutoff float]
                   [--parallel_strategy {chunk,queue,auto}] [--ligand_sdf FILENAME] [--water_bridge] [--water_selection STRING]
-                  [--water_bridge_order INTEGER] [--water_cutoff float] [--occupancy float] [--not_save_pics] [-o string]
+                  [--water_bridge_order INTEGER] [--water_cutoff float] [--occupancy float] [--not_save_pics] [--no-show_percentage] [-o string]
 
 Get protein-ligand interactions from MD trajectories using ProLIF module.
 The computed interactions are: Hydrophobic, HBDonor, HBAcceptor, Anionic, Cationic, CationPi, PiCation, PiStacking, MetalAcceptor and halogen bonds (XBDonor, XBAcceptor).
@@ -54,6 +54,7 @@ options:
   --water_cutoff float  only waters within this distance (A) of the ligand in a given frame are considered for --water_bridge. Main speed lever for water-bridge: ProLIF otherwise converts every water to RDKit every frame. Auto-widened for higher --water_bridge_order. Set to 0 to consider all waters (slow). (default: 8.0)
   --occupancy float     occupancy of the unique contacts to show. Applied for plifs_occupancyX.html (for each complex) and prolif_output_occupancyX.png (all systems aggregated plot) (default: 0.6)
   --not_save_pics       not create html and png files (by frames) for each unique trajectory. Only overall prolif png file will be created. (default: False)
+  --no-show_percentage  do not show the occupancy percentage label above each dot in the aggregated prolif_output_occupancyX.png plot. Percentages are shown by default. (default: False)
   -o string, --out_suffix string
                         Unique suffix for output files. By default, start-time_unique-id.Unique suffix is used to separate outputs from different runs.
 ```
@@ -108,7 +109,7 @@ See {doc}`outputs` for where these files are written alongside other analysis re
 **prolif_drawmap**
 ```
 prolif_drawmap -h
-usage: prolif_drawmap [-h] -i FILENAME [FILENAME ...] [-o FILENAME] [--width FILENAME] [--height FILENAME] [--base_size FILENAME]
+usage: prolif_drawmap [-h] -i FILENAME [FILENAME ...] [-o FILENAME] [--width FILENAME] [--height FILENAME] [--base_size FILENAME] [--point_size int] [--no-show_percentage]
 
 Draw prolif plot for analysis binding mode of multiple ligands
 
@@ -122,6 +123,18 @@ options:
   --width int      width of the output picture
   --height int     height of the output picture
   --base_size int  base size of the output picture
+  --point_size int dots size of the output picture
+  --no-show_percentage
+                   do not show the occupancy percentage label above each dot (percentages are shown by default)
+```
+
+Example:
+```
+prolif_drawmap -i prolif_output.csv -o prolif_output_occ0.png --base_size 18 --point_size 10 --occupancy 0
+```
+If the plot looks too small or the residue labels/percentages overlap, increase the figure size (`--width`/`--height`) and rerun, e.g.:
+```
+prolif_drawmap -i prolif_output.csv -o prolif_output_occ0.png --base_size 18 --point_size 10 --occupancy 0 --width 20
 ```
 
 **prolif_draw_by_frame**

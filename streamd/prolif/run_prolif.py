@@ -333,7 +333,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose,
           binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
           water_bridge=False, water_selection='resname SOL', water_bridge_order=1,
-          water_cutoff=8.0):
+          water_cutoff=8.0, show_percentage=True):
     """Run ProLIF across multiple directories and aggregate results.
     :param wdir_to_run: list
     :param wdir_output: path to dirn
@@ -360,6 +360,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param water_selection: str, MDAnalysis selection for water molecules
     :param water_bridge_order: int, maximum number of bridging water molecules
     :param water_cutoff: float, only waters within this distance (A) of the ligand each frame are used
+    :param show_percentage: bool, draw the occupancy percentage as a label above each dot in the aggregated plot
     :return:
     """
     output = 'plifs.csv'
@@ -425,7 +426,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
 
     convertprolif2png(output_aggregated, occupancy=occupancy,
                       plot_width=plot_width, plot_height=plot_height,
-                      base_size=12, point_size=3)
+                      base_size=12, point_size=3, show_percentage=show_percentage)
     finished_complexes_file = os.path.join(wdir_output, f"finished_prolif_files_{unique_id}.txt")
     with open(finished_complexes_file, 'w') as output:
         output.write("\n".join(var_prolif_out_files))
@@ -530,8 +531,11 @@ def main():
                              'Applied for plifs_occupancyX.html (for each complex) and'
                              ' prolif_output_occupancyX.png (all systems aggregated plot)')
     parser.add_argument('--not_save_pics', default=False, action='store_true',
-                        help='not create html and png files (by frames) for each unique trajectory.'
-                             ' Only overall prolif png file will be created.')
+                        help='dont create html and png files (by frames) for each unique trajectory.'
+                             ' Only overall prolif png plot file will be created.')
+    parser.add_argument('--no-show_percentage', default=False, action='store_true',
+                        help='do not show the occupancy percentage label above each dot in the aggregated '
+                             'prolif_output_occupancyX.png plot (percentages are shown by default).')
     parser.add_argument('-o','--out_suffix',
                         metavar='string', default=None,
                         help='Unique suffix for output files. By default, start-time_unique-id.'
@@ -588,7 +592,8 @@ def main():
           parallel_strategy=None if args.parallel_strategy == 'auto' else args.parallel_strategy,
           ligand_sdf=args.ligand_sdf,
           water_bridge=args.water_bridge, water_selection=args.water_selection,
-          water_bridge_order=args.water_bridge_order, water_cutoff=args.water_cutoff)
+          water_bridge_order=args.water_bridge_order, water_cutoff=args.water_cutoff,
+          show_percentage=not args.no_show_percentage)
     finally:
         logging.shutdown()
 

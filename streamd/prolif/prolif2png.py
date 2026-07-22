@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import re
 import matplotlib.pyplot as plt
-from plotnine import ggplot, geom_point, aes, theme, element_text, element_blank, theme_bw, scale_color_manual, element_rect, scale_x_discrete
+from plotnine import ggplot, geom_point, geom_text, aes, theme, element_text, element_blank, theme_bw, scale_color_manual, element_rect, scale_x_discrete
 plt.ioff()
 
 # def calculate_figure_size(num_data_points_x, num_data_points_y):
@@ -33,7 +33,7 @@ plt.ioff()
 
 def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
                       plot_width=None, plot_height=None,
-                      point_size=3, base_size=12):
+                      point_size=3, base_size=12, show_percentage=True):
     '''
 
     :param plif_out_file:
@@ -42,6 +42,7 @@ def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
     :param plot_height:
     :param point_size:
     :param base_size:
+    :param show_percentage: if True, draw the occupancy percentage as a label above each dot
     :return:
     '''
 
@@ -55,7 +56,10 @@ def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
 
     df = pd.read_csv(plif_out_file, sep='\t')
     id_columns = ['Name','directory'] if 'directory' in df.columns else ['Name']
-    df_occup = df.drop(['Frame'], axis=1).groupby(id_columns).apply(lambda x: round(x.sum() / len(x), 1))
+    # keep the exact occupancy fraction; rounding here to 1 decimal (0.1) collapsed all
+    # contacts below ~5% occupancy to 0.0 (dropped by the value > 0 filter) and forced
+    # every percentage label to a multiple of 10
+    df_occup = df.drop(['Frame'], axis=1).groupby(id_columns).apply(lambda x: x.sum() / len(x))
 
     subdf = pd.melt(df_occup.reset_index(), id_vars=id_columns)
     subdf = subdf[(subdf['value'] >= occupancy) & (subdf['value'] > 0)]
@@ -72,6 +76,17 @@ def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
     subdf = subdf.sort_values(by=['chain','resi', 'interaction']).reset_index(drop=True)
     subdf['variable'] = pd.Categorical(subdf.variable, categories=pd.unique(subdf.variable))
 
+    if show_percentage:
+        def _format_percentage(value):
+            pct = value * 100
+            # normally show a whole-number percentage; when no occupancy cutoff is applied,
+            # keep 2 decimals for sub-1% contacts so rare interactions are not shown as "0%"
+            if occupancy == 0 and round(pct) == 0:
+                return f'{pct:.2f}%'
+            return f'{round(pct)}%'
+
+        subdf['percentage'] = subdf['value'].apply(_format_percentage)
+
     plot = (ggplot(subdf)+ geom_point(aes( x="variable", y="Name",
                                            color = "interaction",
                                           ), size=point_size)
@@ -87,6 +102,11 @@ def convertprolif2png(plif_out_file, output=None, occupancy=0.6,
                   legend_box_spacing=0,
     )
             )
+
+    if show_percentage:
+        plot = plot + geom_text(aes(x="variable", y="Name", label="percentage"),
+                                size=base_size * 0.55, nudge_y=0.18, color="black",
+                                show_legend=False)
 
     if output is None:
         output_name = os.path.join(os.path.dirname(plif_out_file),
@@ -116,13 +136,17 @@ def main():
                         help='base size of the output picture')
     parser.add_argument('--point_size', metavar='int', default=3, type=int,
                         help='dots size of the output picture')
+    parser.add_argument('--no-show_percentage', default=False, action='store_true',
+                        help='do not show the occupancy percentage label above each dot '
+                             '(percentages are shown by default)')
 
     args = parser.parse_args()
 
     for input_file in args.input:
         convertprolif2png(input_file, output=args.output, occupancy=args.occupancy,
                           plot_width=args.width, plot_height=args.height,
-                          point_size=args.point_size, base_size=args.base_size)
+                          point_size=args.point_size, base_size=args.base_size,
+                          show_percentage=not args.no_show_percentage)
 
 
 if __name__ == '__main__':

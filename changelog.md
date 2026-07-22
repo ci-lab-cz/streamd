@@ -15,6 +15,7 @@
 - `run_prolif` add argument `parallel_strategy` (default `chunk`): ProLIF auto-selects `queue` for solvated systems
 - `run_prolif` make `--water_bridge` usable: restrict waters to an updating per-frame selection near the ligand instead of converting every water every frame. New argument `water_cutoff` (default `8` Å, automatically widened for higher `water_bridge_order`; set `0` to use all waters)
 - `run_prolif` add argument `ligand_sdf`: optional reference `.sdf`/`.mol` bond-order template for the ligand (usually unnecessary — ligand chemistry is inferred from the topology and the interpreted SMILES is logged for verification)
+- `run_prolif`/`prolif_drawmap` show the occupancy percentage above each dot in `prolif_output_occupancyX.png` by default (use `--no-show_percentage` to disable)
 
 **0.5**
 - add argument `box_type` - simulation box type (`triclinic`, `cubic`, `dodecahedron`, `octahedron`) (default `cubic`) defined using `gmx editconf -bt`
