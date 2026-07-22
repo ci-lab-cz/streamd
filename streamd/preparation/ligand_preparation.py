@@ -63,41 +63,46 @@ def write_prepared_ligand_forcefield(wdir, ligand_forcefield):
         out.write(f'{ligand_forcefield}\n')
 
 
-# Files whose presence in a run directory means an MD simulation/analysis was already
-# produced there (energy minimization, equilibration, production, analysis), so a
-# force-field switch must not silently reuse/mix it.
-_RUN_OUTPUT_MARKERS = ('em.gro', 'nvt.gro', 'npt.gro',
-                       'md_out.tpr', 'md_out.xtc', 'md_out.gro', 'md_out.cpt',
-                       'md_fit.xtc')
-
-
-def run_has_md_outputs(run_dir):
-    """True if a run directory already contains MD simulation/analysis outputs."""
-    return any(os.path.isfile(os.path.join(run_dir, m)) for m in _RUN_OUTPUT_MARKERS)
-
-
 def ensure_run_forcefield_compatible(run_dir, ligand_forcefield):
-    """Abort if a run directory already holds MD outputs built with a different force field.
+    """Abort if an existing run directory was built with a different ligand force field.
 
-    A run directory that already contains MD simulation/analysis files (energy
-    minimization, equilibration, production or analysis outputs) prepared with a
-    different force field must not be reused, as it would mix force fields. Run
-    directories with no MD outputs yet are allowed (their inputs are refreshed by the
-    caller). Legacy run directories (MD outputs but no record) are conservatively
-    assumed to be GAFF.
+    Triggers on the mere existence of a (non-empty) run directory - not on specific
+    output files - so a mismatched force field is caught before any simulation runs and
+    no stale files are reused/mixed. An empty directory (nothing prepared) is allowed; a
+    legacy run directory (content but no record) is conservatively assumed to be GAFF.
 
-    :raises ValueError: if the run has MD outputs and its recorded/assumed force field
-        differs from the requested one.
+    :raises ValueError: if the run directory exists with content and its recorded/assumed
+        force field differs from the requested one.
     """
-    if not run_has_md_outputs(run_dir):
+    if not os.path.isdir(run_dir):
         return
-    recorded = read_prepared_ligand_forcefield(run_dir) or 'gaff'
-    if recorded != ligand_forcefield:
+    recorded = read_prepared_ligand_forcefield(run_dir)
+    if recorded is None and not os.listdir(run_dir):
+        return  # empty directory - nothing prepared here
+    known_forcefield = recorded or 'gaff'
+    if known_forcefield != ligand_forcefield:
         raise ValueError(
-            f'Run directory {run_dir} already contains MD simulation files prepared with the '
-            f'"{recorded}" ligand force field, but "{ligand_forcefield}" was requested. Rerun with '
-            f'--ligand_forcefield {recorded} to match the existing run, or remove {run_dir} (or use a '
-            f'fresh --wdir) to run with "{ligand_forcefield}". Use --wdir_to_continue to extend the existing run.')
+            f'Run directory {run_dir} already exists and was prepared with the "{known_forcefield}" '
+            f'ligand force field, but "{ligand_forcefield}" was requested. Rerun with '
+            f'--ligand_forcefield {known_forcefield} to match it, or remove {run_dir} (or use a fresh '
+            f'--wdir) to run with "{ligand_forcefield}". Use --wdir_to_continue to extend the existing run.')
+    logging.info(f'Run directory {run_dir} already exists and was prepared with the matching '
+                 f'"{ligand_forcefield}" ligand force field; existing files will be reused.')
+
+
+def ensure_no_conflicting_run(md_run_dir, ligand_forcefield):
+    """Check every existing run directory under ``md_run_dir`` for a force-field conflict.
+
+    Intended as a pre-flight run *before* any (re)preparation, so a conflicting explicit
+    force field aborts the run before the ligand parameterization is regenerated (rather
+    than stopping later at run assembly). Delegates each directory to
+    :func:`ensure_run_forcefield_compatible`.
+
+    :raises ValueError: if any existing run directory was built with a different force field.
+    """
+    for run_dir in sorted(glob(os.path.join(md_run_dir, '*'))):
+        if os.path.isdir(run_dir):
+            ensure_run_forcefield_compatible(run_dir, ligand_forcefield)
 
 
 def resolve_ligand_forcefield(search_dirs, requested, explicit):
@@ -111,8 +116,6 @@ def resolve_ligand_forcefield(search_dirs, requested, explicit):
 
     :raises ValueError: if records disagree (ambiguous) and no explicit choice was given.
     """
-    if explicit:
-        return requested
     recorded = set()
     for base in search_dirs:
         for path in glob(os.path.join(base, '**', LIGAND_FORCEFIELD_METADATA), recursive=True):
@@ -125,17 +128,36 @@ def resolve_ligand_forcefield(search_dirs, requested, explicit):
                 continue
             if value:
                 recorded.add(value)
-    if not recorded:
-        return requested
+
     if len(recorded) > 1:
+        if explicit:
+            logging.warning(
+                f'Multiple ligand force fields are recorded in this working directory ({sorted(recorded)}); '
+                f'using the explicitly requested "{requested}".')
+            return requested
         raise ValueError(
             f'Multiple ligand force fields are recorded in this working directory ({sorted(recorded)}). '
             f'Specify --ligand_forcefield explicitly to choose one.')
-    adopted = recorded.pop()
-    if adopted != requested:
-        logging.info(f'Adopting previously used ligand force field "{adopted}" '
+
+    existing = recorded.pop() if recorded else None
+
+    if explicit:
+        if existing is not None and existing != requested:
+            logging.info(
+                f'Requested ligand force field "{requested}" differs from the one recorded in this working '
+                f'directory ("{existing}"); an existing run with a different force field will be rejected.')
+        elif existing is not None:
+            logging.info(f'Ligand force field "{requested}" matches the record in this working directory.')
+        return requested
+
+    if existing is None:
+        return requested  # nothing recorded - use the requested/default value
+    if existing != requested:
+        logging.info(f'Adopting previously used ligand force field "{existing}" '
                      f'(pass --ligand_forcefield to override).')
-    return adopted
+    else:
+        logging.info(f'Reusing previously recorded ligand force field "{existing}".')
+    return existing
 
 
 def _ligand_artifact_paths(wdir, molid):
@@ -394,7 +416,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
             f'Existing {molid} files were prepared with the "{prepared_forcefield}" ligand force field, but '
             f'"{ligand_forcefield}" was requested. They will be regenerated with "{ligand_forcefield}" '
             f'(this re-runs Antechamber atom typing, parmchk2 and LEaP); the previous files are moved to a '
-            f'backup subdirectory rather than deleted.')
+            f'backup subdirectory.')
         backup_stale_ligand_files(wdir_ligand_cur, molid, prepared_forcefield)
     elif os.path.isfile(itp_file) and os.path.isfile(posre_file):
         # A complete parameterization with a matching force field exists - reuse it.
