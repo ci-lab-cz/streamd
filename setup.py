@@ -1,14 +1,18 @@
 import setuptools
 from os import path
-import streamd
+
 
 this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+version = {}
+with open(path.join(this_directory, 'streamd', '__init__.py'), encoding='utf-8') as f:
+    exec(f.read(), version)
+
 setuptools.setup(
     name="streamd",
-    version=streamd.__version__,
+    version=version['__version__'],
     author="Aleksandra Ivanova, Olena Mokshyna, Pavel Polishchuk",
     description="Streamd Python module to facilitate molecular dynamics",
     long_description=long_description,

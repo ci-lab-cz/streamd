@@ -1,4 +1,4 @@
-<img src="./streamd_logo.png" alt="StreaMD Logo" width="220" height="220">
+<img src="https://raw.githubusercontent.com/ci-lab-cz/streamd/master/streamd_logo.png" alt="StreaMD Logo" width="220" height="220">
 
 # StreaMD:  a tool to perform high-throughput automated molecular dynamics simulations
 
