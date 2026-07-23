@@ -50,6 +50,7 @@ def test_run_prolif_full_pipline(dir_with_streamd_output_for_prolif):
 
     assert os.path.isfile(os.path.join(wdir, f"finished_prolif_files_test.txt"))
     assert os.path.isfile(os.path.join(wdir, f"plifs.csv"))
+    assert os.path.isfile(os.path.join(wdir, f"plifs.pkl"))
     assert os.path.isfile(os.path.join(wdir, f"plif.png"))
     assert os.path.isfile(os.path.join(wdir, f"plif_framemap.png"))
     assert os.path.isfile(os.path.join(wdir, f"plif_occupancy0.6.html"))
@@ -57,6 +58,7 @@ def test_run_prolif_full_pipline(dir_with_streamd_output_for_prolif):
     assert os.path.isfile(os.path.join(wdir, f"prolif_output_test.csv"))
 
     assert os.path.getsize(os.path.join(wdir, f"finished_prolif_files_test.txt")) > 0
+    assert os.path.getsize(os.path.join(wdir, f"plifs.pkl")) > 0
     assert os.path.getsize(os.path.join(wdir, f"plif.png")) > 0
     assert os.path.getsize(os.path.join(wdir, f"plif_framemap.png")) > 0
     assert os.path.getsize(os.path.join(wdir, f"prolif_output_test_occupancy{occupancy}.png")) > 0
@@ -66,6 +68,11 @@ def test_run_prolif_full_pipline(dir_with_streamd_output_for_prolif):
 
     assert not plifs_out.empty
     assert not prolif_output_test_out.empty
+
+    # the saved pickle must reload into a Fingerprint whose interaction data matches the CSV
+    import prolif as plf
+    reloaded_fp = plf.Fingerprint.from_pickle(os.path.join(wdir, f"plifs.pkl"))
+    assert len(reloaded_fp.to_dataframe()) == len(plifs_out)
 
 
 
@@ -103,6 +110,7 @@ def test_run_prolif_full_pipline_from_files(dir_with_streamd_output_for_prolif):
 
     assert os.path.isfile(os.path.join(wdir, f"finished_prolif_files_test.txt"))
     assert os.path.isfile(os.path.join(wdir, f"plifs.csv"))
+    assert os.path.isfile(os.path.join(wdir, f"plifs.pkl"))
     assert os.path.isfile(os.path.join(wdir, f"plif.png"))
     assert os.path.isfile(os.path.join(wdir, f"plif_framemap.png"))
     assert os.path.isfile(os.path.join(wdir, f"plif_occupancy0.6.html"))
@@ -110,6 +118,7 @@ def test_run_prolif_full_pipline_from_files(dir_with_streamd_output_for_prolif):
     assert os.path.isfile(os.path.join(wdir, f"prolif_output_test.csv"))
 
     assert os.path.getsize(os.path.join(wdir, f"finished_prolif_files_test.txt")) > 0
+    assert os.path.getsize(os.path.join(wdir, f"plifs.pkl")) > 0
     assert os.path.getsize(os.path.join(wdir, f"plif.png")) > 0
     assert os.path.getsize(os.path.join(wdir, f"plif_framemap.png")) > 0
     assert os.path.getsize(os.path.join(wdir, f"prolif_output_test_occupancy{occupancy}.png")) > 0
@@ -119,3 +128,8 @@ def test_run_prolif_full_pipline_from_files(dir_with_streamd_output_for_prolif):
 
     assert not plifs_out.empty
     assert not prolif_output_test_out.empty
+
+    # the saved pickle must reload into a Fingerprint whose interaction data matches the CSV
+    import prolif as plf
+    reloaded_fp = plf.Fingerprint.from_pickle(os.path.join(wdir, f"plifs.pkl"))
+    assert len(reloaded_fp.to_dataframe()) == len(plifs_out)

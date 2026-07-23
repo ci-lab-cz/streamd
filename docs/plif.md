@@ -11,7 +11,7 @@ This functionality is based on [ProLIF tool](https://github.com/chemosim-lab/Pro
 usage: run_prolif [-h] [-i DIRNAME [DIRNAME ...]] [--xtc FILENAME] [--tpr FILENAME] [-l STRING] [-s INTEGER] [--protein_selection STRING] [-a STRING] [-d WDIR] [-v]
                   [--hostfile FILENAME] [-c INTEGER] [--n_jobs INTEGER] [--width FILENAME] [--height FILENAME] [--binding_site_cutoff float]
                   [--parallel_strategy {chunk,queue,auto}] [--ligand_sdf FILENAME] [--water_bridge] [--water_selection STRING]
-                  [--water_bridge_order INTEGER] [--water_cutoff float] [--occupancy float] [--not_save_pics] [--no-show_percentage] [-o string]
+                  [--water_bridge_order INTEGER] [--water_cutoff float] [--occupancy float] [--not_save_pics] [--not_save_pkl] [--no-show_percentage] [-o string]
 
 Get protein-ligand interactions from MD trajectories using ProLIF module.
 The computed interactions are: Hydrophobic, HBDonor, HBAcceptor, Anionic, Cationic, CationPi, PiCation, PiStacking, MetalAcceptor and halogen bonds (XBDonor, XBAcceptor).
@@ -54,6 +54,7 @@ options:
   --water_cutoff float  only waters within this distance (A) of the ligand in a given frame are considered for --water_bridge. Main speed lever for water-bridge: ProLIF otherwise converts every water to RDKit every frame. Auto-widened for higher --water_bridge_order. Set to 0 to consider all waters (slow). (default: 8.0)
   --occupancy float     occupancy of the unique contacts to show. Applied for plifs_occupancyX.html (for each complex) and prolif_output_occupancyX.png (all systems aggregated plot) (default: 0.6)
   --not_save_pics       not create html and png files (by frames) for each unique trajectory. Only overall prolif png file will be created. (default: False)
+  --not_save_pkl        do not save the per-trajectory ProLIF fingerprints as a pickle (plifs.pkl, saved by default next to plifs.csv). The pickle stores the full Fingerprint object and can be reloaded with prolif.Fingerprint.from_pickle(path) to re-plot or run further analysis without recomputing the trajectory. (default: False)
   --no-show_percentage  do not show the occupancy percentage label above each dot in the aggregated prolif_output_occupancyX.png plot. Percentages are shown by default. (default: False)
   -o string, --out_suffix string
                         Unique suffix for output files. By default, start-time_unique-id.Unique suffix is used to separate outputs from different runs.
@@ -119,7 +120,7 @@ To control parallelism:
 2) `--n_jobs`: number of processes per trajectory. StreaMD distributes `--ncpu` across trajectories and `--n_jobs`. By default, `--n_jobs` is capped (12) to avoid the ProLIF bottleneck; override explicitly if needed. See also `--parallel_strategy` (default `chunk`), which makes `--n_jobs > 1` effective for solvated systems.
 
 ## Outputs
-1) Per trajectory: `plifs.csv`, `plifs.png`, `plifs_map.png`, `plifs.html` (HTML/PNG creation can be disabled with `--not_save_pics`)
+1) Per trajectory: `plifs.csv`, `plifs.pkl`, `plifs.png`, `plifs_map.png`, `plifs.html` (HTML/PNG creation can be disabled with `--not_save_pics`; the `plifs.pkl` fingerprint dump can be disabled with `--not_save_pkl`). Reload the fingerprints with `prolif.Fingerprint.from_pickle("plifs.pkl")`.
 2) Aggregated: `prolif_output_<unique-suffix>.{csv,png}` summarizing all analyzed simulations (unique suffix separates runs)
 
 See {doc}`outputs` for where these files are written alongside other analysis results.

@@ -163,7 +163,7 @@ def resolve_ligand_converter_kwargs(ligand, ligand_selection, ligand_sdf, xtc):
 
 
 def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose, output, n_jobs,
-                    occupancy = 0.6, save_viz=True, dpi=300, plot_width=15, plot_height=8, pdb=None,
+                    occupancy = 0.6, save_viz=True, save_pkl=True, dpi=300, plot_width=15, plot_height=8, pdb=None,
                     binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
                     water_bridge=False, water_selection='resname SOL', water_bridge_order=1,
                     water_cutoff=8.0):
@@ -177,7 +177,10 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     :param verbose:
     :param output:
     :param n_jobs:
-    :param save_pics: save barcode in png and network in html
+    :param save_viz: save barcode in png and network in html
+    :param save_pkl: dump the computed ProLIF Fingerprint object next to the CSV as a .pkl
+        (dill pickle). It can be reloaded with ``prolif.Fingerprint.from_pickle(path)`` to
+        re-plot or run further analysis without recomputing the trajectory.
     :param dpi:
     :param plot_width:  in inches
     :param plot_height: in inches
@@ -284,6 +287,14 @@ def run_prolif_task(tpr, xtc, protein_selection, ligand_selection, step, verbose
     df = df.reindex(sorted(df.columns), axis=1)
     df.to_csv(output, sep='\t')
 
+    if save_pkl:
+        # Persist the full Fingerprint object (all per-frame interactions), not just the
+        # dataframe, so it can be reloaded with prolif.Fingerprint.from_pickle(path) to
+        # re-plot or run further analysis without recomputing the trajectory.
+        pkl_output = f'{os.path.splitext(output)[0]}.pkl'
+        fp.to_pickle(pkl_output)
+        logging.info(f'{xtc}: saved ProLIF fingerprints to {pkl_output}.')
+
     if save_viz:
         # barcode
         Barcode.from_fingerprint(fp).display(figsize=(plot_width, plot_height)).figure.savefig(f'{output.rstrip(".csv")}.png', dpi=dpi)
@@ -307,7 +318,7 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
                          plot_width, plot_height, save_viz, pdb, n_jobs, occupancy,
                          binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
                          water_bridge=False, water_selection='resname SOL', water_bridge_order=1,
-                         water_cutoff=8.0):
+                         water_cutoff=8.0, save_pkl=True):
     """Execute ProLIF analysis using paths relative to a directory."""
     tpr = os.path.join(wdir, tpr)
     xtc = os.path.join(wdir, xtc)
@@ -322,8 +333,8 @@ def run_prolif_from_wdir(wdir, tpr, xtc, protein_selection, ligand_selection, st
 
     run_prolif_task(tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                     ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
-                    plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, occupancy=occupancy,
-                    pdb=pdb, n_jobs=n_jobs, binding_site_cutoff=binding_site_cutoff,
+                    plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, save_pkl=save_pkl,
+                    occupancy=occupancy, pdb=pdb, n_jobs=n_jobs, binding_site_cutoff=binding_site_cutoff,
                     parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
                     water_bridge=water_bridge, water_selection=water_selection,
                     water_bridge_order=water_bridge_order, water_cutoff=water_cutoff)
@@ -354,7 +365,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
           occupancy, plot_width, plot_height, save_viz, unique_id, pdb, verbose,
           binding_site_cutoff=12.0, parallel_strategy='chunk', ligand_sdf=None,
           water_bridge=False, water_selection='resname SOL', water_bridge_order=1,
-          water_cutoff=8.0, show_percentage=True):
+          water_cutoff=8.0, show_percentage=True, save_pkl=True):
     """Run ProLIF across multiple directories and aggregate results.
     :param wdir_to_run: list
     :param wdir_output: path to dirn
@@ -371,6 +382,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
     :param plot_width: float
     :param plot_height: float
     :param save_viz: bool
+    :param save_pkl: bool, dump each trajectory's ProLIF Fingerprint object as a .pkl next to its CSV
     :param unique_id: str
     :param pdb: None or path to file (protein.pdb for renumbering)
     :param verbose: bool
@@ -412,7 +424,8 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
             for res in calc_dask(run_prolif_from_wdir, wdir_to_run, dask_client=dask_client,
                                  tpr=tpr, xtc=xtc, protein_selection=protein_selection,
                                  ligand_selection=ligand_selection, step=step, verbose=verbose, output=output,
-                                 plot_width=plot_width, plot_height=plot_height, save_viz=save_viz, pdb=pdb,
+                                 plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
+                                 save_pkl=save_pkl, pdb=pdb,
                                  n_jobs=n_jobs_per_task, occupancy=occupancy,
                                  binding_site_cutoff=binding_site_cutoff,
                                  parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
@@ -435,6 +448,7 @@ def start(wdir_to_run, wdir_output, tpr, xtc, step, append_protein_selection,
                         ligand_selection=ligand_selection,
                         step=step, verbose=verbose, output=output,
                         plot_width=plot_width, plot_height=plot_height, save_viz=save_viz,
+                        save_pkl=save_pkl,
                         pdb=pdb, n_jobs= min(12, ncpu), occupancy=occupancy,
                         binding_site_cutoff=binding_site_cutoff,
                         parallel_strategy=parallel_strategy, ligand_sdf=ligand_sdf,
@@ -558,6 +572,12 @@ def main():
     parser.add_argument('--not_save_pics', default=False, action='store_true',
                         help='dont create html and png files (by frames) for each unique trajectory.'
                              ' Only overall prolif png plot file will be created.')
+    parser.add_argument('--not_save_pkl', default=False, action='store_true',
+                        help='do not save the per-trajectory ProLIF fingerprints as a pickle '
+                             '(plifs.pkl, saved by default next to plifs.csv). The pickle stores the '
+                             'full Fingerprint object and can be reloaded with '
+                             'prolif.Fingerprint.from_pickle(path) to re-plot or run further analysis '
+                             'without recomputing the trajectory.')
     parser.add_argument('--no-show_percentage', default=False, action='store_true',
                         help='do not show the occupancy percentage label above each dot in the aggregated '
                              'prolif_output_occupancyX.png plot (percentages are shown by default).')
@@ -612,7 +632,7 @@ def main():
           xtc=xtc, step=args.step, append_protein_selection=args.append_protein_selection,
           protein_selection=args.protein_selection, ligand_resid=args.ligand, hostfile=args.hostfile, ncpu=args.ncpu,
           n_jobs=args.n_jobs, occupancy=args.occupancy, plot_width=args.width, plot_height=args.height,
-          save_viz=not args.not_save_pics, unique_id=unique_id, pdb=pdb,
+          save_viz=not args.not_save_pics, save_pkl=not args.not_save_pkl, unique_id=unique_id, pdb=pdb,
           verbose=args.verbose, binding_site_cutoff=args.binding_site_cutoff,
           parallel_strategy=None if args.parallel_strategy == 'auto' else args.parallel_strategy,
           ligand_sdf=args.ligand_sdf,
