@@ -15,6 +15,207 @@ from rdkit.Chem import rdmolops
 from streamd.utils.dask_init import init_dask_cluster, calc_dask
 from streamd.utils.utils import run_check_subprocess
 
+# Supported ligand force fields (AmberTools GAFF family). The selected value is
+# applied consistently to Antechamber atom typing (``antechamber -at``),
+# ``parmchk2 -s`` and the LEaP parameter library sourced in ``tleap.in``.
+# Partial charges use AM1-BCC (``antechamber -c bcc``) for standard organic ligands;
+# boron-containing ligands are parameterized via Gaussian using RESP charges. The
+# charge method is independent of the GAFF/GAFF2 choice.
+LIGAND_LEAPRC = {
+    'gaff': 'leaprc.gaff',
+    'gaff2': 'leaprc.gaff2',
+}
+
+# Name of the per-ligand file that records the force field a preparation was run with.
+# It is written as soon as preparation commits (before the expensive Antechamber/tleap
+# steps) and read before reusing existing files, so a GAFF topology is never silently
+# reused for a GAFF2 request (and vice versa) and an interrupted run can be resumed with
+# the same force field. Reuse of a *completed* preparation is separately gated on the
+# presence of the .itp/posre outputs, so a partial run is never skipped-and-reused.
+LIGAND_FORCEFIELD_METADATA = 'ligand_forcefield.txt'
+
+# Generated files moved aside (not deleted) before re-parameterizing a ligand with
+# a different force field, so stale artifacts cannot be reused (in particular the
+# cached .mol2, which would otherwise make Antechamber atom typing be skipped) while
+# the potentially expensive previous parameterization is preserved for inspection.
+_STALE_LIGAND_SUFFIXES = ('.mol2', '.mol', '.frcmod', '.itp', '.top', '.gro',
+                          '.prmtop', '.inpcrd', '.lib')
+
+
+def read_prepared_ligand_forcefield(wdir):
+    """Return the recorded ligand force field, or ``None``.
+
+    The record is written when preparation commits (before the heavy steps), so a
+    missing record means a legacy preparation created before ``--ligand_forcefield``
+    was introduced (such topologies were always GAFF).
+    """
+    path = os.path.join(wdir, LIGAND_FORCEFIELD_METADATA)
+    if os.path.isfile(path):
+        with open(path) as inp:
+            value = inp.read().strip()
+        return value or None
+    return None
+
+
+def write_prepared_ligand_forcefield(wdir, ligand_forcefield):
+    """Record the force field a ligand directory is (being) prepared with."""
+    with open(os.path.join(wdir, LIGAND_FORCEFIELD_METADATA), 'w') as out:
+        out.write(f'{ligand_forcefield}\n')
+
+
+def ensure_run_forcefield_compatible(run_dir, ligand_forcefield):
+    """Abort if an existing run directory was built with a different ligand force field.
+
+    Triggers on the mere existence of a (non-empty) run directory - not on specific
+    output files - so a mismatched force field is caught before any simulation runs and
+    no stale files are reused/mixed. An empty directory (nothing prepared) is allowed; a
+    legacy run directory (content but no record) is conservatively assumed to be GAFF.
+
+    :raises ValueError: if the run directory exists with content and its recorded/assumed
+        force field differs from the requested one.
+    """
+    if not os.path.isdir(run_dir):
+        return
+    recorded = read_prepared_ligand_forcefield(run_dir)
+    if recorded is None and not os.listdir(run_dir):
+        return  # empty directory - nothing prepared here
+    known_forcefield = recorded or 'gaff'
+    if known_forcefield != ligand_forcefield:
+        raise ValueError(
+            f'Run directory {run_dir} already exists and was prepared with the "{known_forcefield}" '
+            f'ligand force field, but "{ligand_forcefield}" was requested. Rerun with '
+            f'--ligand_forcefield {known_forcefield} to match it, or remove {run_dir} (or use a fresh '
+            f'--wdir) to run with "{ligand_forcefield}". Use --wdir_to_continue to extend the existing run.')
+    logging.info(f'Run directory {run_dir} already exists and was prepared with the matching '
+                 f'"{ligand_forcefield}" ligand force field; existing files will be reused.')
+
+
+def ensure_no_conflicting_run(md_run_dir, ligand_forcefield):
+    """Check every existing run directory under ``md_run_dir`` for a force-field conflict.
+
+    Intended as a pre-flight run *before* any (re)preparation, so a conflicting explicit
+    force field aborts the run before the ligand parameterization is regenerated (rather
+    than stopping later at run assembly). Delegates each directory to
+    :func:`ensure_run_forcefield_compatible`.
+
+    :raises ValueError: if any existing run directory was built with a different force field.
+    """
+    for run_dir in sorted(glob(os.path.join(md_run_dir, '*'))):
+        if os.path.isdir(run_dir):
+            ensure_run_forcefield_compatible(run_dir, ligand_forcefield)
+
+
+def resolve_ligand_forcefield(search_dirs, requested, explicit):
+    """Resolve the effective ligand force field for a run.
+
+    When the user did not explicitly request one (``explicit`` is False), adopt the
+    force field recorded by a previous run under ``search_dirs`` - so, e.g., a working
+    directory prepared with GAFF2 is not silently reverted to the default. If the user
+    was explicit, or nothing is recorded, ``requested`` is returned unchanged. Backup
+    subdirectories (``backup_*``) are ignored.
+
+    :raises ValueError: if records disagree (ambiguous) and no explicit choice was given.
+    """
+    recorded = set()
+    for base in search_dirs:
+        for path in glob(os.path.join(base, '**', LIGAND_FORCEFIELD_METADATA), recursive=True):
+            if any(part.startswith('backup_') for part in os.path.normpath(path).split(os.sep)):
+                continue  # ignore preserved previous parameterizations
+            try:
+                with open(path) as inp:
+                    value = inp.read().strip()
+            except OSError:
+                continue
+            if value:
+                recorded.add(value)
+
+    if len(recorded) > 1:
+        if explicit:
+            logging.warning(
+                f'Multiple ligand force fields are recorded in this working directory ({sorted(recorded)}); '
+                f'using the explicitly requested "{requested}".')
+            return requested
+        raise ValueError(
+            f'Multiple ligand force fields are recorded in this working directory ({sorted(recorded)}). '
+            f'Specify --ligand_forcefield explicitly to choose one.')
+
+    existing = recorded.pop() if recorded else None
+
+    if explicit:
+        if existing is not None and existing != requested:
+            logging.info(
+                f'Requested ligand force field "{requested}" differs from the one recorded in this working '
+                f'directory ("{existing}"); an existing run with a different force field will be rejected.')
+        elif existing is not None:
+            logging.info(f'Ligand force field "{requested}" matches the record in this working directory.')
+        return requested
+
+    if existing is None:
+        return requested  # nothing recorded - use the requested/default value
+    if existing != requested:
+        logging.info(f'Adopting previously used ligand force field "{existing}" '
+                     f'(pass --ligand_forcefield to override).')
+    else:
+        logging.info(f'Reusing previously recorded ligand force field "{existing}".')
+    return existing
+
+
+def _ligand_artifact_paths(wdir, molid):
+    """Regenerable ligand artifacts (excluding the force-field metadata record).
+
+    Includes intermediate files (``.mol2``/``.frcmod``/``tleap.in`` ...) so a
+    partial/interrupted preparation is detected, not only completed topologies.
+    """
+    paths = [os.path.join(wdir, f'{molid}{suffix}') for suffix in _STALE_LIGAND_SUFFIXES]
+    paths.append(os.path.join(wdir, f'posre_{molid}.itp'))
+    paths.append(os.path.join(wdir, 'tleap.in'))
+    return paths
+
+
+def has_existing_ligand_files(wdir, molid):
+    """True if any artifact from a previous (complete or partial) preparation exists."""
+    return any(os.path.isfile(p) for p in _ligand_artifact_paths(wdir, molid))
+
+
+def backup_stale_ligand_files(wdir, molid, prepared_forcefield):
+    """Move a previous ligand parameterization aside before re-parameterizing.
+
+    Files are moved (never deleted) into a ``backup_<prepared_forcefield>``
+    subdirectory of the ligand's own working directory, so an expensive previous
+    parameterization (e.g. AM1-BCC or Gaussian/RESP derived) is preserved and can
+    be inspected or restored. Returns the backup directory path (or ``None`` if
+    there was nothing to move).
+    """
+    to_move = _ligand_artifact_paths(wdir, molid) + [os.path.join(wdir, LIGAND_FORCEFIELD_METADATA)]
+    existing = [p for p in to_move if os.path.isfile(p)]
+    if not existing:
+        return None
+
+    # pick a non-colliding backup directory name (repeated switches keep every snapshot)
+    backup_dir = os.path.join(wdir, f'backup_{prepared_forcefield}')
+    suffix_n = 1
+    while os.path.exists(backup_dir):
+        backup_dir = os.path.join(wdir, f'backup_{prepared_forcefield}_{suffix_n}')
+        suffix_n += 1
+    os.makedirs(backup_dir)
+
+    for path in existing:
+        try:
+            os.rename(path, os.path.join(backup_dir, os.path.basename(path)))
+        except OSError as e:
+            # A stale file that cannot be moved would be left in place and reused,
+            # silently combining the previous force field's atom types/charges with a
+            # different parameter set. This is a correctness failure, so abort rather
+            # than continue with a partially moved (inconsistent) directory.
+            raise RuntimeError(
+                f'Failed to move stale ligand file {path} to {backup_dir}: {e}. Aborting so the '
+                f'previous "{prepared_forcefield}" parameterization of {molid} is not partially reused '
+                f'with a different ligand force field. Free or remove {path} (or the whole {molid} '
+                f'directory) and rerun.') from e
+    logging.warning(f'Previous "{prepared_forcefield}" parameterization of {molid} was moved to {backup_dir}')
+    return backup_dir
+
+
 def reorder_hydrogens(mol):
     """Move hydrogens to follow their heavy atom in atom order."""
     new_order = []
@@ -130,11 +331,24 @@ def make_all_itp(fileitp_input_list, fileitp_output_list, out_file):
         output.write('\n'.join(start_columns) + '\n')
         output.write('\n'.join(atom_type_uniq) + '\n')
 
-def prepare_tleap(tleap_template, tleap, molid, conda_env_path):
-    """Fill a tleap template with ligand identifiers and environment path."""
+def prepare_tleap(tleap_template, tleap, molid, conda_env_path, ligand_forcefield='gaff'):
+    """Fill a tleap template with ligand identifiers, environment path and force field.
+
+    ``ligand_forcefield`` selects the LEaP parameter library sourced by tleap.
+    Only validated values from :data:`LIGAND_LEAPRC` are inserted into the
+    template (no unrestricted text interpolation).
+    """
+    if ligand_forcefield not in LIGAND_LEAPRC:
+        raise ValueError(f'Unsupported ligand force field: {ligand_forcefield}. '
+                         f'Choose one of: {", ".join(LIGAND_LEAPRC)}')
+    leaprc = LIGAND_LEAPRC[ligand_forcefield]
     with open(tleap_template) as inp:
         data = inp.read()
-    new_data = data.replace('env_path', conda_env_path).replace('ligand', molid)
+    # order matters: substitute the leaprc placeholder before the generic
+    # 'ligand' -> molid replacement so the mapped value is left untouched
+    new_data = (data.replace('env_path', conda_env_path)
+                    .replace('leaprc_ligff', leaprc)
+                    .replace('ligand', molid))
     with open(tleap, 'w') as output:
         output.write(new_data)
 
@@ -161,23 +375,67 @@ def prepare_gaussian_files(file_template, file_out, ncpu, opt_restart=False, gau
 def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
                 conda_env_path, bash_log, gaussian_exe=None,  no_dr=False,
                 activate_gaussian=None, gaussian_basis='B3LYP/6-31G*', gaussian_memory='60GB', ncpu=1,
-                mol2_file=None, env=None):
-    """Prepare force-field parameters and conformers for a single ligand."""
+                mol2_file=None, env=None, ligand_forcefield='gaff'):
+    """Prepare force-field parameters for a single ligand.
+
+    :param ligand_forcefield: AmberTools parameter set (``gaff`` or ``gaff2``)
+        applied to Antechamber atom typing, ``parmchk2`` and LEaP. Charges use
+        AM1-BCC, except boron-containing ligands, which are parameterized via
+        Gaussian using RESP. Default: ``gaff``.
+    """
+    if ligand_forcefield not in LIGAND_LEAPRC:
+        raise ValueError(f'Unsupported ligand force field: {ligand_forcefield}. '
+                         f'Choose one of: {", ".join(LIGAND_LEAPRC)}')
     mol, molid, resid = mol_tuple
 
     wdir_ligand_cur = os.path.abspath(os.path.join(wdir_ligand, molid))
     os.makedirs(wdir_ligand_cur, exist_ok=True)
 
-    if os.path.isfile(os.path.join(wdir_ligand_cur, f'{molid}.itp')) and os.path.isfile(
-            os.path.join(wdir_ligand_cur, f'posre_{molid}.itp')):
+    itp_file = os.path.join(wdir_ligand_cur, f'{molid}.itp')
+    posre_file = os.path.join(wdir_ligand_cur, f'posre_{molid}.itp')
+
+    # Determine the force field of any existing preparation - complete OR partial. The
+    # requested force field is recorded (below) as soon as preparation commits, BEFORE
+    # the heavy Antechamber/tleap steps, so an interrupted run is attributable to its
+    # force field and can be resumed (or correctly rejected on a switch) rather than
+    # guessed at. A missing record therefore means a legacy preparation created before
+    # --ligand_forcefield existed, which was always GAFF.
+    # The record is READ here, before it is (re)written, so a genuine force-field switch
+    # is still detected as a mismatch. This check must run before the completed-output
+    # reuse below, otherwise a stale {molid}.mol2 from an interrupted run would be reused
+    # (Antechamber skipped) and silently combined with a different parmchk2 -s / leaprc set.
+    recorded_forcefield = read_prepared_ligand_forcefield(wdir_ligand_cur)
+    prepared_forcefield = recorded_forcefield or (
+        'gaff' if has_existing_ligand_files(wdir_ligand_cur, molid) else None)
+
+    if prepared_forcefield is not None and prepared_forcefield != ligand_forcefield:
+        # Existing files were built with a different force field. Move them aside so
+        # nothing stale is reused (in particular a mismatched {molid}.mol2 that would
+        # make Antechamber atom typing be skipped), then regenerate from scratch.
         logging.warning(
-            f'{molid}.itp and posre_{molid}.itp files already exist. '
-            f'Mol preparation step will be skipped for such molecule')
+            f'Existing {molid} files were prepared with the "{prepared_forcefield}" ligand force field, but '
+            f'"{ligand_forcefield}" was requested. They will be regenerated with "{ligand_forcefield}" '
+            f'(this re-runs Antechamber atom typing, parmchk2 and LEaP); the previous files are moved to a '
+            f'backup subdirectory.')
+        backup_stale_ligand_files(wdir_ligand_cur, molid, prepared_forcefield)
+    elif os.path.isfile(itp_file) and os.path.isfile(posre_file):
+        # A complete parameterization with a matching force field exists - reuse it.
+        logging.warning(
+            f'{molid}.itp and posre_{molid}.itp files already exist and were prepared with the '
+            f'"{ligand_forcefield}" ligand force field. Mol preparation step will be skipped for such molecule')
         if not os.path.isfile(os.path.join(wdir_ligand_cur, 'resid.txt')):
             with open(os.path.join(wdir_ligand_cur, 'resid.txt'), 'w') as out:
                 out.write(f'{molid}\t{resid}\n')
-
         return wdir_ligand_cur
+    # else: nothing exists yet, or a partial preparation with the SAME force field - fall
+    # through and (re)prepare. A consistent same-force-field {molid}.mol2 left by an
+    # interrupted run may be reused below, which is a safe resume.
+
+    # Record the requested force field now, before the (expensive) Antechamber/tleap
+    # steps. If preparation is interrupted, a later run with the same --ligand_forcefield
+    # resumes from the partial files, while a run with a different force field reads this
+    # value first (above) and backs the partial work up instead of reusing it.
+    write_prepared_ligand_forcefield(wdir_ligand_cur, ligand_forcefield)
 
     if not mol2_file or not os.path.isfile(mol2_file):
         mol2_file = os.path.join(wdir_ligand_cur, f'{molid}.mol2')
@@ -203,6 +461,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
                                                gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory)
                     cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
                           f'resid={resid} molid={molid} charge={charge} gaussian_version={gaussian_exe} ' \
+                          f'ligand_forcefield="{ligand_forcefield}" ' \
                           f'activate_gaussian="{activate_gaussian if activate_gaussian else ""}" ' \
                           f'bash {os.path.join(script_path, "script_sh", "ligand_mol2prep_by_gaussian.sh")} ' \
                           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
@@ -212,7 +471,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
                     return None
             else:
                 cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
-                      f'resid={resid} molid={molid} charge={charge} dr=yes bash {os.path.join(script_path, "script_sh", "ligand_mol2prep.sh")} ' \
+                      f'resid={resid} molid={molid} charge={charge} ligand_forcefield="{ligand_forcefield}" dr=yes bash {os.path.join(script_path, "script_sh", "ligand_mol2prep.sh")} ' \
                       f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
                 if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env,
                                             ignore_error=True if no_dr else False):
@@ -222,7 +481,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
                         logging.warning(f'Ambertools structure checking returned an error for the {mol_file} file.'
                                         f'Check the input structure carefully. Continue with -dr no mode.')
                         cmd = f'script_path={script_path} lfile={mol_file} input_dirname={wdir_ligand_cur} ' \
-                          f'resid={resid} molid={molid} charge={charge} dr=no bash {os.path.join(script_path, "script_sh","ligand_mol2prep.sh")} ' \
+                          f'resid={resid} molid={molid} charge={charge} ligand_forcefield="{ligand_forcefield}" dr=no bash {os.path.join(script_path, "script_sh","ligand_mol2prep.sh")} ' \
                           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1',
                         if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
                             return None
@@ -231,11 +490,22 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
         mol2.residues[0].name = 'UNL'
         mol2.save(os.path.join(wdir_ligand_cur, f'{molid}.mol2'))
         logging.info(f'No mol2 file will be generated. {mol2_file} will be used instead')
+        # Antechamber is skipped for a pre-existing MOL2 input, so its atom types and
+        # partial charges are NOT reassigned. Only parmchk2 (-s) and LEaP (leaprc.*)
+        # use the selected force field; the MOL2 is trusted to already match it.
+        logging.warning(
+            f'The supplied MOL2 file {mol2_file} is used as-is: Antechamber is skipped for '
+            f'pre-existing MOL2 inputs, so its atom types and partial charges are NOT reassigned '
+            f'(AM1-BCC is not applied). They are trusted to already be consistent with the selected '
+            f'ligand force field "{ligand_forcefield}". Only parmchk2 (-s {ligand_forcefield}) and '
+            f'LEaP (source {LIGAND_LEAPRC[ligand_forcefield]}) are applied. If the MOL2 atom types do '
+            f'not correspond to {ligand_forcefield}, provide a .mol/.sdf input instead so that '
+            f'Antechamber can assign {ligand_forcefield} atom types.')
 
     prepare_tleap(os.path.join(script_path, 'tleap.in'), tleap=os.path.join(wdir_ligand_cur, 'tleap.in'),
-                  molid=molid, conda_env_path=conda_env_path)
+                  molid=molid, conda_env_path=conda_env_path, ligand_forcefield=ligand_forcefield)
     cmd = f'script_path={script_path} input_dirname={wdir_ligand_cur} ' \
-          f'molid={molid} bash {os.path.join(script_path, "script_sh","ligand_prep.sh")} ' \
+          f'molid={molid} ligand_forcefield="{ligand_forcefield}" bash {os.path.join(script_path, "script_sh","ligand_prep.sh")} ' \
           f' >> {os.path.join(wdir_ligand_cur, bash_log)} 2>&1'
     if not run_check_subprocess(cmd, molid, log=os.path.join(wdir_ligand_cur, bash_log), env=env):
         return None
@@ -248,7 +518,7 @@ def prep_ligand(mol_tuple, script_path, project_dir, wdir_ligand,
 
 def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_path, project_dir, wdir_ligand,
                           no_dr, gaussian_exe, activate_gaussian, gaussian_basis, gaussian_memory,
-                          hostfile, ncpu, bash_log):
+                          hostfile, ncpu, bash_log, ligand_forcefield='gaff'):
     """Prepare parameterization inputs for multiple ligands.
      :param ligand_fname:
     :param preset_resid:
@@ -261,6 +531,8 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
     :param hostfile:
     :param ncpu:
     :param bash_log:
+    :param ligand_forcefield: AmberTools parameter set (``gaff`` or ``gaff2``)
+        applied to Antechamber atom typing, ``parmchk2`` and LEaP. Default: ``gaff``.
     :return:
     """
     lig_wdirs = []
@@ -271,7 +543,8 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
             project_dir=project_dir, wdir_ligand=wdir_ligand,
             conda_env_path=os.environ["CONDA_PREFIX"],
             ncpu = ncpu, mol2_file = ligand_fname,
-            bash_log=bash_log, env = os.environ.copy())
+            bash_log=bash_log, env = os.environ.copy(),
+            ligand_forcefield=ligand_forcefield)
 
         if res:
             lig_wdirs.append(res)
@@ -300,7 +573,7 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
                                          gaussian_exe=gaussian_exe, activate_gaussian=activate_gaussian,
                                          gaussian_basis=gaussian_basis, gaussian_memory=gaussian_memory,
                                          ncpu=ncpu, bash_log=bash_log, no_dr=no_dr,
-                                         env=os.environ.copy()):
+                                         env=os.environ.copy(), ligand_forcefield=ligand_forcefield):
                         if res:
                             lig_wdirs.append(res)
                 finally:
@@ -324,7 +597,7 @@ def prepare_input_ligands(ligand_fname, preset_resid, protein_resid_set, script_
                                      wdir_ligand=wdir_ligand, no_dr=no_dr,
                                      conda_env_path=os.environ["CONDA_PREFIX"],
                                      ncpu=ncpu, bash_log=bash_log,
-                                     env=os.environ.copy()):
+                                     env=os.environ.copy(), ligand_forcefield=ligand_forcefield):
                     if res:
                         lig_wdirs.append(res)
             finally:

@@ -1,4 +1,4 @@
-source env_path/dat/leap/cmd/leaprc.gaff
+source env_path/dat/leap/cmd/leaprc_ligff
 loadamberparams ligand.frcmod
 LIGAND = loadmol2 ligand.mol2
 check LIGAND

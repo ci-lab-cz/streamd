@@ -133,7 +133,6 @@ def test_last_frame_time_2023_single_progress_line(monkeypatch):
 
 
 def test_last_frame_time_missing_line_raises(monkeypatch):
-    """No 'Last frame' line and no summary table raises a clear error with gmx output."""
     _patch_gmx_check(monkeypatch, stdout=b'Reading frame 0 time 0.000\n')
     with pytest.raises(RuntimeError) as excinfo:
         utils.get_last_frame_time('traj.xtc')

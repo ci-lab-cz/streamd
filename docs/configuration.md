@@ -6,6 +6,7 @@ Example `config.yml` for `run_md`:
 ```yaml
 protein: protein.pdb
 ligand: ligand.mol
+ligand_forcefield: gaff2
 steps: 3 4
 md_time: 2
 box_type: cubic
