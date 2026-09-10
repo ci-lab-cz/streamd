@@ -4,7 +4,7 @@ channels:
   - nodefaults
 dependencies:
   - python=3.11
-  - gromacs=2025.2=nompi_cuda_h7ac747b_0
+  - gromacs=2025.3=nompi_cuda_h7ac747b_0
   - ambertools=24.8
   - rdkit>=2024.09,<2026
   - parmed=4.3.1
