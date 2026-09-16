@@ -3,9 +3,15 @@
 
 ### Python Tests
 
-To install pytest:
+To install the dependencies used by the lightweight CI suite:
 ````
-pip install -U pytest
+python -m pip install -r requirements-ci.txt -e .
+````
+
+Run the lightweight suite (the expensive workflows are opt-in and remain
+disabled unless their ``--run-*`` options are supplied):
+````
+python -m pytest streamd/tests -q
 ````
 
 #### Run tests:  
@@ -47,7 +53,6 @@ All the provided arguments above can be used together to run all tests in 1 pyte
 ````
 pytest streamd/streamd/tests/  --run-preparation --run-analysis --run-gbsa-full --run-prolif-full --run-md
 ````
-
 
 
 

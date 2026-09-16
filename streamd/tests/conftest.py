@@ -94,11 +94,42 @@ _stub_if_missing(
 _stub_if_missing("MDAnalysis.analysis", {"rms": object()})
 
 _stub_if_missing("seaborn", {"set_context": lambda *a, **k: None})
-_stub_if_missing("plotly", {"__path__": []})
-_stub_if_missing("plotly.offline")
-_stub_if_missing("plotly.express")
+class _DummyPlotlyFigure:
+    """No-op Plotly figure used when the optional plotting stack is absent."""
 
-_stub_if_missing("parmed", {"Structure": type("Structure", (), {})})
+    def _return_self(self, *args, **kwargs):
+        return self
+
+    add_hline = _return_self
+    add_vline = _return_self
+    add_shape = _return_self
+    update_annotations = _return_self
+    update_layout = _return_self
+    update_xaxes = _return_self
+    update_yaxes = _return_self
+    for_each_annotation = _return_self
+    for_each_xaxis = _return_self
+    for_each_yaxis = _return_self
+
+
+def _write_dummy_plot(_figure, filename, **_kwargs):
+    with open(filename, "w", encoding="utf-8") as output:
+        output.write("")
+
+
+_stub_if_missing("plotly", {"__path__": []})
+_stub_if_missing("plotly.offline", {"plot": _write_dummy_plot})
+_stub_if_missing("plotly.express", {"scatter": lambda *a, **k: _DummyPlotlyFigure()})
+sys.modules["plotly"].offline = sys.modules["plotly.offline"]
+sys.modules["plotly"].express = sys.modules["plotly.express"]
+
+_stub_if_missing(
+    "parmed",
+    {
+        "Structure": type("Structure", (), {}),
+        "load_file": lambda *a, **k: None,
+    },
+)
 
 Mol = type(
     "Mol",
@@ -117,13 +148,16 @@ _stub_if_missing(
     {
         "Mol": Mol,
         "MolFromMolFile": lambda *a, **k: Mol(),
+        "MolFromSmarts": lambda pattern: pattern,
+        "MolToMolFile": lambda *a, **k: None,
+        "AddHs": lambda mol, **kwargs: mol,
         "SanitizeMol": lambda *a, **k: None,
         "SDMolSupplier": lambda *a, **k: [],
         "PropertyPickleOptions": type("PropertyPickleOptions", (), {"AllProps": 0}),
         "SetDefaultPickleProperties": lambda *a, **k: None,
     },
 )
-_stub_if_missing("rdkit.Chem.rdmolops")
+_stub_if_missing("rdkit.Chem.rdmolops", {"GetFormalCharge": lambda mol: 0})
 
 _stub_if_missing("pandas", {"DataFrame": type("DataFrame", (), {})})
 _stub_if_missing("numpy")
@@ -267,4 +301,3 @@ def dir_with_streamd_output_for_prolif() -> str:
                                          'md_run', pytest.system_name, file_name),
                             os.path.join(dirname, file_name))
         yield dirname
-
