@@ -100,6 +100,9 @@ More examples can be found in the [documentation](https://streamd.readthedocs.io
 ## Documentation
 https://streamd.readthedocs.io/
 
+Maintainers can find the automated PyPI release procedure in
+[docs/releasing.md](docs/releasing.md).
+
 ## Ready-to-use containers (Apptainer)
 Pre-built `.sif` images are available (CPU and GPU) in the [Zenodo record](https://zenodo.org/records/18176058)  
 - CPU image

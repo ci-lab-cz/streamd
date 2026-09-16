@@ -1,0 +1,91 @@
+name: Publish to PyPI
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - streamd/__init__.py
+
+concurrency:
+  group: pypi-publish-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Validate and build ${{ github.sha }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements-ci.txt
+            requirements-release.txt
+
+      - name: Install release dependencies
+        run: python -m pip install -r requirements-release.txt
+
+      - name: Validate version change
+        id: version
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          version="$(python .github/scripts/check_release_version.py --before "$BEFORE_SHA")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Preparing streamd $version"
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Run lightweight tests
+        run: python -m pytest streamd/tests -q
+
+      - name: Build distributions
+        run: python -m build --no-isolation
+
+      - name: Verify distributions
+        run: python -m twine check --strict dist/*
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/streamd
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distributions
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
