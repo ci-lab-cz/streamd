@@ -31,4 +31,47 @@ jobs:
       # Expensive preparation, MD, GBSA, ProLIF, and full-analysis tests are
       # opt-in via --run-* flags and are intentionally not enabled here.
       - name: Run lightweight tests
-        run: python -m pytest streamd/tests -q
+        run: >-
+          python -m pytest streamd/tests -q
+          --cov
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+
+      - name: Store coverage report
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    name: Upload coverage to Codecov
+    if: github.event_name == 'push'
+    needs: lightweight-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository metadata
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v7
+        with:
+          name: coverage-report
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: coverage.xml
+          flags: unittests
+          name: lightweight-tests
+          fail_ci_if_error: true

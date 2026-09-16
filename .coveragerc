@@ -1,0 +1,11 @@
+[run]
+branch = True
+source = streamd
+omit =
+    streamd/tests/*
+
+[report]
+show_missing = True
+
+[xml]
+output = coverage.xml

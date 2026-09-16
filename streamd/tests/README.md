@@ -14,6 +14,11 @@ disabled unless their ``--run-*`` options are supplied):
 python -m pytest streamd/tests -q
 ````
 
+Generate the same branch-coverage report used by CI:
+````
+python -m pytest streamd/tests -q --cov --cov-report=term-missing --cov-report=xml:coverage.xml
+````
+
 #### Run tests:  
 Add the ``--not-cleanup`` argument to ensure that test directories and test files are not removed and can be used for debugging purposes.
 Add the ``-v`` or `-vs` arguments for printing verbose information.
@@ -53,6 +58,5 @@ All the provided arguments above can be used together to run all tests in 1 pyte
 ````
 pytest streamd/streamd/tests/  --run-preparation --run-analysis --run-gbsa-full --run-prolif-full --run-md
 ````
-
 
 
