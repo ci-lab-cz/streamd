@@ -2,6 +2,13 @@
 
 # StreaMD:  a tool to perform high-throughput automated molecular dynamics simulations
 
+[![PyPI](https://img.shields.io/pypi/v/streamd?label=PyPI)](https://pypi.org/project/streamd/)
+[![CI](https://img.shields.io/github/actions/workflow/status/ci-lab-cz/streamd/tests.yml?branch=master&label=CI)](https://github.com/ci-lab-cz/streamd/actions/workflows/tests.yml)
+[![Documentation Status](https://readthedocs.org/projects/streamd/badge/?version=latest)](https://streamd.readthedocs.io/en/latest/)
+[![Apptainer](https://img.shields.io/badge/Apptainer-CPU%20%2B%20GPU-742e90)](https://zenodo.org/records/18176058)
+[![DOI](https://img.shields.io/badge/DOI-10.1186%2Fs13321--024--00918--w-blue)](https://doi.org/10.1186/s13321-024-00918-w)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ci-lab-cz/streamd/blob/master/LICENSE.txt)
+
 StreaMD provides an end-to-end molecular dynamics workflow that takes a PDB structure as input and automatically performs system preparation, equilibration, production and continuation runs, and analysis,
 producing XTC trajectories together with ready-to-use plots and CSV outputs.
 
