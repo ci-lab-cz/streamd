@@ -1,5 +1,11 @@
-**0.6.1 (github)**
-- add argument `ligand_forcefield` - AmberTools parameter set (`gaff` or `gaff2`) for standard organic ligand parameterization (default `gaff`)
+**0.6.1**
+- add `--ligand_forcefield` to select GAFF or GAFF2 for standard organic ligand parameterization; record and inherit the selected force field, regenerate incompatible cached ligand artifacts, and reject incompatible run directories instead of silently mixing parameter sets
+- save each computed ProLIF fingerprint as `plifs.pkl` by default so it can be reused without processing the trajectory again (disable with `--not_save_pkl`)
+- support the `gmx check` output used by GROMACS 2023.x when determining the final trajectory time
+- update the CPU and GPU environment pins to GROMACS 2025.3
+- make source and wheel builds read the package version without importing StreaMD and exclude Python bytecode from distributions
+- add lightweight GitHub Actions tests, coverage reporting, and version-triggered trusted publishing to PyPI
+
 **0.6**
 - add argument `salt_concentration` - salt concentration in mol/L passed to `gmx genion -conc` (default: not set, only charge neutralization is performed)
 - add argument `ion_pname` - positive ion name passed to `gmx genion -pname` (default `NA`)
