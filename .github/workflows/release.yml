@@ -19,6 +19,8 @@ jobs:
     name: Validate and build ${{ github.sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Check out repository history
@@ -89,3 +91,32 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           print-hash: true
+
+  github-release:
+    name: Create GitHub release
+    needs:
+      - build
+      - publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v7
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: >-
+          gh release create "v${VERSION}" dist/*
+          --repo "${GITHUB_REPOSITORY}"
+          --target "${GITHUB_SHA}"
+          --title "StreaMD ${VERSION}"
+          --generate-notes
+          --fail-on-no-commits
